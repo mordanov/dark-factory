@@ -1,0 +1,50 @@
+repos:
+  # ── General ──────────────────────────────────────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-json
+        exclude: tsconfig.*\.json$  # tsconfig files allow comments
+
+  # ── Backend ──────────────────────────────────────────────────────────────
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.4
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^backend/
+      - id: ruff-format
+        files: ^backend/
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.10.0
+    hooks:
+      - id: mypy
+        files: ^backend/src/
+        args: [--ignore-missing-imports]
+        additional_dependencies:
+          - pydantic==2.7.1
+          - sqlalchemy[asyncio]==2.0.30
+          - fastapi==0.111.0
+          - types-python-jose==3.3.4.20240106
+
+  # ── Frontend ─────────────────────────────────────────────────────────────
+  - repo: local
+    hooks:
+      - id: frontend-typecheck
+        name: TypeScript type-check
+        language: system
+        entry: bash -c 'cd frontend && npx tsc --noEmit'
+        pass_filenames: false
+        files: ^frontend/.*\.(ts|tsx)$
+
+      - id: frontend-eslint
+        name: ESLint
+        language: system
+        entry: bash -c 'cd frontend && npx eslint src/ --max-warnings 0'
+        pass_filenames: false
+        files: ^frontend/src/.*\.(ts|tsx)$

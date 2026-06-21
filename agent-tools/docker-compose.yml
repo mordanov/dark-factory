@@ -1,0 +1,21 @@
+services:
+  agent-tools:
+    build: .
+    stdin_open: true
+    tty: false
+    environment:
+      GIT_REPO_PATH: ${GIT_REPO_PATH}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      DISTILLER_BASE_URL: ${DISTILLER_BASE_URL:-http://context-distiller:8001}
+      DISTILLER_TIMEOUT_SECONDS: ${DISTILLER_TIMEOUT_SECONDS:-10}
+      GIT_READ_TIMEOUT_SECONDS: ${GIT_READ_TIMEOUT_SECONDS:-15}
+      SEARCH_MAX_RESULTS: ${SEARCH_MAX_RESULTS:-50}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+    volumes:
+      - ${GIT_REPO_PATH}:${GIT_REPO_PATH}:ro
+    networks:
+      - dark-factory
+
+networks:
+  dark-factory:
+    external: true

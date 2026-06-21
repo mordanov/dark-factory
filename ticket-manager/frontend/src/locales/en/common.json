@@ -1,0 +1,264 @@
+{
+  "app": {
+    "name": "Ticket Manager",
+    "loading": "Loading…"
+  },
+  "auth": {
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign in",
+    "signingIn": "Signing in…",
+    "signOut": "Sign out",
+    "logout": "Log out",
+    "error": {
+      "required": "Email and password are required.",
+      "invalid": "Invalid email or password.",
+      "unexpected": "An unexpected error occurred. Please try again.",
+      "blocked": "Your account has been blocked. Contact an administrator."
+    }
+  },
+  "nav": {
+    "backToProjects": "← Projects",
+    "backToProject": "← Back to project",
+    "projects": "Projects",
+    "admin": "Admin",
+    "openMenu": "Open navigation menu"
+  },
+  "projects": {
+    "title": "Projects",
+    "newProject": "+ New Project",
+    "cancel": "Cancel",
+    "createProject": "Create Project",
+    "creating": "Creating…",
+    "create": "Create",
+    "projectName": "Project name",
+    "code": "Code",
+    "codeFormat": "Format: AAAA-NNN — immutable after creation",
+    "codeTitle": "4 uppercase letters, hyphen, 3 digits (e.g. ABCD-123)",
+    "noProjects": "No projects yet. Create one above.",
+    "loadingProjects": "Loading projects…",
+    "failedToLoad": "Failed to load projects.",
+    "failedToCreate": "Failed to create project.",
+    "createdOn": "Created {{date}}",
+    "tickets": {
+      "open": "Open",
+      "active": "Active",
+      "done": "Done"
+    }
+  },
+  "tickets": {
+    "newTicket": "+ New Ticket",
+    "createTicket": "Create Ticket",
+    "editTicket": "Edit Ticket",
+    "loadingBoard": "Loading board…",
+    "failedToLoad": "Failed to load tickets.",
+    "dropHere": "Drop here",
+    "view": {
+      "list": "☰ List",
+      "board": "⊞ Board"
+    },
+    "form": {
+      "title": "Title",
+      "titleRequired": "Title is required.",
+      "description": "Description",
+      "type": "Type",
+      "spec": "Specification",
+      "specRequired": "Specification is required.",
+      "specPlaceholder": "— select —",
+      "flags": "Flags",
+      "tags": "Tags",
+      "tagsHint": "(optional, up to 10)",
+      "saving": "Saving…",
+      "save": "Save",
+      "cancel": "Cancel",
+      "createTicket": "Create Ticket",
+      "saveChanges": "Save Changes",
+      "createFollowUp": "Create Follow-up",
+      "error": "An unexpected error occurred."
+    },
+    "status": {
+      "OPEN": "Open",
+      "IN_PROGRESS": "In Progress",
+      "IN_REVIEW": "In Review",
+      "DONE": "Done",
+      "CLOSED": "Closed"
+    },
+    "type": {
+      "bug": "Bug",
+      "feature": "Feature",
+      "improvement": "Improvement",
+      "investigation": "Investigation",
+      "discovery": "Discovery",
+      "reporting": "Reporting",
+      "testing": "Testing",
+      "analysis": "Analysis",
+      "other": "Other"
+    },
+    "spec": {
+      "backend": "Backend",
+      "frontend": "Frontend",
+      "architecture": "Architecture",
+      "testing": "Testing",
+      "business_analysis": "Business Analysis",
+      "product_management": "Product Management",
+      "other": "Other"
+    },
+    "flags": {
+      "urgent": "urgent",
+      "blocker": "blocker",
+      "bugfix": "bugfix"
+    },
+    "detail": {
+      "createdBy": "Created by {{email}}",
+      "followUpOf": "Follow-up of",
+      "parentTicket": "parent ticket",
+      "edit": "Edit",
+      "delete": "Delete",
+      "cancelFollowUp": "Cancel Follow-up",
+      "addFollowUp": "+ Follow-up",
+      "tags": "Tags",
+      "assigneesProgress": "Assignees & Progress",
+      "statusTransition": "Status Transition",
+      "activityHistory": "Activity History",
+      "createFollowUp": "Create Follow-up Ticket",
+      "noTransitions": "No further transitions available.",
+      "movingTo": "Moving…",
+      "moveTo": "→ {{status}}",
+      "transitionBlocked": "Waiting on progress updates from:",
+      "updateRequiredForTransition": "You need to submit a progress update before transitioning this ticket.",
+      "deleteConfirm": "Delete this ticket? This cannot be undone.",
+      "deleteError": "Failed to delete ticket.",
+      "deleteConflict": "Cannot delete: this ticket has active follow-up tickets.",
+      "invalidTransition": "Invalid transition. That status move is not permitted.",
+      "notAssignedError": "You must be assigned to this ticket to change its status.",
+      "transitionError": "An unexpected error occurred."
+    },
+    "progress": {
+      "submitUpdate": "Submit your progress update",
+      "placeholder": "Describe your progress…",
+      "submit": "Submit Progress",
+      "submitting": "Submitting…",
+      "failed": "Failed to submit progress update.",
+      "required": "Progress content is required."
+    },
+    "assign": {
+      "assignMe": "+ Assign me",
+      "assignUser": "+ Assign user",
+      "assignTitle": "Assign user",
+      "loadingUsers": "Loading users…",
+      "allAssigned": "All users are already assigned.",
+      "selectUser": "— select a user —",
+      "cancel": "Cancel",
+      "assign": "Assign",
+      "failed": "Failed to assign.",
+      "removeFailed": "Failed to remove assignee.",
+      "userFailed": "Failed to assign user."
+    },
+    "tags": {
+      "failed": "Failed to update tags."
+    },
+    "tagInput": {
+      "placeholder": "Type tag name, press Enter to add…",
+      "maxReached": "Maximum 10 tags reached.",
+      "remove": "Remove \"{{tag}}\""
+    },
+    "events": {
+      "noActivity": "No activity yet.",
+      "by": "by {{email}}",
+      "time": {
+        "justNow": "just now",
+        "minutesAgo_one": "{{count}} minute ago",
+        "minutesAgo_other": "{{count}} minutes ago",
+        "hoursAgo_one": "{{count}} hour ago",
+        "hoursAgo_other": "{{count}} hours ago",
+        "daysAgo_one": "{{count}} day ago",
+        "daysAgo_other": "{{count}} days ago"
+      },
+      "label": {
+        "ticket_created": "Ticket created",
+        "ticket_updated": "Ticket updated",
+        "ticket_deleted": "Ticket deleted",
+        "ticket_assigned": "User assigned",
+        "ticket_unassigned": "User unassigned",
+        "ticket_status_changed": "Status changed",
+        "ticket_progress_updated": "Progress updated",
+        "ticket_transition_blocked": "Transition blocked"
+      }
+    },
+    "loading": "Loading…",
+    "notFound": "Ticket not found."
+  },
+  "filter": {
+    "status": "Status",
+    "allStatuses": "All statuses",
+    "assignee": "Assignee",
+    "allAssignees": "All assignees"
+  },
+  "admin": {
+    "users": {
+      "title": "User Management",
+      "newUser": "+ New User",
+      "loading": "Loading users…",
+      "failed": "Failed to load users.",
+      "empty": "No users found.",
+      "table": {
+        "email": "Email",
+        "role": "Role",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "status": {
+        "active": "Active",
+        "blocked": "Blocked"
+      },
+      "role": {
+        "administrator": "Administrator",
+        "user": "User"
+      },
+      "actions": {
+        "edit": "Edit",
+        "block": "Block",
+        "unblock": "Unblock"
+      },
+      "form": {
+        "createTitle": "Create User",
+        "editTitle": "Edit User",
+        "email": "Email",
+        "emailRequired": "Email is required.",
+        "password": "Password",
+        "passwordHint": "Minimum 8 characters",
+        "passwordRequired": "Password is required (min 8 characters).",
+        "role": "Role",
+        "cancel": "Cancel",
+        "create": "Create",
+        "save": "Save",
+        "creating": "Creating…",
+        "saving": "Saving…"
+      },
+      "errors": {
+        "createFailed": "Failed to create user.",
+        "updateFailed": "Failed to update user.",
+        "blockFailed": "Failed to block user.",
+        "unblockFailed": "Failed to unblock user."
+      }
+    }
+  },
+  "theme": {
+    "label": "Theme",
+    "toggleDark": "Toggle dark mode",
+    "themes": {
+      "light": "Light",
+      "dark": "Dark",
+      "solarized": "Solarized",
+      "oceanic": "Oceanic",
+      "high-contrast": "High Contrast",
+      "warm": "Warm"
+    }
+  },
+  "language": {
+    "label": "Language",
+    "en": "EN",
+    "ru": "RU",
+    "es": "ES"
+  }
+}

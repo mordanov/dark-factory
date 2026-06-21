@@ -1,0 +1,877 @@
+openapi: "3.1.0"
+info:
+  title: Ticket Management System API
+  version: "1.0.0"
+  description: >
+    REST API for tracking software delivery lifecycle progress across projects.
+    All state-changing actions emit immutable timestamped events.
+
+servers:
+  - url: /api/v1
+    description: Version 1
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    UserRole:
+      type: string
+      enum: [administrator, user]
+
+    TicketStatus:
+      type: string
+      enum: [OPEN, IN_PROGRESS, IN_REVIEW, DONE, CLOSED]
+
+    ErrorResponse:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string
+
+    ValidationError:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: array
+          items:
+            type: object
+            properties:
+              loc:
+                type: array
+                items:
+                  type: string
+              msg:
+                type: string
+              type:
+                type: string
+
+    # --- Auth ---
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 1
+
+    TokenResponse:
+      type: object
+      required: [access_token, token_type, expires_in]
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          example: bearer
+        expires_in:
+          type: integer
+          description: Seconds until access token expiry
+          example: 1800
+        refresh_token:
+          type: string
+          description: Opaque token for obtaining a new access token
+
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+
+    # --- Users ---
+
+    UserSummary:
+      type: object
+      required: [id, email, role]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          $ref: "#/components/schemas/UserRole"
+
+    # --- Projects ---
+
+    ProjectSummary:
+      type: object
+      required: [id, name, slug]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+
+    # --- Tickets ---
+
+    TicketCreate:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+        description:
+          type: string
+          nullable: true
+
+    FollowUpTicketCreate:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+        description:
+          type: string
+          nullable: true
+
+    TicketUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+        description:
+          type: string
+          nullable: true
+
+    AssigneeSummary:
+      type: object
+      required: [user_id, email, has_progress_update]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        has_progress_update:
+          type: boolean
+          description: Whether this assignee has submitted a progress update
+
+    TicketResponse:
+      type: object
+      required: [id, project_id, title, status, created_by, created_at, updated_at,
+                 assignees]
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        parent_ticket_id:
+          type: string
+          format: uuid
+          nullable: true
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/TicketStatus"
+        created_by:
+          $ref: "#/components/schemas/UserSummary"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        assignees:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssigneeSummary"
+        follow_up_count:
+          type: integer
+          description: Number of non-deleted follow-up tickets
+
+    TicketListResponse:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TicketResponse"
+        total:
+          type: integer
+
+    # --- Assignments ---
+
+    AssignRequest:
+      type: object
+      required: [user_id]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+
+    AssignmentResponse:
+      type: object
+      required: [ticket_id, user_id, assigned_at]
+      properties:
+        ticket_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        assigned_at:
+          type: string
+          format: date-time
+
+    # --- Progress Updates ---
+
+    ProgressUpdateRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+
+    ProgressUpdateResponse:
+      type: object
+      required: [ticket_id, user_id, content, created_at, updated_at]
+      properties:
+        ticket_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        content:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ProgressListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProgressUpdateResponse"
+
+    # --- Transitions ---
+
+    TransitionRequest:
+      type: object
+      required: [to_status]
+      properties:
+        to_status:
+          $ref: "#/components/schemas/TicketStatus"
+
+    TransitionBlockedError:
+      type: object
+      required: [detail, missing_updates]
+      properties:
+        detail:
+          type: string
+          example: "Transition blocked: not all assignees have submitted progress updates"
+        missing_updates:
+          type: array
+          description: Assignees who have not yet submitted a progress update
+          items:
+            type: object
+            properties:
+              user_id:
+                type: string
+                format: uuid
+              email:
+                type: string
+
+    # --- Events ---
+
+    TicketEventResponse:
+      type: object
+      required: [id, ticket_id, event_type, actor, occurred_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        ticket_id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+          example: ticket.status_changed
+        actor:
+          $ref: "#/components/schemas/UserSummary"
+        prev_state:
+          type: object
+          nullable: true
+        new_state:
+          type: object
+          nullable: true
+        metadata:
+          type: object
+          nullable: true
+        occurred_at:
+          type: string
+          format: date-time
+
+    EventListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TicketEventResponse"
+
+paths:
+
+  # ── Auth ──────────────────────────────────────────────────────────────────
+
+  /auth/login:
+    post:
+      operationId: login
+      summary: Authenticate and obtain tokens
+      security: []
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+
+  /auth/refresh:
+    post:
+      operationId: refreshToken
+      summary: Obtain a new access token using a refresh token
+      security: []
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: New access token issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "401":
+          description: Refresh token invalid or revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      summary: Revoke the current session's refresh token
+      tags: [Auth]
+      responses:
+        "204":
+          description: Session revoked
+        "401":
+          description: Not authenticated
+
+  # ── Projects ──────────────────────────────────────────────────────────────
+
+  /projects:
+    get:
+      operationId: listProjects
+      summary: List all accessible projects
+      tags: [Projects]
+      responses:
+        "200":
+          description: Project list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProjectSummary"
+        "401":
+          description: Not authenticated
+
+  /projects/{project_id}/tickets:
+    get:
+      operationId: listTickets
+      summary: List tickets in a project with optional filters
+      tags: [Tickets]
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/TicketStatus"
+        - name: assignee_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+      responses:
+        "200":
+          description: Paginated ticket list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketListResponse"
+        "401":
+          description: Not authenticated
+        "404":
+          description: Project not found
+
+    post:
+      operationId: createTicket
+      summary: Create a primary ticket in a project
+      tags: [Tickets]
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TicketCreate"
+      responses:
+        "201":
+          description: Ticket created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketResponse"
+        "401":
+          description: Not authenticated
+        "404":
+          description: Project not found
+        "422":
+          description: Validation error
+
+  # ── Ticket CRUD ───────────────────────────────────────────────────────────
+
+  /tickets/{ticket_id}:
+    get:
+      operationId: getTicket
+      summary: Get ticket detail
+      tags: [Tickets]
+      parameters:
+        - name: ticket_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Ticket detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketResponse"
+        "401":
+          description: Not authenticated
+        "404":
+          description: Ticket not found
+
+    patch:
+      operationId: updateTicket
+      summary: Edit ticket title or description (creator only)
+      tags: [Tickets]
+      parameters:
+        - name: ticket_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TicketUpdate"
+      responses:
+        "200":
+          description: Ticket updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketResponse"
+        "401":
+          description: Not authenticated
+        "403":
+          description: Forbidden — not the ticket creator
+        "404":
+          description: Ticket not found
+
+    delete:
+      operationId: deleteTicket
+      summary: Soft-delete a ticket (creator only; blocked if follow-ups exist)
+      tags: [Tickets]
+      parameters:
+        - name: ticket_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Ticket deleted
+        "401":
+          description: Not authenticated
+        "403":
+          description: Forbidden — not the ticket creator
+        "404":
+          description: Ticket not found
+        "409":
+          description: Conflict — ticket has active follow-up tickets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /tickets/{ticket_id}/follow-ups:
+    post:
+      operationId: createFollowUpTicket
+      summary: Create a follow-up ticket linked to an existing ticket
+      tags: [Tickets]
+      parameters:
+        - name: ticket_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FollowUpTicketCreate"
+      responses:
+        "201":
+          description: Follow-up ticket created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketResponse"
+        "401":
+          description: Not authenticated
+        "404":
+          description: Parent ticket not found
+
+  # ── Assignments ───────────────────────────────────────────────────────────
+
+  /tickets/{ticket_id}/assignments:
+    post:
+      operationId: assignUser
+      summary: Assign a user to a ticket
+      tags: [Assignments]
+      parameters:
+        - name: ticket_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignRequest"
+      responses:
+        "201":
+          description: User assigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssignmentResponse"
+        "401":
+          description: Not authenticated
+        "403":
+          description: Forbidden — must be creator, existing assignee, or administrator
+        "404":
+          description: Ticket or user not found
+        "409":
+          description: User already assigned
+
+  /tickets/{ticket_id}/assignments/{user_id}:
+    delete:
+      operationId: unassignUser
+      summary: Remove a user from a ticket
+      tags: [Assignments]
+      parameters:
+        - name: ticket_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: User unassigned
+        "401":
+          description: Not authenticated
+        "403":
+          description: Forbidden
+        "404":
+          description: Assignment not found
+
+  # ── Progress Updates ──────────────────────────────────────────────────────
+
+  /tickets/{ticket_id}/progress:
+    get:
+      operationId: listProgressUpdates
+      summary: List all progress updates for a ticket (one per assignee)
+      tags: [Progress]
+      parameters:
+        - name: ticket_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Progress update list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProgressListResponse"
+        "401":
+          description: Not authenticated
+        "404":
+          description: Ticket not found
+
+    put:
+      operationId: submitProgressUpdate
+      summary: Submit or update the caller's progress record for a ticket
+      tags: [Progress]
+      parameters:
+        - name: ticket_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProgressUpdateRequest"
+      responses:
+        "200":
+          description: Progress update saved (upsert)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProgressUpdateResponse"
+        "401":
+          description: Not authenticated
+        "403":
+          description: Forbidden — caller is not assigned to this ticket
+        "404":
+          description: Ticket not found
+
+  # ── Status Transitions ────────────────────────────────────────────────────
+
+  /tickets/{ticket_id}/transitions:
+    post:
+      operationId: transitionTicket
+      summary: Move a ticket to the next status (assignees only; all progress updates required)
+      tags: [Transitions]
+      parameters:
+        - name: ticket_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransitionRequest"
+      responses:
+        "200":
+          description: Transition successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketResponse"
+        "401":
+          description: Not authenticated
+        "403":
+          description: Forbidden — caller is not assigned to this ticket
+        "404":
+          description: Ticket not found
+        "409":
+          description: Invalid transition (not in allowed workflow)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Transition blocked — not all assignees have submitted progress updates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransitionBlockedError"
+
+  # ── Activity History ──────────────────────────────────────────────────────
+
+  /tickets/{ticket_id}/events:
+    get:
+      operationId: listTicketEvents
+      summary: Get the full chronological activity history for a ticket
+      tags: [Events]
+      parameters:
+        - name: ticket_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+      responses:
+        "200":
+          description: Event history (chronological, oldest first)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventListResponse"
+        "401":
+          description: Not authenticated
+        "404":
+          description: Ticket not found
+
+  # ── Health ────────────────────────────────────────────────────────────────
+
+  /health:
+    get:
+      operationId: health
+      summary: Liveness probe
+      security: []
+      tags: [System]
+      responses:
+        "200":
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /ready:
+    get:
+      operationId: ready
+      summary: Readiness probe (checks database connectivity)
+      security: []
+      tags: [System]
+      responses:
+        "200":
+          description: Service is ready to accept traffic
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ready
+        "503":
+          description: Service not ready (database unreachable)

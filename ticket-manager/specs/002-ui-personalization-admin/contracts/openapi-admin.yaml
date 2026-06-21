@@ -1,0 +1,294 @@
+openapi: "3.1.0"
+info:
+  title: Ticket Management System — Admin & Personalization Extensions
+  version: "1.1.0"
+  description: >
+    New and modified endpoints for feature 002: admin user management,
+    blocked-user enforcement. i18n and theme are frontend-only and have no
+    backend contract. This document extends the base contract in
+    specs/001-ticket-management-system/contracts/openapi.yaml.
+
+servers:
+  - url: /api/v1
+    description: Version 1
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    UserRole:
+      type: string
+      enum: [administrator, user]
+
+    AdminUserResponse:
+      type: object
+      required: [id, email, role, created_at, blocked_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          $ref: "#/components/schemas/UserRole"
+        created_at:
+          type: string
+          format: date-time
+        blocked_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: "null means active; non-null means blocked since that timestamp"
+
+    AdminUserCreate:
+      type: object
+      required: [email, password, role]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          description: Initial password set by admin
+        role:
+          $ref: "#/components/schemas/UserRole"
+
+    AdminUserUpdate:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        role:
+          $ref: "#/components/schemas/UserRole"
+
+    AdminUserListResponse:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminUserResponse"
+        total:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string
+
+paths:
+
+  # ── Admin: User Management ──────────────────────────────────────────────────
+
+  /admin/users:
+    get:
+      summary: List all users (admin only)
+      description: >
+        Returns all users including blocked ones. Only accessible to
+        administrators. Used to populate the admin user management page.
+      operationId: admin_list_users
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Full user list with blocked status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserListResponse"
+        "403":
+          description: Caller is not an administrator
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    post:
+      summary: Create a new user (admin only)
+      description: >
+        Creates a user account with the supplied email, password, and role.
+        Emits an admin audit log entry.
+      operationId: admin_create_user
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUserCreate"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserResponse"
+        "409":
+          description: Email already registered (conflict)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Caller is not an administrator
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Validation error (invalid email or short password)
+
+  /admin/users/{userId}:
+    patch:
+      summary: Edit a user's email or role (admin only)
+      description: >
+        Partial update. Admin cannot edit their own account via this endpoint.
+        Emits an admin audit log entry.
+      operationId: admin_update_user
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUserUpdate"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserResponse"
+        "403":
+          description: Caller is not an administrator, or attempting to edit own account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found
+
+  /admin/users/{userId}/block:
+    post:
+      summary: Block a user (admin only)
+      description: >
+        Sets blocked_at to the current UTC timestamp. Idempotent if already
+        blocked. Admin cannot block themselves. Emits an admin audit log entry.
+        The blocked user's active sessions are not terminated; the block takes
+        effect on their next login attempt.
+      operationId: admin_block_user
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: User is now blocked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserResponse"
+        "403":
+          description: Caller is not an administrator, or attempting to block own account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found
+
+  /admin/users/{userId}/unblock:
+    post:
+      summary: Unblock a user (admin only)
+      description: >
+        Clears blocked_at (sets to NULL). Idempotent if already active.
+        Emits an admin audit log entry.
+      operationId: admin_unblock_user
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: User is now active
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserResponse"
+        "403":
+          description: Caller is not an administrator
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found
+
+  # ── Modified: auth/login — blocked user rejection ──────────────────────────
+
+  /auth/login:
+    post:
+      summary: Authenticate (modified — blocked users rejected)
+      description: >
+        Existing endpoint. This feature adds a new rejection path: if the
+        matching user has a non-null blocked_at, the login is rejected with
+        403 Forbidden regardless of password correctness.
+      operationId: auth_login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        "200":
+          description: Access token issued
+        "401":
+          description: Invalid credentials
+        "403":
+          description: Account is blocked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                detail: "Your account has been blocked. Contact an administrator."

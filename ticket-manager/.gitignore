@@ -1,0 +1,35 @@
+# JetBrains IDEs (PyCharm, IntelliJ IDEA, WebStorm, etc.)
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Visual Studio Code
+.vscode/
+
+# Other editor metadata
+.fleet/
+.zed/
+.history/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Local environment files
+.env
+.env.local
+**/.env
+**/.env.local
+
+# Local OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Agent credential files (per-role, written by project-administrator bootstrap)
+*/credentials.json

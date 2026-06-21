@@ -1,0 +1,260 @@
+{
+  "app": {
+    "name": "Менеджер задач",
+    "loading": "Загрузка…"
+  },
+  "auth": {
+    "email": "Email",
+    "password": "Пароль",
+    "signIn": "Войти",
+    "signingIn": "Вход…",
+    "signOut": "Выйти",
+    "error": {
+      "required": "Введите email и пароль.",
+      "invalid": "Неверный email или пароль.",
+      "unexpected": "Произошла непредвиденная ошибка. Попробуйте снова.",
+      "blocked": "Ваш аккаунт заблокирован. Обратитесь к администратору."
+    }
+  },
+  "nav": {
+    "backToProjects": "← Проекты",
+    "backToProject": "← Назад к проекту",
+    "openMenu": "Открыть меню навигации"
+  },
+  "projects": {
+    "title": "Проекты",
+    "newProject": "+ Новый проект",
+    "cancel": "Отмена",
+    "createProject": "Создать проект",
+    "creating": "Создание…",
+    "create": "Создать",
+    "projectName": "Название проекта",
+    "code": "Код",
+    "codeFormat": "Формат: AAAA-NNN — неизменен после создания",
+    "codeTitle": "4 заглавные буквы, дефис, 3 цифры (например ABCD-123)",
+    "noProjects": "Нет проектов. Создайте первый.",
+    "loadingProjects": "Загрузка проектов…",
+    "failedToLoad": "Не удалось загрузить проекты.",
+    "failedToCreate": "Не удалось создать проект.",
+    "createdOn": "Создан {{date}}",
+    "tickets": {
+      "open": "Открытые",
+      "active": "Активные",
+      "done": "Завершённые"
+    }
+  },
+  "tickets": {
+    "newTicket": "+ Новая задача",
+    "createTicket": "Создать задачу",
+    "editTicket": "Редактировать задачу",
+    "loadingBoard": "Загрузка доски…",
+    "failedToLoad": "Не удалось загрузить задачи.",
+    "dropHere": "Перетащите сюда",
+    "view": {
+      "list": "☰ Список",
+      "board": "⊞ Доска"
+    },
+    "form": {
+      "title": "Заголовок",
+      "titleRequired": "Заголовок обязателен.",
+      "description": "Описание",
+      "type": "Тип",
+      "spec": "Специализация",
+      "specRequired": "Специализация обязательна.",
+      "specPlaceholder": "— выберите —",
+      "flags": "Флаги",
+      "tags": "Теги",
+      "tagsHint": "(необязательно, до 10)",
+      "saving": "Сохранение…",
+      "save": "Сохранить",
+      "cancel": "Отмена",
+      "createTicket": "Создать задачу",
+      "saveChanges": "Сохранить изменения",
+      "createFollowUp": "Создать подзадачу",
+      "error": "Произошла непредвиденная ошибка."
+    },
+    "status": {
+      "OPEN": "Открыта",
+      "IN_PROGRESS": "В работе",
+      "IN_REVIEW": "На проверке",
+      "DONE": "Готово",
+      "CLOSED": "Закрыта"
+    },
+    "type": {
+      "bug": "Баг",
+      "feature": "Фича",
+      "improvement": "Улучшение",
+      "investigation": "Исследование",
+      "discovery": "Открытие",
+      "reporting": "Отчётность",
+      "testing": "Тестирование",
+      "analysis": "Анализ",
+      "other": "Прочее"
+    },
+    "spec": {
+      "backend": "Бэкенд",
+      "frontend": "Фронтенд",
+      "architecture": "Архитектура",
+      "testing": "Тестирование",
+      "business_analysis": "Бизнес-анализ",
+      "product_management": "Продуктовый менеджмент",
+      "other": "Прочее"
+    },
+    "flags": {
+      "urgent": "срочно",
+      "blocker": "блокер",
+      "bugfix": "исправление"
+    },
+    "detail": {
+      "createdBy": "Создал {{email}}",
+      "followUpOf": "Подзадача для",
+      "parentTicket": "родительской задачи",
+      "edit": "Редактировать",
+      "delete": "Удалить",
+      "cancelFollowUp": "Отмена подзадачи",
+      "addFollowUp": "+ Подзадача",
+      "tags": "Теги",
+      "assigneesProgress": "Исполнители и прогресс",
+      "statusTransition": "Смена статуса",
+      "activityHistory": "История активности",
+      "createFollowUp": "Создать подзадачу",
+      "noTransitions": "Дальнейшие переходы недоступны.",
+      "movingTo": "Перемещение…",
+      "moveTo": "→ {{status}}",
+      "transitionBlocked": "Ожидание обновлений прогресса от:",
+      "updateRequiredForTransition": "Необходимо отправить обновление прогресса перед сменой статуса.",
+      "deleteConfirm": "Удалить эту задачу? Это действие необратимо.",
+      "deleteError": "Не удалось удалить задачу.",
+      "deleteConflict": "Нельзя удалить: у задачи есть активные подзадачи.",
+      "invalidTransition": "Недопустимый переход. Этот статус недоступен.",
+      "notAssignedError": "Вы должны быть назначены на задачу для смены статуса.",
+      "transitionError": "Произошла непредвиденная ошибка."
+    },
+    "progress": {
+      "submitUpdate": "Отправить обновление прогресса",
+      "placeholder": "Опишите ваш прогресс…",
+      "submit": "Отправить прогресс",
+      "submitting": "Отправка…",
+      "failed": "Не удалось отправить обновление прогресса.",
+      "required": "Содержание обновления обязательно."
+    },
+    "assign": {
+      "assignMe": "+ Назначить меня",
+      "assignUser": "+ Назначить пользователя",
+      "assignTitle": "Назначить пользователя",
+      "loadingUsers": "Загрузка пользователей…",
+      "allAssigned": "Все пользователи уже назначены.",
+      "selectUser": "— выберите пользователя —",
+      "cancel": "Отмена",
+      "assign": "Назначить",
+      "failed": "Не удалось назначить.",
+      "removeFailed": "Не удалось удалить исполнителя.",
+      "userFailed": "Не удалось назначить пользователя."
+    },
+    "tags": {
+      "failed": "Не удалось обновить теги."
+    },
+    "tagInput": {
+      "placeholder": "Введите название тега, нажмите Enter для добавления…",
+      "maxReached": "Достигнут максимум 10 тегов.",
+      "remove": "Удалить \"{{tag}}\""
+    },
+    "events": {
+      "noActivity": "Активности пока нет.",
+      "by": "от {{email}}",
+      "time": {
+        "justNow": "только что",
+        "minutesAgo_one": "{{count}} минуту назад",
+        "minutesAgo_other": "{{count}} минут назад",
+        "hoursAgo_one": "{{count}} час назад",
+        "hoursAgo_other": "{{count}} часов назад",
+        "daysAgo_one": "{{count}} день назад",
+        "daysAgo_other": "{{count}} дней назад"
+      },
+      "label": {
+        "ticket_created": "Задача создана",
+        "ticket_updated": "Задача обновлена",
+        "ticket_deleted": "Задача удалена",
+        "ticket_assigned": "Пользователь назначен",
+        "ticket_unassigned": "Пользователь снят",
+        "ticket_status_changed": "Статус изменён",
+        "ticket_progress_updated": "Прогресс обновлён",
+        "ticket_transition_blocked": "Переход заблокирован"
+      }
+    },
+    "loading": "Загрузка…",
+    "notFound": "Задача не найдена."
+  },
+  "filter": {
+    "status": "Статус",
+    "allStatuses": "Все статусы",
+    "assignee": "Исполнитель",
+    "allAssignees": "Все исполнители"
+  },
+  "admin": {
+    "users": {
+      "title": "Управление пользователями",
+      "newUser": "+ Новый пользователь",
+      "loading": "Загрузка пользователей…",
+      "failed": "Не удалось загрузить пользователей.",
+      "empty": "Пользователи не найдены.",
+      "table": {
+        "email": "Email",
+        "role": "Роль",
+        "status": "Статус",
+        "actions": "Действия"
+      },
+      "status": {
+        "active": "Активен",
+        "blocked": "Заблокирован"
+      },
+      "role": {
+        "administrator": "Администратор",
+        "user": "Пользователь"
+      },
+      "actions": {
+        "edit": "Редактировать",
+        "block": "Заблокировать",
+        "unblock": "Разблокировать"
+      },
+      "form": {
+        "createTitle": "Создать пользователя",
+        "editTitle": "Редактировать пользователя",
+        "email": "Email",
+        "emailRequired": "Email обязателен.",
+        "password": "Пароль",
+        "passwordHint": "Минимум 8 символов",
+        "passwordRequired": "Пароль обязателен (минимум 8 символов).",
+        "role": "Роль",
+        "cancel": "Отмена",
+        "create": "Создать",
+        "save": "Сохранить",
+        "creating": "Создание…",
+        "saving": "Сохранение…"
+      },
+      "errors": {
+        "createFailed": "Не удалось создать пользователя.",
+        "updateFailed": "Не удалось обновить пользователя.",
+        "blockFailed": "Не удалось заблокировать пользователя.",
+        "unblockFailed": "Не удалось разблокировать пользователя."
+      }
+    }
+  },
+  "theme": {
+    "label": "Тема",
+    "themes": {
+      "light": "Светлая",
+      "dark": "Тёмная",
+      "solarized": "Solarized",
+      "oceanic": "Океаническая",
+      "high-contrast": "Высокий контраст",
+      "warm": "Тёплая"
+    }
+  },
+  "language": {
+    "label": "Язык",
+    "en": "EN",
+    "ru": "RU",
+    "es": "ES"
+  }
+}

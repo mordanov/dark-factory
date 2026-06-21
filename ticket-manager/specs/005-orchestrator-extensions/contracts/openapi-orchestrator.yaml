@@ -1,0 +1,677 @@
+openapi: "3.1.0"
+info:
+  title: Ticket Manager — Orchestrator Integration API
+  description: >
+    New endpoints added to support the Workflow Orchestrator polling model.
+    All endpoints are under /api/v1/ prefix and use the same Bearer JWT
+    authentication as the rest of the Ticket Manager API.
+  version: "1.0.0"
+
+servers:
+  - url: /api/v1
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    FsmStatus:
+      type: string
+      enum:
+        - backlog
+        - triage
+        - specification
+        - architecture_review
+        - implementation
+        - code_review
+        - security_review
+        - testing
+        - release
+        - done
+        - BLOCKED
+
+    FsmPatchRequest:
+      type: object
+      description: Partial update of FSM fields only. All fields optional.
+      properties:
+        fsm_status:
+          $ref: "#/components/schemas/FsmStatus"
+          nullable: true
+        blocked_reason:
+          type: string
+          nullable: true
+          description: Set to null to clear. Required when fsm_status is BLOCKED.
+        brainstorm_round:
+          type: integer
+          minimum: 0
+        assigned_agent:
+          type: string
+          nullable: true
+        override_reason:
+          type: string
+          nullable: true
+        last_orchestrator_run:
+          type: string
+          format: date-time
+          nullable: true
+        orchestrator_errors:
+          type: array
+          items:
+            type: string
+          nullable: true
+
+    FsmFields:
+      type: object
+      properties:
+        fsm_status:
+          $ref: "#/components/schemas/FsmStatus"
+          nullable: true
+        blocked_reason:
+          type: string
+          nullable: true
+        brainstorm_round:
+          type: integer
+          default: 0
+        assigned_agent:
+          type: string
+          nullable: true
+        override:
+          type: boolean
+          default: false
+        override_reason:
+          type: string
+          nullable: true
+        last_orchestrator_run:
+          type: string
+          format: date-time
+          nullable: true
+        orchestrator_errors:
+          type: array
+          items:
+            type: string
+          nullable: true
+
+    TicketSummary:
+      type: object
+      required: [id, project_id, title, description, ticket_type, tags, status,
+                 brainstorm_round, dependencies, follow_ups, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        ticket_type:
+          type: string
+          enum: [feature, bugfix, improvement, investigation, discovery,
+                 reporting, testing, analysis, other]
+        tags:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          description: Native TM status (OPEN/IN_PROGRESS/IN_REVIEW/DONE/CLOSED)
+        fsm_status:
+          $ref: "#/components/schemas/FsmStatus"
+          nullable: true
+        blocked_reason:
+          type: string
+          nullable: true
+        brainstorm_round:
+          type: integer
+        assigned_agent:
+          type: string
+          nullable: true
+        last_orchestrator_run:
+          type: string
+          format: date-time
+          nullable: true
+        dependencies:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: IDs of tickets this ticket depends on (parent_ticket_id chain)
+        follow_ups:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: IDs of direct follow-up tickets
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PendingTicketsResponse:
+      type: object
+      required: [tickets, total_pending]
+      properties:
+        tickets:
+          type: array
+          items:
+            $ref: "#/components/schemas/TicketSummary"
+        next_cursor:
+          type: string
+          nullable: true
+          description: Opaque cursor for next page. Absent when no more results.
+        total_pending:
+          type: integer
+          description: Total count of pending tickets matching the query.
+
+    AuditEventCreate:
+      type: object
+      required: [event, actor]
+      properties:
+        event:
+          type: string
+          maxLength: 50
+          description: "e.g. ADVANCE, BLOCK, ASSIGN, WAIT"
+        actor:
+          type: string
+          maxLength: 255
+          description: "Service identifier, e.g. 'orchestrator'"
+        from_state:
+          type: string
+          nullable: true
+        to_state:
+          type: string
+          nullable: true
+        details:
+          type: string
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+          description: Defaults to server now() if not provided.
+
+    AuditEventResponse:
+      type: object
+      required: [id, ticket_id, event, actor, timestamp]
+      properties:
+        id:
+          type: string
+          format: uuid
+        ticket_id:
+          type: string
+          format: uuid
+        event:
+          type: string
+        actor:
+          type: string
+        from_state:
+          type: string
+          nullable: true
+        to_state:
+          type: string
+          nullable: true
+        details:
+          type: string
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+
+    AuditLogResponse:
+      type: object
+      required: [entries]
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEventResponse"
+
+    OverrideRequest:
+      type: object
+      required: [override]
+      properties:
+        override:
+          type: boolean
+        override_reason:
+          type: string
+          description: Required when override is true.
+
+    TagDeltaRequest:
+      type: object
+      properties:
+        add:
+          type: array
+          items:
+            type: string
+          default: []
+        remove:
+          type: array
+          items:
+            type: string
+          default: []
+
+    TagDeltaResponse:
+      type: object
+      required: [tags]
+      properties:
+        tags:
+          type: array
+          items:
+            type: string
+
+    BatchFsmStatusRequest:
+      type: object
+      required: [ticket_ids]
+      properties:
+        ticket_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 100
+
+    BatchFsmStatusEntry:
+      type: object
+      required: [fsm_status, title]
+      properties:
+        fsm_status:
+          $ref: "#/components/schemas/FsmStatus"
+          nullable: true
+        title:
+          type: string
+        blocked_reason:
+          type: string
+          nullable: true
+
+    BatchFsmStatusResponse:
+      type: object
+      description: Map of ticket_id (UUID string) to status entry.
+      additionalProperties:
+        $ref: "#/components/schemas/BatchFsmStatusEntry"
+
+    ErrorResponse:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string
+
+paths:
+  /projects/{project_id}/tickets/{ticket_id}/fsm:
+    patch:
+      summary: Update FSM fields on a ticket
+      description: >
+        Updates only the FSM fields of a ticket. Native TM fields (title, description,
+        status) are never modified by this endpoint.
+        Restricted to the Dark Factory service account or an administrator.
+      operationId: patchTicketFsm
+      tags: [Orchestrator]
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: ticket_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FsmPatchRequest"
+      responses:
+        "200":
+          description: Updated ticket (full representation including FSM fields)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/TicketSummary"
+                  - $ref: "#/components/schemas/FsmFields"
+        "400":
+          description: Invalid field values
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Caller is not the service account or an administrator
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Ticket or project not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects/{project_id}/tickets/{ticket_id}/full:
+    get:
+      summary: Get a ticket with all FSM fields
+      description: Returns the complete ticket object including all orchestrator FSM fields.
+      operationId: getTicketFull
+      tags: [Orchestrator]
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: ticket_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Full ticket with FSM fields
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/TicketSummary"
+                  - $ref: "#/components/schemas/FsmFields"
+        "404":
+          description: Ticket or project not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects/{project_id}/tickets/{ticket_id}/override:
+    post:
+      summary: Set gate override for a ticket
+      description: >
+        Allows an administrator to override a failed quality gate for a single
+        polling cycle. The override flag is reset by the orchestrator after processing.
+        Restricted to administrator role.
+      operationId: overrideTicketGate
+      tags: [Orchestrator]
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: ticket_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OverrideRequest"
+      responses:
+        "200":
+          description: Updated ticket
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/TicketSummary"
+                  - $ref: "#/components/schemas/FsmFields"
+        "403":
+          description: Caller does not have administrator role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Ticket or project not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects/{project_id}/tickets/{ticket_id}/tags/delta:
+    post:
+      summary: Add and/or remove tags atomically
+      description: >
+        Applies a tag delta in a single atomic operation. Adding a tag that already
+        exists and removing a tag that does not exist are both silently idempotent.
+      operationId: applyTagDelta
+      tags: [Tickets]
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: ticket_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TagDeltaRequest"
+      responses:
+        "200":
+          description: Current tag list after delta applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TagDeltaResponse"
+        "404":
+          description: Ticket or project not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /orchestrator/pending:
+    get:
+      summary: Get tickets pending orchestrator processing
+      description: >
+        Returns tickets where fsm_status != 'done' AND (last_orchestrator_run IS NULL
+        OR updated_at > last_orchestrator_run). Results are ordered by (updated_at ASC, id ASC)
+        and paginated via keyset cursor.
+      operationId: getOrchestratorPending
+      tags: [Orchestrator]
+      parameters:
+        - name: project_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Filter by project
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: after_cursor
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Opaque pagination cursor from previous response
+      responses:
+        "200":
+          description: Pending tickets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PendingTicketsResponse"
+
+  /tickets/{ticket_id}/audit:
+    post:
+      summary: Record an orchestrator audit event
+      description: Appends an immutable audit event to the ticket's orchestrator log.
+      operationId: createAuditEvent
+      tags: [Orchestrator]
+      parameters:
+        - name: ticket_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuditEventCreate"
+      responses:
+        "201":
+          description: Audit event created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [audit_entry_id]
+                properties:
+                  audit_entry_id:
+                    type: string
+                    format: uuid
+        "404":
+          description: Ticket not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    get:
+      summary: Get orchestrator audit log for a ticket
+      description: Returns all orchestrator audit events for the ticket in chronological order.
+      operationId: getAuditLog
+      tags: [Orchestrator]
+      parameters:
+        - name: ticket_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogResponse"
+        "404":
+          description: Ticket not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /tickets/batch-fsm-status:
+    post:
+      summary: Batch FSM status lookup
+      description: >
+        Returns FSM status and title for a list of ticket IDs.
+        Unknown IDs are silently omitted from the response.
+      operationId: batchFsmStatus
+      tags: [Orchestrator]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchFsmStatusRequest"
+      responses:
+        "200":
+          description: Map of ticket_id to FSM status entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchFsmStatusResponse"
+
+  /projects/{project_id}/tickets:
+    get:
+      summary: List tickets (extended with optional FSM fields)
+      description: >
+        Existing endpoint. When include_fsm=true, each ticket in the response
+        additionally includes all FSM fields. Default behavior (include_fsm=false
+        or absent) is unchanged.
+      operationId: listTickets
+      tags: [Projects]
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: assignee_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - name: include_fsm
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: When true, includes all FSM fields on each ticket
+      responses:
+        "200":
+          description: Ticket list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TicketSummary"
+                  total:
+                    type: integer

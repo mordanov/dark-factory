@@ -1,0 +1,143 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  pre-commit:
+    name: pre-commit (lint, format, type-check)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Cache pre-commit environments
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+          restore-keys: pre-commit-
+
+      - name: Install pre-commit
+        run: pip install pre-commit
+
+      - name: Run pre-commit on all files
+        run: pre-commit run --all-files
+
+  backend:
+    name: Backend — test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ticket_manager_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('backend/pyproject.toml') }}
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run migrations
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ticket_manager_test
+          SECRET_KEY: ci-secret-key-not-used-in-production
+          REFRESH_TOKEN_SECRET: ci-refresh-secret-not-used-in-production
+          ENVIRONMENT: test
+          LOG_LEVEL: WARNING
+          TICKET_MANAGER_SERVICE_EMAIL: orchestrator@ci.internal
+        run: alembic upgrade head
+
+      - name: Tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ticket_manager_test
+          SECRET_KEY: ci-secret-key-not-used-in-production
+          REFRESH_TOKEN_SECRET: ci-refresh-secret-not-used-in-production
+          ENVIRONMENT: test
+          LOG_LEVEL: WARNING
+          TICKET_MANAGER_SERVICE_EMAIL: orchestrator@ci.internal
+        run: pytest tests/integration/ tests/contract/ -v --tb=short
+
+      - name: Dependency audit (pip-audit)
+        run: |
+          pip install --upgrade pip
+          pip install pip-audit
+          pip-audit --skip-editable \
+            --ignore-vuln PYSEC-2025-185 \
+            --ignore-vuln CVE-2025-54121 \
+            --ignore-vuln PYSEC-2026-161
+
+  frontend:
+    name: Frontend — test, build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test (vitest)
+        run: npm run test:run
+
+      - name: Build (vite)
+        env:
+          VITE_API_BASE_URL: http://localhost:8000
+        run: npm run build

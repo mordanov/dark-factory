@@ -1,0 +1,260 @@
+{
+  "app": {
+    "name": "Gestor de Tickets",
+    "loading": "Cargando…"
+  },
+  "auth": {
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "signIn": "Iniciar sesión",
+    "signingIn": "Iniciando sesión…",
+    "signOut": "Cerrar sesión",
+    "error": {
+      "required": "El correo y la contraseña son obligatorios.",
+      "invalid": "Correo o contraseña incorrectos.",
+      "unexpected": "Ocurrió un error inesperado. Inténtalo de nuevo.",
+      "blocked": "Tu cuenta ha sido bloqueada. Contacta al administrador."
+    }
+  },
+  "nav": {
+    "backToProjects": "← Proyectos",
+    "backToProject": "← Volver al proyecto",
+    "openMenu": "Abrir menú de navegación"
+  },
+  "projects": {
+    "title": "Proyectos",
+    "newProject": "+ Nuevo proyecto",
+    "cancel": "Cancelar",
+    "createProject": "Crear proyecto",
+    "creating": "Creando…",
+    "create": "Crear",
+    "projectName": "Nombre del proyecto",
+    "code": "Código",
+    "codeFormat": "Formato: AAAA-NNN — inmutable tras la creación",
+    "codeTitle": "4 letras mayúsculas, guión, 3 dígitos (ej. ABCD-123)",
+    "noProjects": "Sin proyectos. Crea el primero.",
+    "loadingProjects": "Cargando proyectos…",
+    "failedToLoad": "Error al cargar proyectos.",
+    "failedToCreate": "Error al crear el proyecto.",
+    "createdOn": "Creado el {{date}}",
+    "tickets": {
+      "open": "Abiertos",
+      "active": "Activos",
+      "done": "Terminados"
+    }
+  },
+  "tickets": {
+    "newTicket": "+ Nuevo ticket",
+    "createTicket": "Crear ticket",
+    "editTicket": "Editar ticket",
+    "loadingBoard": "Cargando tablero…",
+    "failedToLoad": "Error al cargar tickets.",
+    "dropHere": "Suelta aquí",
+    "view": {
+      "list": "☰ Lista",
+      "board": "⊞ Tablero"
+    },
+    "form": {
+      "title": "Título",
+      "titleRequired": "El título es obligatorio.",
+      "description": "Descripción",
+      "type": "Tipo",
+      "spec": "Especificación",
+      "specRequired": "La especificación es obligatoria.",
+      "specPlaceholder": "— seleccionar —",
+      "flags": "Indicadores",
+      "tags": "Etiquetas",
+      "tagsHint": "(opcional, hasta 10)",
+      "saving": "Guardando…",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "createTicket": "Crear ticket",
+      "saveChanges": "Guardar cambios",
+      "createFollowUp": "Crear seguimiento",
+      "error": "Ocurrió un error inesperado."
+    },
+    "status": {
+      "OPEN": "Abierto",
+      "IN_PROGRESS": "En progreso",
+      "IN_REVIEW": "En revisión",
+      "DONE": "Listo",
+      "CLOSED": "Cerrado"
+    },
+    "type": {
+      "bug": "Error",
+      "feature": "Funcionalidad",
+      "improvement": "Mejora",
+      "investigation": "Investigación",
+      "discovery": "Descubrimiento",
+      "reporting": "Reporte",
+      "testing": "Pruebas",
+      "analysis": "Análisis",
+      "other": "Otro"
+    },
+    "spec": {
+      "backend": "Backend",
+      "frontend": "Frontend",
+      "architecture": "Arquitectura",
+      "testing": "Pruebas",
+      "business_analysis": "Análisis de negocio",
+      "product_management": "Gestión de producto",
+      "other": "Otro"
+    },
+    "flags": {
+      "urgent": "urgente",
+      "blocker": "bloqueador",
+      "bugfix": "corrección"
+    },
+    "detail": {
+      "createdBy": "Creado por {{email}}",
+      "followUpOf": "Seguimiento de",
+      "parentTicket": "ticket padre",
+      "edit": "Editar",
+      "delete": "Eliminar",
+      "cancelFollowUp": "Cancelar seguimiento",
+      "addFollowUp": "+ Seguimiento",
+      "tags": "Etiquetas",
+      "assigneesProgress": "Asignados y progreso",
+      "statusTransition": "Cambio de estado",
+      "activityHistory": "Historial de actividad",
+      "createFollowUp": "Crear ticket de seguimiento",
+      "noTransitions": "No hay más transiciones disponibles.",
+      "movingTo": "Moviendo…",
+      "moveTo": "→ {{status}}",
+      "transitionBlocked": "Esperando actualizaciones de progreso de:",
+      "updateRequiredForTransition": "Debes enviar una actualización de progreso antes de cambiar el estado.",
+      "deleteConfirm": "¿Eliminar este ticket? Esta acción no se puede deshacer.",
+      "deleteError": "Error al eliminar el ticket.",
+      "deleteConflict": "No se puede eliminar: el ticket tiene tickets de seguimiento activos.",
+      "invalidTransition": "Transición inválida. Este cambio de estado no está permitido.",
+      "notAssignedError": "Debes estar asignado a este ticket para cambiar su estado.",
+      "transitionError": "Ocurrió un error inesperado."
+    },
+    "progress": {
+      "submitUpdate": "Enviar actualización de progreso",
+      "placeholder": "Describe tu progreso…",
+      "submit": "Enviar progreso",
+      "submitting": "Enviando…",
+      "failed": "Error al enviar la actualización de progreso.",
+      "required": "El contenido del progreso es obligatorio."
+    },
+    "assign": {
+      "assignMe": "+ Asignarme",
+      "assignUser": "+ Asignar usuario",
+      "assignTitle": "Asignar usuario",
+      "loadingUsers": "Cargando usuarios…",
+      "allAssigned": "Todos los usuarios ya están asignados.",
+      "selectUser": "— seleccionar usuario —",
+      "cancel": "Cancelar",
+      "assign": "Asignar",
+      "failed": "Error al asignar.",
+      "removeFailed": "Error al eliminar al asignado.",
+      "userFailed": "Error al asignar al usuario."
+    },
+    "tags": {
+      "failed": "Error al actualizar las etiquetas."
+    },
+    "tagInput": {
+      "placeholder": "Escriba el nombre de la etiqueta, Enter para agregar…",
+      "maxReached": "Se alcanzó el máximo de 10 etiquetas.",
+      "remove": "Eliminar \"{{tag}}\""
+    },
+    "events": {
+      "noActivity": "Sin actividad aún.",
+      "by": "por {{email}}",
+      "time": {
+        "justNow": "justo ahora",
+        "minutesAgo_one": "hace {{count}} minuto",
+        "minutesAgo_other": "hace {{count}} minutos",
+        "hoursAgo_one": "hace {{count}} hora",
+        "hoursAgo_other": "hace {{count}} horas",
+        "daysAgo_one": "hace {{count}} día",
+        "daysAgo_other": "hace {{count}} días"
+      },
+      "label": {
+        "ticket_created": "Ticket creado",
+        "ticket_updated": "Ticket actualizado",
+        "ticket_deleted": "Ticket eliminado",
+        "ticket_assigned": "Usuario asignado",
+        "ticket_unassigned": "Usuario desasignado",
+        "ticket_status_changed": "Estado cambiado",
+        "ticket_progress_updated": "Progreso actualizado",
+        "ticket_transition_blocked": "Transición bloqueada"
+      }
+    },
+    "loading": "Cargando…",
+    "notFound": "Ticket no encontrado."
+  },
+  "filter": {
+    "status": "Estado",
+    "allStatuses": "Todos los estados",
+    "assignee": "Asignado",
+    "allAssignees": "Todos los asignados"
+  },
+  "admin": {
+    "users": {
+      "title": "Gestión de usuarios",
+      "newUser": "+ Nuevo usuario",
+      "loading": "Cargando usuarios…",
+      "failed": "Error al cargar usuarios.",
+      "empty": "No se encontraron usuarios.",
+      "table": {
+        "email": "Correo",
+        "role": "Rol",
+        "status": "Estado",
+        "actions": "Acciones"
+      },
+      "status": {
+        "active": "Activo",
+        "blocked": "Bloqueado"
+      },
+      "role": {
+        "administrator": "Administrador",
+        "user": "Usuario"
+      },
+      "actions": {
+        "edit": "Editar",
+        "block": "Bloquear",
+        "unblock": "Desbloquear"
+      },
+      "form": {
+        "createTitle": "Crear usuario",
+        "editTitle": "Editar usuario",
+        "email": "Correo electrónico",
+        "emailRequired": "El correo es obligatorio.",
+        "password": "Contraseña",
+        "passwordHint": "Mínimo 8 caracteres",
+        "passwordRequired": "La contraseña es obligatoria (mínimo 8 caracteres).",
+        "role": "Rol",
+        "cancel": "Cancelar",
+        "create": "Crear",
+        "save": "Guardar",
+        "creating": "Creando…",
+        "saving": "Guardando…"
+      },
+      "errors": {
+        "createFailed": "Error al crear el usuario.",
+        "updateFailed": "Error al actualizar el usuario.",
+        "blockFailed": "Error al bloquear al usuario.",
+        "unblockFailed": "Error al desbloquear al usuario."
+      }
+    }
+  },
+  "theme": {
+    "label": "Tema",
+    "themes": {
+      "light": "Claro",
+      "dark": "Oscuro",
+      "solarized": "Solarized",
+      "oceanic": "Oceánico",
+      "high-contrast": "Alto contraste",
+      "warm": "Cálido"
+    }
+  },
+  "language": {
+    "label": "Idioma",
+    "en": "EN",
+    "ru": "RU",
+    "es": "ES"
+  }
+}

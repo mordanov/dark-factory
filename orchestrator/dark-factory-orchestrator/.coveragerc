@@ -1,0 +1,9 @@
+[run]
+source = src
+omit =
+    src/main.py
+    alembic/*
+
+[report]
+fail_under = 80
+show_missing = true
