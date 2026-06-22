@@ -288,7 +288,7 @@ Product work is done when:
 
 Interact with Ticket Manager only through endpoints documented in `documentation/api-endpoints-agent-playbook.md`.
 
-Use Ticket Manager connection details provisioned by `project-administrator` in `product-manager/credentials.json`.
+Use Ticket Manager connection details provisioned by `project-administrator` in `credentials.json`.
 
 ### Credential format
 
@@ -309,7 +309,7 @@ After joining brainstorm, wait for `project-administrator` to broadcast `payload
 ### Step 2 - Read credentials and build base URL
 
 ```bash
-CRED_FILE="product-manager/credentials.json"
+CRED_FILE="credentials.json"
 test -f "$CRED_FILE" || { echo "Missing $CRED_FILE" >&2; exit 1; }
 
 TM_HOST=$(jq -r '.host' "$CRED_FILE")

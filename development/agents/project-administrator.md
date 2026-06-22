@@ -80,7 +80,7 @@ For this project, treat `specs/001-monorepo-unification/spec.md` as the feature 
   - tokens spent on the task
   - model used
 - Record optional notes when values are estimated or disputed.
-- Store all events in the local SQLite database using `project-administrator/agent_metrics.py`.
+- Store all events in the local SQLite database using `agent_metrics.py`.
 - Treat missing tokens, zero-time entries, reconstructed entries, and non-completed task statuses as follow-up gaps until reconciled.
 
 ### Periodic Reconciliation
@@ -113,7 +113,7 @@ Run this bootstrap sequence once at the start of each agent run, before metrics 
 
 ### Prerequisites
 
-- `project-administrator/credentials.json` must exist with Ticket Manager connection and admin credentials in this shape:
+- `credentials.json` must exist with Ticket Manager connection and admin credentials in this shape:
 
 ```json
 {
@@ -123,8 +123,8 @@ Run this bootstrap sequence once at the start of each agent run, before metrics 
 }
 ```
 
-- If the file is missing, halt immediately with: `ERROR: project-administrator/credentials.json not found. Place admin credentials before running.`
-- See `project-administrator/credentials.json.example` for the expected format.
+- If the file is missing, halt immediately with: `ERROR: credentials.json not found. Place admin credentials before running.`
+- See `credentials.json.example` for the expected format.
 
 ### Bootstrap Sequence
 
@@ -133,9 +133,9 @@ Run this bootstrap sequence once at the start of each agent run, before metrics 
 Extract connection settings first:
 
 ```bash
-TM_HOST=$(jq -r '.host' project-administrator/credentials.json)
-TM_USER=$(jq -r '.username' project-administrator/credentials.json)
-TM_PASSWORD=$(jq -r '.password' project-administrator/credentials.json)
+TM_HOST=$(jq -r '.host' credentials.json)
+TM_USER=$(jq -r '.username' credentials.json)
+TM_PASSWORD=$(jq -r '.password' credentials.json)
 TM_BASE_URL="$TM_HOST"
 ```
 
@@ -163,8 +163,8 @@ Build a map of `email → user_id` from the response.
 For each role in `[product-manager, software-architect, security-architect, frontend, designer, backend, devops, code-reviewer, autotester]`:
 
 - Target email: `{role}@agents.local`
-- Target credentials file: `{role}/credentials.json`
-- Explicitly provision `designer@agents.local` and write `designer/credentials.json` during bootstrap.
+- Target credentials file: `../{role}/credentials.json`
+- Explicitly provision `designer@agents.local` and write `../designer/credentials.json` during bootstrap.
 
 **Case A — Account does not exist in the user map:**
 
@@ -181,15 +181,15 @@ curl -s -X POST "$TM_BASE_URL/api/v1/admin/users" \
   -d '{"email": "{role}@agents.local", "password": "<password>", "role": "user"}'
 
 # Write credentials file
-echo '{"host": "'"$TM_HOST"'", "username": "{role}@agents.local", "password": "<password>"}' > {role}/credentials.json
+echo '{"host": "'"$TM_HOST"'", "username": "{role}@agents.local", "password": "<password>"}' > ../{role}/credentials.json
 ```
 
-**Case B — Account exists and `{role}/credentials.json` exists and is valid:**
+**Case B — Account exists and `../{role}/credentials.json` exists and is valid:**
 
 Attempt login with stored credentials:
 
 ```bash
-ROLE_PASSWORD=$(jq -r '.password' {role}/credentials.json)
+ROLE_PASSWORD=$(jq -r '.password' ../{role}/credentials.json)
 curl -s -X POST "$TM_BASE_URL/api/v1/auth/token" \
   -H "Content-Type: application/json" \
   -d "{\"email\":\"{role}@agents.local\",\"password\":\"$ROLE_PASSWORD\"}"
@@ -206,14 +206,14 @@ curl -s -X PATCH "$TM_BASE_URL/api/v1/admin/users/<user_id>" \
   -d '{"password": "<new_password>"}'
 
 # Update credentials file
-echo '{"host": "'"$TM_HOST"'", "username": "{role}@agents.local", "password": "<new_password>"}' > {role}/credentials.json
+echo '{"host": "'"$TM_HOST"'", "username": "{role}@agents.local", "password": "<new_password>"}' > ../{role}/credentials.json
 ```
 
-**Case C — Account exists but `{role}/credentials.json` is missing:**
+**Case C — Account exists but `../{role}/credentials.json` is missing:**
 
 - Generate a new password.
 - Reset password through `PATCH /api/v1/admin/users/{user_id}`.
-- Create `{role}/credentials.json` with `host`, `username`, and `password`.
+- Create `../{role}/credentials.json` with `host`, `username`, and `password`.
 
 **Step 4 — Signal bootstrap complete via brainstorm-mcp**
 
@@ -240,7 +240,7 @@ Replace placeholders with the value from `TM_HOST` so all agents can resolve the
 
 - Never log or print passwords.
 - Credential files (`*/credentials.json`) are gitignored — verify with `git status` before committing.
-- The example file `project-administrator/credentials.json.example` is committed; the actual `credentials.json` is not.
+- The example file `credentials.json.example` is committed; the actual `credentials.json` is not.
 
 ## Ticket Manager Ticket Operations
 
@@ -249,7 +249,7 @@ Project Administrator can also manage tickets directly when coordination or reco
 ### Read connection settings
 
 ```bash
-CRED_FILE="project-administrator/credentials.json"
+CRED_FILE="credentials.json"
 TM_HOST=$(jq -r '.host' "$CRED_FILE")
 TM_USER=$(jq -r '.username' "$CRED_FILE")
 TM_PASSWORD=$(jq -r '.password' "$CRED_FILE")

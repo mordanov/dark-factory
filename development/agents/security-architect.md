@@ -283,7 +283,7 @@ Security architecture work is done only when:
 
 All API work must use endpoints from `documentation/api-endpoints-agent-playbook.md` only.
 
-Use Ticket Manager connection details provisioned by `project-administrator` in `security-architect/credentials.json`.
+Use Ticket Manager connection details provisioned by `project-administrator` in `credentials.json`.
 
 ### Credential format
 
@@ -304,7 +304,7 @@ After joining brainstorm, wait for `project-administrator` to broadcast `payload
 ### Step 2 - Read credentials and build base URL
 
 ```bash
-CRED_FILE="security-architect/credentials.json"
+CRED_FILE="credentials.json"
 test -f "$CRED_FILE" || { echo "Missing $CRED_FILE" >&2; exit 1; }
 
 TM_HOST=$(jq -r '.host' "$CRED_FILE")
