@@ -174,14 +174,15 @@ password = secrets.token_urlsafe(18)  # 24-character URL-safe password
 ```
 
 ```bash
-# Create the user
-curl -s -X POST "$TM_BASE_URL/api/v1/admin/users" \
+# Create the user and capture the new user_id
+USER_RESP=$(curl -s -X POST "$TM_BASE_URL/api/v1/admin/users" \
   -H "Authorization: Bearer <jwt>" \
   -H "Content-Type: application/json" \
-  -d '{"email": "{role}@agents.local", "password": "<password>", "role": "user"}'
+  -d '{"email": "{role}@agents.local", "password": "<password>", "role": "user"}')
+USER_ID=$(echo "$USER_RESP" | jq -r '.id')
 
-# Write credentials file
-echo '{"host": "'"$TM_HOST"'", "username": "{role}@agents.local", "password": "<password>"}' > ../{role}/credentials.json
+# Write credentials file including user_id (agents use it for ticket assignment)
+echo '{"host": "'"$TM_HOST"'", "username": "{role}@agents.local", "password": "<password>", "user_id": "'"$USER_ID"'"}' > ../{role}/credentials.json
 ```
 
 **Case B — Account exists and `../{role}/credentials.json` exists and is valid:**
@@ -205,17 +206,47 @@ curl -s -X PATCH "$TM_BASE_URL/api/v1/admin/users/<user_id>" \
   -H "Content-Type: application/json" \
   -d '{"password": "<new_password>"}'
 
-# Update credentials file
-echo '{"host": "'"$TM_HOST"'", "username": "{role}@agents.local", "password": "<new_password>"}' > ../{role}/credentials.json
+# Update credentials file (USER_ID comes from the email→user_id map built in Step 2)
+echo '{"host": "'"$TM_HOST"'", "username": "{role}@agents.local", "password": "<new_password>", "user_id": "<user_id>"}' > ../{role}/credentials.json
 ```
 
 **Case C — Account exists but `../{role}/credentials.json` is missing:**
 
 - Generate a new password.
 - Reset password through `PATCH /api/v1/admin/users/{user_id}`.
-- Create `../{role}/credentials.json` with `host`, `username`, and `password`.
+- Create `../{role}/credentials.json` with `host`, `username`, `password`, and `user_id` (from the email→user_id map built in Step 2).
 
-**Step 4 — Signal bootstrap complete via brainstorm-mcp**
+**Step 4 — Create TM project for this feature run**
+
+Create a Ticket Manager project scoped to the active feature. For `001-monorepo-unification` use code `MONO-001` (format: 4 uppercase letters, hyphen, 3 digits):
+
+```bash
+FEATURE_NAME="001-monorepo-unification"
+FEATURE_CODE="MONO-001"
+
+PROJECT_RESP=$(curl -s -X POST "$TM_BASE_URL/api/v1/projects" \
+  -H "Authorization: Bearer <jwt>" \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"$FEATURE_NAME\",\"code\":\"$FEATURE_CODE\"}")
+
+TM_PROJECT_ID=$(echo "$PROJECT_RESP" | jq -r '.id // empty')
+```
+
+If the response is `400` (code already exists), find the existing project:
+
+```bash
+TM_PROJECT_ID=$(curl -s "$TM_BASE_URL/api/v1/projects" \
+  -H "Authorization: Bearer <jwt>" \
+  | jq -r '.[] | select(.code == "'"$FEATURE_CODE"'") | .id')
+```
+
+Save the project ID locally for all subsequent ticket operations:
+
+```bash
+echo "{\"project_id\":\"$TM_PROJECT_ID\",\"feature\":\"$FEATURE_NAME\"}" > tm_project.json
+```
+
+**Step 5 — Signal bootstrap complete via brainstorm-mcp**
 
 After all credential files are written, broadcast the completion signal before proceeding to metrics collection:
 
@@ -228,6 +259,7 @@ mcp__brainstorm__send_message(
   payload={
     "type": "bootstrap-complete",
     "host": "<ticket-manager-host>",
+    "tm_project_id": "<TM_PROJECT_ID>",
     "roles": ["product-manager", "software-architect", "security-architect",
                "frontend", "designer", "backend", "devops", "code-reviewer", "autotester"]
   }
@@ -254,6 +286,7 @@ TM_HOST=$(jq -r '.host' "$CRED_FILE")
 TM_USER=$(jq -r '.username' "$CRED_FILE")
 TM_PASSWORD=$(jq -r '.password' "$CRED_FILE")
 TM_BASE_URL="$TM_HOST"
+TM_PROJECT_ID=$(jq -r '.project_id' tm_project.json)
 
 TOKEN=$(curl -s -X POST "$TM_BASE_URL/api/v1/auth/token" \
   -H "Content-Type: application/json" \
@@ -264,7 +297,7 @@ TOKEN=$(curl -s -X POST "$TM_BASE_URL/api/v1/auth/token" \
 ### Create a ticket
 
 ```bash
-curl -s -X POST "$TM_BASE_URL/api/v1/projects/<project_id>/tickets" \
+curl -s -X POST "$TM_BASE_URL/api/v1/projects/$TM_PROJECT_ID/tickets" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{

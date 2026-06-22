@@ -149,9 +149,15 @@ Each agent credential file must include host, username, and password:
 }
 ```
 
-### Step 1 - Wait for bootstrap signal
+### Step 1 - Wait for bootstrap signal and record project context
 
-After joining brainstorm, wait for `project-administrator` to broadcast `payload.type == "bootstrap-complete"` before calling Ticket Manager.
+After joining brainstorm, wait for `project-administrator` to broadcast `payload.type == "bootstrap-complete"`. Extract and save the TM project ID from the payload before calling Ticket Manager:
+
+```bash
+# From the bootstrap-complete payload:
+TM_PROJECT_ID="<value of payload.tm_project_id>"
+echo "{\"project_id\":\"$TM_PROJECT_ID\"}" > tm_project.json
+```
 
 ### Step 2 - Read credentials and build base URL
 
@@ -169,7 +175,7 @@ for v in TM_HOST TM_USER TM_PASSWORD; do
 done
 ```
 
-### Step 3 - Obtain JWT
+### Step 3 - Obtain JWT and load context
 
 ```bash
 TOKEN=$(curl -s -X POST "$TM_BASE_URL/api/v1/auth/token" \
@@ -178,57 +184,113 @@ TOKEN=$(curl -s -X POST "$TM_BASE_URL/api/v1/auth/token" \
   | jq -r '.access_token')
 
 [ -n "$TOKEN" ] && [ "$TOKEN" != "null" ] || { echo "Token request failed" >&2; exit 1; }
+
+MY_USER_ID=$(jq -r '.user_id' credentials.json)
+TM_PROJECT_ID=$(jq -r '.project_id' tm_project.json)
 ```
 
-### Step 4 - Create, update, and transition tickets
+### Step 4 - Check for assigned tickets on startup
 
-Use `Authorization: Bearer $TOKEN` on every request.
-
-#### Create a ticket
+Immediately after authenticating, check for tickets already assigned to you in the project:
 
 ```bash
-curl -s -X POST "$TM_BASE_URL/api/v1/projects/<project_id>/tickets" \
+ASSIGNED_TICKETS=$(curl -s "$TM_BASE_URL/api/v1/projects/$TM_PROJECT_ID/tickets?assignee_id=$MY_USER_ID" \
+  -H "Authorization: Bearer $TOKEN")
+```
+
+For each ticket in the response:
+- `OPEN` or `IN_PROGRESS`: resume this work before starting new tasks. Transition `OPEN` to `IN_PROGRESS` before working:
+  ```bash
+  curl -s -X POST "$TM_BASE_URL/api/v1/tickets/$TICKET_ID/transitions" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{"to_status":"IN_PROGRESS"}'
+  ```
+- `IN_REVIEW`: verify your progress update is submitted; no further action unless the ticket is returned to `IN_PROGRESS`.
+- `DONE` or `CLOSED`: no action needed.
+
+### Step 5 - Per-task ticket workflow
+
+Follow this sequence for every task you work on.
+
+#### A. Find or create a ticket
+
+Search open tickets in the project for one matching your task title or keywords:
+
+```bash
+OPEN_TICKETS=$(curl -s "$TM_BASE_URL/api/v1/projects/$TM_PROJECT_ID/tickets?status=OPEN" \
+  -H "Authorization: Bearer $TOKEN")
+TICKET_ID=$(echo "$OPEN_TICKETS" | jq -r '[.[] | select(.title | ascii_downcase | contains("<keyword>"))][0].id // empty')
+```
+
+If no matching ticket is found, create one:
+
+```bash
+TICKET_RESP=$(curl -s -X POST "$TM_BASE_URL/api/v1/projects/$TM_PROJECT_ID/tickets" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "title": "<task-title>",
-    "description": "<task-description>",
-    "ticket_type": "task",
-    "ticket_spec": "devops",
+    "title": "<task title>",
+    "description": "<task description>",
+    "ticket_type": "feature",
+    "ticket_spec": "other",
     "tags": ["agent-work", "devops"]
-  }'
+  }')
+TICKET_ID=$(echo "$TICKET_RESP" | jq -r '.id')
 ```
 
-#### Update a ticket (progress update)
+#### B. Assign yourself and transition to IN_PROGRESS
 
 ```bash
-curl -s -X PUT "$TM_BASE_URL/api/v1/tickets/<ticket_id>/progress" \
+curl -s -X POST "$TM_BASE_URL/api/v1/tickets/$TICKET_ID/assignments" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"content":"CI/CD validation complete and evidence attached."}'
+  -d "{\"user_id\":\"$MY_USER_ID\"}"
+
+curl -s -X POST "$TM_BASE_URL/api/v1/tickets/$TICKET_ID/transitions" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"to_status":"IN_PROGRESS"}'
 ```
 
-#### Transition a ticket
+#### C. Write progress during work
+
+Submit or update your progress as work proceeds. Required before any status transition:
 
 ```bash
-curl -s -X POST "$TM_BASE_URL/api/v1/tickets/<ticket_id>/transitions" \
+curl -s -X PUT "$TM_BASE_URL/api/v1/tickets/$TICKET_ID/progress" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"content":"<what you have done so far>"}'
+```
+
+#### D. Complete the ticket
+
+Write a final progress update, report resources, and transition to `IN_REVIEW`:
+
+```bash
+# Final progress update
+curl -s -X PUT "$TM_BASE_URL/api/v1/tickets/$TICKET_ID/progress" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"content":"<complete summary of work done>"}'
+
+# Report time and tokens consumed
+curl -s -X POST "$TM_BASE_URL/api/v1/tickets/$TICKET_ID/resources" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"time_spent_delta":<seconds>,"tokens_consumed_delta":<tokens>}'
+
+# Transition to IN_REVIEW
+curl -s -X POST "$TM_BASE_URL/api/v1/tickets/$TICKET_ID/transitions" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"to_status":"IN_REVIEW"}'
 ```
 
-Only assignees may transition tickets. Valid statuses: `OPEN`, `IN_PROGRESS`, `IN_REVIEW`, `DONE`, `CLOSED`.
+If the transition returns `422` (missing progress update), submit step C first then retry.
 
-#### Report ticket resource usage after completion
-
-```bash
-curl -s -X POST "$TM_BASE_URL/api/v1/tickets/<ticket_id>/resources" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"time_spent_delta":300,"tokens_consumed_delta":1500}'
-```
-
-If any request returns `401`, re-authenticate by repeating Step 3.
+If any request returns `401`, re-authenticate via Step 3.
 
 ---
 
