@@ -1,0 +1,76 @@
+version: "3.9"
+
+services:
+  # ─── PostgreSQL (job queue + memory metadata) ────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: df_distiller
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal
+
+  # ─── MongoDB (distilled memory documents) ────────────────────────────────
+  mongo:
+    image: mongo:7-jammy
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+  # ─── Context Distiller Service ────────────────────────────────────────────
+  context-distiller:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8004:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/df_distiller
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB_NAME: ${MONGO_DB_NAME:-df_distiller_docs}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      AUTH_MODE: ${AUTH_MODE:-local}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      TICKET_MANAGER_BASE_URL: ${TICKET_MANAGER_BASE_URL:-https://ticket-manager.dark-factory.miveralta.ru}
+      TICKET_MANAGER_SERVICE_EMAIL: ${TICKET_MANAGER_SERVICE_EMAIL:-}
+      TICKET_MANAGER_SERVICE_PASSWORD: ${TICKET_MANAGER_SERVICE_PASSWORD:-}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - internal
+
+volumes:
+  postgres_data:
+  mongo_data:
+
+networks:
+  internal:
+    driver: bridge

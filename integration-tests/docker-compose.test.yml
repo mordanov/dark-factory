@@ -1,0 +1,184 @@
+version: "3.9"
+
+# Self-contained test environment for Dark Factory integration tests.
+# All LLM calls intercepted by the llm-mock service.
+# User provisioning done via seed SQL — conftest.py does NOT call registration APIs.
+
+services:
+  # ─── Databases ────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_test
+      POSTGRES_DB: postgres
+    volumes:
+      - ./seed/01_create_test_databases.sql:/docker-entrypoint-initdb.d/01_create_test_databases.sql:ro
+      - ./seed/02_seed_test_users.sql:/docker-entrypoint-initdb.d/02_seed_test_users.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - test-internal
+
+  mongo:
+    image: mongo:7-jammy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    networks:
+      - test-internal
+
+  # ─── LLM Mock ─────────────────────────────────────────────────────────────
+  llm-mock:
+    build:
+      context: ./llm-mock
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:11434/health')\" || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 6
+    networks:
+      - test-internal
+
+  # ─── user-input-manager backend ───────────────────────────────────────────
+  user-input-manager:
+    build:
+      context: ../services/user-input-manager/backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://uim_test:uim_test_password@postgres:5432/df_user_input_test
+      # JWT_SECRET_KEY is shared with orchestrator: orchestrator validates UIM-issued tokens
+      JWT_SECRET_KEY: test-secret-key-user-input-manager-32chars
+      OPENAI_API_KEY: test-invalid-key
+      OPENAI_BASE_URL: http://llm-mock:11434/v1
+      ORCHESTRATOR_BASE_URL: http://orchestrator:8000
+      TICKET_MANAGER_BASE_URL: http://ticket-manager:8000
+      TICKET_MANAGER_SERVICE_EMAIL: service@example.com
+      TICKET_MANAGER_SERVICE_PASSWORD: service_password_test
+      AUTH_MODE: local
+      ENVIRONMENT: test
+      INITIAL_ADMIN_EMAIL: admin@uim.example.com
+      INITIAL_ADMIN_PASSWORD: AdminPass123!
+    depends_on:
+      postgres:
+        condition: service_healthy
+      llm-mock:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')\" || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - test-internal
+
+  # ─── ticket-manager backend ───────────────────────────────────────────────
+  ticket-manager:
+    build:
+      context: ../services/ticket-manager/backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tm_test:tm_test_password@postgres:5432/df_ticket_manager_test
+      SECRET_KEY: test-secret-key-ticket-manager-32-characters-long
+      REFRESH_TOKEN_SECRET: test-refresh-secret-ticket-manager-32chars!
+      DEFAULT_ADMIN_EMAIL: admin@tm.example.com
+      DEFAULT_ADMIN_PASSWORD: AdminPass123!
+      DEFAULT_USER_EMAIL: user@tm.example.com
+      DEFAULT_USER_PASSWORD: UserPass123!
+      AUTH_MODE: local
+      ENVIRONMENT: test
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')\" || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - test-internal
+
+  # ─── orchestrator ─────────────────────────────────────────────────────────
+  orchestrator:
+    build:
+      context: ../services/orchestrator
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://orch_test:orch_test_password@postgres:5432/df_orchestrator_test
+      DATABASE_URL_SYNC: postgresql://orch_test:orch_test_password@postgres:5432/df_orchestrator_test
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB_NAME: df_orchestrator_docs_test
+      # JWT_SECRET_KEY matches UIM — orchestrator validates UIM-issued tokens (known cross-service trust coupling)
+      JWT_SECRET_KEY: test-secret-key-user-input-manager-32chars
+      OPENAI_API_KEY: test-invalid-key
+      OPENAI_BASE_URL: http://llm-mock:11434/v1
+      TICKET_MANAGER_BASE_URL: http://ticket-manager:8000
+      TICKET_MANAGER_SERVICE_EMAIL: service@example.com
+      TICKET_MANAGER_SERVICE_PASSWORD: service_password_test
+      AUTH_MODE: local
+      ENVIRONMENT: test
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      ticket-manager:
+        condition: service_healthy
+      llm-mock:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')\" || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - test-internal
+
+  # ─── context-distiller ────────────────────────────────────────────────────
+  context-distiller:
+    build:
+      context: ../services/context-distiller
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://distiller_test:distiller_test_password@postgres:5432/df_distiller_test
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB_NAME: df_distiller_docs_test
+      # JWT_SECRET_KEY matches UIM — context-distiller validates UIM-issued tokens (known cross-service trust coupling)
+      JWT_SECRET_KEY: test-secret-key-user-input-manager-32chars
+      OPENAI_API_KEY: test-invalid-key
+      OPENAI_BASE_URL: http://llm-mock:11434/v1
+      TICKET_MANAGER_BASE_URL: http://ticket-manager:8000
+      AUTH_MODE: local
+      ENVIRONMENT: test
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      llm-mock:
+        condition: service_healthy
+    healthcheck:
+      # context-distiller health endpoint is /health
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')\" || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - test-internal
+
+networks:
+  test-internal:
+    driver: bridge

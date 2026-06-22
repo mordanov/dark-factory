@@ -1,0 +1,33 @@
+# Dev override — exposes service ports on host for local development.
+# Usage: docker compose -f infra/docker-compose.yml -f infra/docker-compose.override.yml up
+# Or: place this file as docker-compose.override.yml next to docker-compose.yml
+# (Docker Compose auto-merges override.yml when present in same directory)
+
+services:
+  user-input-manager:
+    ports:
+      - "8001:8000"
+
+  ticket-manager:
+    ports:
+      - "8002:8000"
+
+  orchestrator:
+    ports:
+      - "8003:8000"
+
+  context-distiller:
+    ports:
+      - "8004:8000"
+
+  agent-tools:
+    ports:
+      - "8005:8000"
+
+  postgres:
+    ports:
+      - "5432:5432"
+
+  mongo:
+    ports:
+      - "27017:27017"

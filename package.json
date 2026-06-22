@@ -1,0 +1,23 @@
+{
+  "name": "dark-factory",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical frontend dependency versions for Dark Factory services. Not a workspace root — each service manages its own node_modules.",
+  "comment": "Pin all services to these exact versions.",
+  "canonicalVersions": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-router-dom": "6.28.0",
+    "react-i18next": "14.1.2",
+    "zustand": "5.0.2",
+    "axios": "1.7.9",
+    "typescript": "5.7.2",
+    "vite": "6.0.3",
+    "vitest": "2.1.8",
+    "@vitest/coverage-v8": "2.1.8",
+    "@vitejs/plugin-react": "4.3.4",
+    "@testing-library/react": "16.1.0",
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1"
+  }
+}

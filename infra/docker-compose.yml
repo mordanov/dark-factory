@@ -1,0 +1,277 @@
+# Unified Dark Factory platform compose.
+# Usage:
+#   cp infra/.env.example infra/.env  # fill credentials
+#   docker compose -f infra/docker-compose.yml up --build
+# All healthchecks must pass within 60 seconds on pre-pulled images.
+
+services:
+
+  # ─── Databases ─────────────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      # Per-service DB credentials — used by 01_create_databases.sql on first boot
+      UIM_DB_USER: ${UIM_DB_USER:?UIM_DB_USER is required}
+      UIM_DB_PASSWORD: ${UIM_DB_PASSWORD:?UIM_DB_PASSWORD is required}
+      TM_DB_USER: ${TM_DB_USER:?TM_DB_USER is required}
+      TM_DB_PASSWORD: ${TM_DB_PASSWORD:?TM_DB_PASSWORD is required}
+      ORCH_DB_USER: ${ORCH_DB_USER:?ORCH_DB_USER is required}
+      ORCH_DB_PASSWORD: ${ORCH_DB_PASSWORD:?ORCH_DB_PASSWORD is required}
+      DISTILLER_DB_USER: ${DISTILLER_DB_USER:?DISTILLER_DB_USER is required}
+      DISTILLER_DB_PASSWORD: ${DISTILLER_DB_PASSWORD:?DISTILLER_DB_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      - internal
+
+  mongo:
+    image: mongo:7-jammy
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    networks:
+      - internal
+
+  # ─── Backend Services ───────────────────────────────────────────────────────
+
+  user-input-manager:
+    build:
+      context: ../services/user-input-manager/backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${UIM_DB_USER:?UIM_DB_USER is required}:${UIM_DB_PASSWORD:?UIM_DB_PASSWORD is required}@postgres:5432/df_user_input
+      JWT_SECRET_KEY: ${UIM_SECRET_KEY:?UIM_SECRET_KEY is required}
+      AUTH_MODE: ${UIM_AUTH_MODE:-local}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      TICKET_MANAGER_BASE_URL: ${UIM_TM_URL:-http://ticket-manager:8000}
+      TICKET_MANAGER_SERVICE_EMAIL: ${TM_SERVICE_EMAIL:-}
+      TICKET_MANAGER_SERVICE_PASSWORD: ${TM_SERVICE_PASSWORD:-}
+      INITIAL_ADMIN_EMAIL: ${UIM_ADMIN_EMAIL:-admin@dark-factory.local}
+      INITIAL_ADMIN_PASSWORD: ${UIM_ADMIN_PASSWORD:-ChangeMe123!}
+      CORS_ALLOW_ORIGINS: '["http://localhost","http://${UIM_HOST:-localhost}"]'
+      ENVIRONMENT: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    expose:
+      - "8000"
+    networks:
+      - internal
+
+  ticket-manager:
+    build:
+      context: ../services/ticket-manager/backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${TM_DB_USER:?TM_DB_USER is required}:${TM_DB_PASSWORD:?TM_DB_PASSWORD is required}@postgres:5432/df_ticket_manager
+      # TM config.py uses field 'secret_key' (pydantic maps to env var SECRET_KEY)
+      SECRET_KEY: ${TM_SECRET_KEY:?TM_SECRET_KEY is required}
+      REFRESH_TOKEN_SECRET: ${TM_REFRESH_SECRET:?TM_REFRESH_SECRET is required}
+      DEFAULT_ADMIN_EMAIL: ${TM_ADMIN_EMAIL:-admin@dark-factory.local}
+      DEFAULT_ADMIN_PASSWORD: ${TM_ADMIN_PASSWORD:-ChangeMe123!}
+      DEFAULT_USER_EMAIL: ${TM_USER_EMAIL:-user@dark-factory.local}
+      DEFAULT_USER_PASSWORD: ${TM_USER_PASSWORD:-ChangeMe123!}
+      AUTH_MODE: ${TM_AUTH_MODE:-local}
+      CORS_ALLOW_ORIGINS: '["http://localhost","http://${TM_HOST:-localhost}"]'
+      ENVIRONMENT: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    expose:
+      - "8000"
+    networks:
+      - internal
+
+  orchestrator:
+    build:
+      context: ../services/orchestrator
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${ORCH_DB_USER:?ORCH_DB_USER is required}:${ORCH_DB_PASSWORD:?ORCH_DB_PASSWORD is required}@postgres:5432/df_orchestrator
+      DATABASE_URL_SYNC: postgresql://${ORCH_DB_USER:?ORCH_DB_USER is required}:${ORCH_DB_PASSWORD:?ORCH_DB_PASSWORD is required}@postgres:5432/df_orchestrator
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB_NAME: ${ORCH_MONGO_DB:-df_orchestrator_docs}
+      JWT_SECRET_KEY: ${ORCH_SECRET_KEY:?ORCH_SECRET_KEY is required}
+      AUTH_MODE: ${ORCH_AUTH_MODE:-local}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      TICKET_MANAGER_BASE_URL: http://ticket-manager:8000
+      TICKET_MANAGER_SERVICE_EMAIL: ${TM_SERVICE_EMAIL:-}
+      TICKET_MANAGER_SERVICE_PASSWORD: ${TM_SERVICE_PASSWORD:-}
+      CORS_ALLOW_ORIGINS: '["http://localhost"]'
+      ENVIRONMENT: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    expose:
+      - "8000"
+    networks:
+      - internal
+
+  context-distiller:
+    build:
+      context: ../services/context-distiller
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DISTILLER_DB_USER:?DISTILLER_DB_USER is required}:${DISTILLER_DB_PASSWORD:?DISTILLER_DB_PASSWORD is required}@postgres:5432/df_distiller
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB_NAME: ${DISTILLER_MONGO_DB:-df_distiller_docs}
+      JWT_SECRET_KEY: ${DISTILLER_SECRET_KEY:?DISTILLER_SECRET_KEY is required}
+      AUTH_MODE: ${DISTILLER_AUTH_MODE:-local}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      TICKET_MANAGER_BASE_URL: http://ticket-manager:8000
+      TICKET_MANAGER_SERVICE_EMAIL: ${TM_SERVICE_EMAIL:-}
+      TICKET_MANAGER_SERVICE_PASSWORD: ${TM_SERVICE_PASSWORD:-}
+      CORS_ALLOW_ORIGINS: '["http://localhost"]'
+      ENVIRONMENT: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    expose:
+      - "8000"
+    networks:
+      - internal
+
+  agent-tools:
+    build:
+      context: ../services/agent-tools
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      AUTH_MODE: ${AGENT_TOOLS_AUTH_MODE:-local}
+      JWT_SECRET_KEY: ${AGENT_TOOLS_SECRET_KEY:?AGENT_TOOLS_SECRET_KEY is required}
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    expose:
+      - "8000"
+    networks:
+      - internal
+
+  # ─── Frontend Services ──────────────────────────────────────────────────────
+
+  uim-frontend:
+    build:
+      context: ../services/user-input-manager/frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    expose:
+      - "80"
+    networks:
+      - internal
+
+  tm-frontend:
+    build:
+      context: ../services/ticket-manager/frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    expose:
+      - "80"
+    networks:
+      - internal
+
+  # ─── Reverse Proxy ──────────────────────────────────────────────────────────
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      UIM_HOST: ${UIM_HOST:-studio.dark-factory.local}
+      TM_HOST: ${TM_HOST:-tickets.dark-factory.local}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    depends_on:
+      user-input-manager:
+        condition: service_healthy
+      ticket-manager:
+        condition: service_healthy
+      uim-frontend:
+        condition: service_healthy
+      tm-frontend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/nginx-health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - internal
+      - external
+
+volumes:
+  postgres_data:
+  mongo_data:
+
+networks:
+  internal:
+    driver: bridge
+  external:
+    driver: bridge
