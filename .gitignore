@@ -39,3 +39,12 @@ dist/
 # Secrets
 credentials.json
 *.sqlite3
+
+# Monorepo infra
+infra/.env
+**/coverage/
+**/.vite/
+
+# Per-service node_modules and dist
+**/node_modules/
+**/dist/

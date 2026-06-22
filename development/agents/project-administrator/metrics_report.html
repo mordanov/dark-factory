@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Agent Metrics Report — auth-app</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem; color: #222; }
+  h1 { color: #1a1a2e; }
+  h2 { color: #16213e; margin-top: 2rem; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 1.5rem; }
+  th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; font-size: 0.9rem; }
+  th { background: #e8eaf6; font-weight: 600; }
+  tr:nth-child(even) { background: #f5f5f5; }
+  .summary-box { background: #e3f2fd; border-left: 4px solid #1976d2; padding: 1rem; margin-bottom: 1.5rem; }
+  .generated { font-size: 0.8rem; color: #666; }
+</style>
+</head>
+<body>
+<h1>Agent Metrics Report — auth-app</h1>
+<p class="generated">Generated: 2026-06-22 12:33 UTC</p>
+
+<div class="summary-box">
+  <strong>Total events:</strong> 37 &nbsp;|&nbsp;
+  <strong>Total time:</strong> 19,620s &nbsp;|&nbsp;
+  <strong>Total tokens:</strong> 300,200
+</div>
+
+<h2>By Agent</h2>
+<table>
+<tr><th>Agent</th><th>Tasks</th><th>Time (s)</th><th>Tokens</th></tr>
+<tr><td>autotester</td><td>7</td><td>1020</td><td>37,000</td></tr>
+<tr><td>backend</td><td>4</td><td>1800</td><td>53,000</td></tr>
+<tr><td>code-reviewer</td><td>8</td><td>2940</td><td>67,500</td></tr>
+<tr><td>designer</td><td>2</td><td>660</td><td>23,000</td></tr>
+<tr><td>devops</td><td>5</td><td>1500</td><td>41,000</td></tr>
+<tr><td>frontend</td><td>2</td><td>0</td><td>0</td></tr>
+<tr><td>product-manager</td><td>1</td><td>3600</td><td>45,000</td></tr>
+<tr><td>security-architect</td><td>4</td><td>6480</td><td>20,000</td></tr>
+<tr><td>software-architect</td><td>4</td><td>1620</td><td>13,700</td></tr>
+</table>
+
+<h2>By Feature</h2>
+<table>
+<tr><th>Feature</th><th>Tasks</th><th>Time (s)</th><th>Tokens</th></tr>
+<tr><td>001-monorepo-unification</td><td>37</td><td>19620</td><td>300,200</td></tr>
+</table>
+
+<h2>All Events</h2>
+<table>
+<tr>
+  <th>Timestamp</th><th>Agent</th><th>Feature</th><th>Task ID</th>
+  <th>Description</th><th>Time (s)</th><th>Tokens</th>
+  <th>Model</th><th>Token Source</th><th>Status</th><th>Notes</th>
+</tr>
+<tr><td>2026-06-22T12:23:37</td><td>designer</td><td>001-monorepo-unification</td><td>designer-ux-review-us3</td><td>UX acceptance criteria for UIM Zustand auth migration (US3/Stream 4): 20 testable criteria, delivered to ux/zustand-migration-ux-acceptance.md</td><td>480</td><td>18000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:23:37</td><td>security-architect</td><td>001-monorepo-unification</td><td>SA-001</td><td>Threat model (30 threats, 5 Blockers, 12 security tests), auth adapter review checklist, Zustand migration checklist, TM project setup</td><td>600</td><td>8500</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:23:37</td><td>devops</td><td>001-monorepo-unification</td><td>T001-T012</td><td>Phase 1: Monorepo scaffold — moved all 5 services to services/, created infra/ and integration-tests/ dirs, root config files</td><td>480</td><td>12000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:23:37</td><td>devops</td><td>001-monorepo-unification</td><td>T013-T020</td><td>Phase 2: Infra files — postgres init, nginx snippets, nginx.conf.template, nginx Dockerfile, unified docker-compose.yml, override, .env.example</td><td>600</td><td>18000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:23:38</td><td>devops</td><td>001-monorepo-unification</td><td>T058-T063</td><td>Phase 7: Pre-commit configs — root + per-service for all 5 services (ruff check + ruff-format, v0.8.3)</td><td>120</td><td>3000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:24:02</td><td>autotester</td><td>001-monorepo-unification</td><td>T051-T057</td><td>Integration test suite: requirements.txt, LLM mock stub, docker-compose.test.yml, conftest.py, test_scenario_a.py, test_scenario_c.py, seed SQL, pytest.ini</td><td>900</td><td>35000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:24:02</td><td>designer</td><td>001-monorepo-unification</td><td>designer-ux-review-verdict-us3</td><td>UX review of migrated UIM Zustand frontend: all 20 AC-UX criteria PASS, SC-006 satisfied</td><td>180</td><td>5000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:24:02</td><td>software-architect</td><td>001-monorepo-unification</td><td>ARCH-REVIEW-001</td><td>Pre-implementation architectural review: nginx template, compose topology, auth adapter contracts. 3 blockers + 8 required changes identified.</td><td>900</td><td>8000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:24:02</td><td>security-architect</td><td>001-monorepo-unification</td><td>SA-002</td><td>Security review of UIM Zustand migration (T043-T050): all Z1-Z20 checks pass, APPROVED, SC-006 satisfied</td><td>180</td><td>2200</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:24:02</td><td>autotester</td><td>001-monorepo-unification</td><td>BLOCKER-1-FIX</td><td>Fixed docker-compose.test.yml: added JWT_SECRET_KEY to context-distiller service block (arch-review BLOCKER-1)</td><td>120</td><td>2000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:24:20</td><td>backend</td><td>001-monorepo-unification</td><td>T021-T025</td><td>Add GET /health endpoints to all 5 backend services returning {status:ok, service:<name>}</td><td>420</td><td>12000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:24:20</td><td>backend</td><td>001-monorepo-unification</td><td>T032-T041</td><td>Auth adapters for all 5 backends + dependencies.py updates + agent-tools sidecar</td><td>900</td><td>28000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:24:20</td><td>backend</td><td>001-monorepo-unification</td><td>T042</td><td>ticket-manager Python 3.12 upgrade: Dockerfile base image, pyproject.toml requires-python, canonical dep versions, remove mypy</td><td>180</td><td>5000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:24:20</td><td>devops</td><td>001-monorepo-unification</td><td>T064</td><td>Run pre-commit --all-files; fixed ruff violations E402/UP035/F841/E501; added per-file-ignores for test/tooling paths</td><td>300</td><td>8000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:24:20</td><td>code-reviewer</td><td>001-monorepo-unification</td><td>review-phase1-phase2-precommit</td><td>Code review Phase 1 scaffold, Phase 2 infra, pre-commit hooks. CHANGES REQUESTED. Blocker resolved; 3 Major still open.</td><td>720</td><td>18000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:24:43</td><td>backend</td><td>001-monorepo-unification</td><td>T033-T035-BLOCKER2-FIX</td><td>Fix BLOCKER-2: add verify_access_token() to TM and CD security.py; fix CD auto_error=False; agent-tools port 8000; TM/CD adapters use verify_access_token</td><td>300</td><td>8000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:24:44</td><td>software-architect</td><td>001-monorepo-unification</td><td>ARCH-FIXES-001</td><td>Applied architectural fixes: nginx default_server health block, agent-tools port alignment, context-distiller HTTPBearer auto_error=False, compose nginx healthcheck</td><td>300</td><td>2500</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:24:44</td><td>security-architect</td><td>001-monorepo-unification</td><td>SA-003</td><td>Security review auth adapters T032-T041 all 5 services: initial CHANGES REQUIRED (H-01 HTTPBearer), re-review after fix, final APPROVED</td><td>300</td><td>3800</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td>Review published: security-review-auth-adapters (APPROVED)</td></tr>
+<tr><td>2026-06-22T12:24:44</td><td>code-reviewer</td><td>001-monorepo-unification</td><td>review-phase4-auth-adapters</td><td>Code review Phase 4: auth adapters + health endpoints (T021-T042). APPROVED WITH COMMENTS. 3 Major, 1 Nit.</td><td>600</td><td>14000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:24:44</td><td>code-reviewer</td><td>001-monorepo-unification</td><td>review-phase5-zustand-migration</td><td>Code review Phase 5: UIM Zustand migration + frontend test standardisation (T043-T050, T065-T069). APPROVED.</td><td>360</td><td>9000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:25:04</td><td>autotester</td><td>001-monorepo-unification</td><td>T070</td><td>Cross-check infra/.env.example against all 5 service config.py files; fixed 9 env var gaps (TM SECRET_KEY mismatch critical boot blocker)</td><td></td><td></td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td>time/tokens not reported by agent</td></tr>
+<tr><td>2026-06-22T12:25:04</td><td>code-reviewer</td><td>001-monorepo-unification</td><td>review-phase6-integration-tests</td><td>Code review Phase 6: integration tests (T051-T057). APPROVED WITH COMMENTS. 2 Major, 1 Minor.</td><td>420</td><td>11000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:25:04</td><td>software-architect</td><td>001-monorepo-unification</td><td>ARCH-FIXES-002</td><td>Applied code-reviewer Phase1/2/4 findings: frontend healthchecks + nginx depends_on, AGENT_TOOLS_SECRET_KEY required, TM pre-commit v0.8.3, UIM pre-commit created, agent-tools PyJWT→python-jose, test deps pinned, bcrypt 4.2.1</td><td>420</td><td>3200</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:25:04</td><td>autotester</td><td>001-monorepo-unification</td><td>T072</td><td>Full Definition of Done checklist: 16/16 FRs pass, SC-005/006/007/008 pass statically, CLAUDE.md corrections</td><td></td><td></td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td>time/tokens not reported</td></tr>
+<tr><td>2026-06-22T12:25:04</td><td>autotester</td><td>001-monorepo-unification</td><td>T074</td><td>SC-002 regression check: per-service unit tests. 1 circular import regression in TM auth_adapter fixed. All other failures pre-existing.</td><td></td><td></td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td>time/tokens not reported</td></tr>
+<tr><td>2026-06-22T12:25:23</td><td>software-architect</td><td>001-monorepo-unification</td><td>ARCH-FIXES-003</td><td>Applied Phase 6 code-review M1/M2a/M2b: orchestrator healthcheck /health, asyncio.get_running_loop(), removed deprecated event_loop fixture. P6-N1: ticket_type field fix in test_scenario_c.py</td><td></td><td></td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td>time/tokens not reported</td></tr>
+<tr><td>2026-06-22T12:25:23</td><td>autotester</td><td>001-monorepo-unification</td><td>T075</td><td>Run Vitest suites in both frontends: UIM 53/53, TM 91/91, zero regressions. SC-007 PASS.</td><td></td><td></td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td>time/tokens not reported</td></tr>
+<tr><td>2026-06-22T12:25:23</td><td>autotester</td><td>001-monorepo-unification</td><td>T076</td><td>Apply Phase 6 code-review findings M1/M2a/M2b: orchestrator healthcheck fix, asyncio.get_running_loop(), remove deprecated event_loop fixture</td><td></td><td></td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td>time/tokens not reported</td></tr>
+<tr><td>2026-06-22T12:25:23</td><td>frontend</td><td>001-monorepo-unification</td><td>T043-T050</td><td>UIM Zustand auth migration: deleted AuthContext.tsx, updated client.ts/App.tsx/AppRoutes.tsx/LoginPage.tsx/Sidebar.tsx, access token in memory only, refresh token in sessionStorage. 53/53 tests pass.</td><td></td><td></td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td>time/tokens not reported</td></tr>
+<tr><td>2026-06-22T12:25:24</td><td>frontend</td><td>001-monorepo-unification</td><td>T065-T068</td><td>Frontend test standardisation: Vitest 2.1.8, coverage thresholds >=80%, canonical versions aligned. UIM 53/53, TM 91/91.</td><td></td><td></td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td>time/tokens not reported</td></tr>
+<tr><td>2026-06-22T12:25:44</td><td>code-reviewer</td><td>001-monorepo-unification</td><td>T058-T064+T065-T069</td><td>Phase 7 pre-commit + Phase 8 frontend tests review. Both APPROVED. Nit P8-N1 branches threshold regression.</td><td>240</td><td>4500</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:25:44</td><td>code-reviewer</td><td>001-monorepo-unification</td><td>T032-T042+T021-T025-recheck</td><td>Phase 4 re-review: auth adapters + health endpoints. All prior Majors resolved. APPROVED.</td><td>420</td><td>8000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:25:44</td><td>code-reviewer</td><td>001-monorepo-unification</td><td>T051-T057-recheck</td><td>Phase 6 re-review: integration tests. M1/M2a/M2b resolved. New Minor P6-N1 (ticket_type). APPROVED.</td><td>180</td><td>3000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:25:44</td><td>security-architect</td><td>001-monorepo-unification</td><td>SA-004</td><td>Final consolidated security sign-off: all ST-01–ST-12 verified, threat model complete, all phases APPROVED. One Medium residual risk documented.</td><td>5400</td><td>5500</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td>Resource: security-signoff-final</td></tr>
+<tr><td>2026-06-22T12:25:44</td><td>product-manager</td><td>001-monorepo-unification</td><td>PM-001</td><td>PM coordination: scope, task breakdown, blocker resolution (3 arch+4 security+6 code-review), product decisions PD-001–PD-008, acceptance criteria validation across all 8 phases</td><td>3600</td><td>45000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-22T12:25:59</td><td>devops</td><td>001-monorepo-unification</td><td>T031</td><td>Unified compose startup: all 10 services healthy on Docker linux/arm64. Fixes: package-lock arm64 binaries, vitest@3.2.6 (later reverted), bcrypt pin, idempotent alembic migration, urllib healthchecks, 127.0.0.1 healthchecks.</td><td></td><td></td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td>SC-001 PASS. time/tokens not reported</td></tr>
+<tr><td>2026-06-22T12:25:59</td><td>code-reviewer</td><td>001-monorepo-unification</td><td>review-t031-postrun</td><td>Review T031 post-run fixes. CHANGES REQUIRED. T031-M1 vitest 3.2.6 (constitution violation), T031-M2 UIM non-canonical deps, T031-N1 mixed healthcheck patterns.</td><td></td><td></td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td>time/tokens not reported</td></tr>
+</table>
+</body>
+</html>

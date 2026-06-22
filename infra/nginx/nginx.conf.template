@@ -1,0 +1,86 @@
+# Health check endpoint — responds on localhost regardless of server_name resolution
+server {
+    listen 80 default_server;
+    server_name _;
+
+    location /nginx-health {
+        return 200 "ok\n";
+        add_header Content-Type text/plain;
+    }
+
+    location / {
+        return 444;
+    }
+}
+
+# Prompt Studio (user-input-manager)
+server {
+    listen 80;
+    server_name ${UIM_HOST};
+
+    # Certbot ACME challenge (always present, even before certbot setup)
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # API proxy → backend (internal port is 8000 in all services)
+    location /api/ {
+        proxy_pass http://user-input-manager:8000;
+        include /etc/nginx/snippets/proxy.conf;
+    }
+
+    # Frontend SPA — proxy to the UIM frontend nginx container
+    location / {
+        proxy_pass http://uim-frontend:80;
+        include /etc/nginx/snippets/proxy.conf;
+    }
+
+    # SSL (commented — enable after certbot setup)
+    # listen 443 ssl;
+    # include /etc/nginx/snippets/ssl.conf;
+    # ssl_certificate /etc/letsencrypt/live/${UIM_HOST}/fullchain.pem;
+    # ssl_certificate_key /etc/letsencrypt/live/${UIM_HOST}/privkey.pem;
+}
+
+# HTTP→HTTPS redirect for Prompt Studio (commented — enable after certbot)
+# server {
+#     listen 80;
+#     server_name ${UIM_HOST};
+#     return 301 https://$host$request_uri;
+# }
+
+# Ticket Manager
+server {
+    listen 80;
+    server_name ${TM_HOST};
+
+    # Certbot ACME challenge (always present)
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # API proxy → backend (internal port is 8000)
+    location /api/ {
+        proxy_pass http://ticket-manager:8000;
+        include /etc/nginx/snippets/proxy.conf;
+    }
+
+    # Frontend SPA — proxy to the TM frontend nginx container
+    location / {
+        proxy_pass http://tm-frontend:80;
+        include /etc/nginx/snippets/proxy.conf;
+    }
+
+    # SSL (commented — enable after certbot setup)
+    # listen 443 ssl;
+    # include /etc/nginx/snippets/ssl.conf;
+    # ssl_certificate /etc/letsencrypt/live/${TM_HOST}/fullchain.pem;
+    # ssl_certificate_key /etc/letsencrypt/live/${TM_HOST}/privkey.pem;
+}
+
+# HTTP→HTTPS redirect for Ticket Manager (commented — enable after certbot)
+# server {
+#     listen 80;
+#     server_name ${TM_HOST};
+#     return 301 https://$host$request_uri;
+# }

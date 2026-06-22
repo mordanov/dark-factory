@@ -1,0 +1,31 @@
+services:
+  agent-tools:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8005:8000"
+    environment:
+      GIT_REPO_PATH: ${GIT_REPO_PATH:?GIT_REPO_PATH is required}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      AUTH_MODE: ${AUTH_MODE:-local}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      DISTILLER_BASE_URL: ${DISTILLER_BASE_URL:-http://context-distiller:8000}
+      DISTILLER_TIMEOUT_SECONDS: ${DISTILLER_TIMEOUT_SECONDS:-10}
+      GIT_READ_TIMEOUT_SECONDS: ${GIT_READ_TIMEOUT_SECONDS:-15}
+      SEARCH_MAX_RESULTS: ${SEARCH_MAX_RESULTS:-50}
+    volumes:
+      - ${GIT_REPO_PATH}:${GIT_REPO_PATH}:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - dark-factory
+
+networks:
+  dark-factory:
+    driver: bridge
