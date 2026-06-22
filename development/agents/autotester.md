@@ -25,21 +25,22 @@ You own test strategy, automated checks, regression suites, bug reproduction, ve
 - Deployment pipeline ownership — coordinate with DevOps.
 - Code review approval — coordinate with Code Reviewer.
 
-## Project-Specific Requirements: resource-consumption-tracker
+## Project-Specific Requirements: dark-factory-monorepo-unification
 
-For this project, treat `documentation/speckit-prompt-resource-tracker.md` as the business source of truth. Test plans and release recommendations must verify all seven feature requirements (FR-0 through FR-6) and both Selena MCP and rigour-labs/mcp quality gates.
+For this project, treat `specs/001-monorepo-unification/spec.md` as the feature source of truth. Test plans and release recommendations must verify all five user stories (US1–US5) and the eight success criteria (SC-001 to SC-008).
 
-- Verify **FR-0 (Auth)**: register with duplicate username/email returns `409`; login with wrong password returns `401`; expired access token returns `401`; refresh token rotation revokes the old token in the DB; `hashed_password` never appears in any response body; `AuthService` imports nothing from `BillService`, `ExportService`, or `AnalyticsService`.
-- Verify **FR-1 (Bill Upload)**: upload a synthetic PDF and assert a `Bill` DB row is created with correct `period_start`, `period_end`, `amount_consumed`, `amount_paid`, and `user_id`; LLM parser returns `422` on structurally invalid extraction; `LLMParserService` unit tests mock OpenAI and achieve ≥ 90% branch coverage; no live OpenAI calls in any test.
-- Verify **FR-2 (Bill Listing)**: paginated `GET /api/v1/bills/` filters correctly by `resource_type` and date range; `DELETE /api/v1/bills/{id}` sets `deleted_at` (soft delete) and returns `204`; deleted bills do not appear in subsequent list calls.
-- Verify **FR-3 (ML Predictions)**: with fewer than 3 bills, `GET /api/v1/predictions/{resource}` returns `409` with a message stating how many more bills are needed; with a synthetic dataset of known trend, the predicted consumption is within 20% of the extrapolated value; prediction records are stored in the `Prediction` table on every call.
-- Verify **FR-4 (Dashboard / Frontend)**: all routes except `/login` and `/register` redirect unauthenticated users to `/login`; access token stored only in Zustand memory (not `localStorage` or cookies accessible to JS); single Axios interceptor handles `401` → refresh → retry without duplicate requests; upload button is disabled during processing.
-- Verify **FR-5 (PDF Export)**: `GET /api/v1/exports/report.pdf` returns `Content-Type: application/pdf` with `%PDF` magic bytes and non-zero length for a dataset with ≥ 1 bill per resource type; a date range spanning more than 24 months returns `400`; `ExportService` has no direct dependency on `request` or `response` objects.
-- Verify **FR-6 (Analytics)**: `GET /api/v1/analytics/summary` returns correct monthly aggregations for a seeded dataset; analytics endpoint responds in < 200ms for up to 100 bills (benchmark with `pytest-benchmark`).
-- Verify **data isolation**: a user can never see another user's bills or predictions — `GET /api/v1/bills/` for user A must never return records scoped to user B.
-- Verify **system gate**: `docker compose up --build` starts all services (backend, frontend, PostgreSQL, Nginx) with no manual steps beyond `.env` setup; OpenAPI docs are reachable at `/api/v1/openapi.json`; `alembic upgrade head` runs cleanly against a fresh DB.
-- **rigour-labs/mcp quality gates**: test coverage ≥ 85% overall; ≥ 90% for `app/services/`; ≥ 85% for `app/repositories/`; ≥ 80% for `app/api/`; `ruff` passes with zero warnings; Docker build succeeds with `--no-cache`; brute-force test — 10 rapid wrong-password requests must all return `401`.
-- **Selena MCP quality gates**: all public functions have type annotations (`mypy --strict`); no function body exceeds 30 lines; all API endpoints documented in OpenAPI with example; no hardcoded secrets; `hashed_password` absent from all Pydantic response schemas.
+- Verify **US1 (Unified compose)**: `docker compose -f infra/docker-compose.yml up --build` on a clean machine starts all five services, postgres, mongo, and nginx; every container healthcheck reaches healthy within 60 s; Prompt Studio frontend is served at `$UIM_HOST`; Ticket Manager frontend at `$TM_HOST`; each service also starts in isolation via its own `docker-compose.yml`.
+- Verify **US2 (Auth adapter)**: for each backend service with `AUTH_MODE=local`, valid credentials return a JWT with identical structure to pre-migration; a tampered or expired token returns `401`; with `AUTH_MODE=keycloak`, any authenticated request returns `501 Not Implemented`; unrecognised `AUTH_MODE` value causes the service to fail at startup (not silently fall through).
+- Verify **US3 (Zustand migration)**: log in to Prompt Studio; inspect `localStorage` and `sessionStorage` — no access token present; navigate to a protected route — renders correctly; refresh the page — session restored via refresh token without re-login prompt; log out — Zustand store cleared, redirected to login.
+- Verify **US4 (Integration tests)**: `pytest integration-tests/tests/test_scenario_a.py` passes (UIM→TM ticket created with tag "needs-estimation"); `pytest integration-tests/tests/test_scenario_c.py` passes (orchestrator job triggers, project memory readable with required YAML keys); full suite completes in < 120 s; no real LLM API calls made (verify by running with an invalid real API key — suite still passes).
+- Verify **US5 (Pre-commit)**: introduce a deliberate ruff violation in any `services/` Python file; run `pre-commit run --all-files` from repo root; violation detected and auto-fixed; clean codebase produces all hooks passing.
+- Verify **SC-002 (No regressions)**: all existing per-service unit and integration tests pass unchanged after the monorepo migration.
+- Verify **SC-005 (ruff)**: `pre-commit run --all-files` passes with zero ruff warnings across the entire monorepo.
+- Verify **SC-006 (no token in storage)**: at no point during a Prompt Studio login session does an access token appear in `localStorage` or `sessionStorage`.
+- Verify **SC-007 (Vitest coverage)**: `vitest run --coverage` in both `user-input-manager` and `ticket-manager` frontends reports ≥ 80% lines and functions.
+- Verify **SC-008 (auth identity)**: `AUTH_MODE=local` authentication behaviour is byte-for-byte identical to pre-migration across all five backends; use recorded request/response pairs as regression fixtures.
+- **Integration test user provisioning**: verify that `conftest.py` does NOT call any registration or user-creation API endpoint — test users must come from the SQL seed script only.
+- **Quality gates**: `ruff` passes with zero warnings; Docker build succeeds with `--no-cache`; all per-service pytest suites pass; no `mypy` required (constitution prohibits it this phase).
 
 ## Tool Authorization and Supervision Policy
 

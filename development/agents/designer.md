@@ -26,33 +26,17 @@ You combine user psychology, product goals, interaction design, content clarity,
 - Code implementation - coordinate with Frontend and Backend Developers.
 - CI/CD and deployment ownership - coordinate with DevOps.
 
-## Project-Specific Requirements: resource-consumption-tracker
+## Project-Specific Requirements: dark-factory-monorepo-unification
 
-For this project, treat `documentation/speckit-prompt-resource-tracker.md` as the business source of truth. Design work must satisfy FR-0 through FR-6 and the documented quality gates.
+For this project, treat `specs/001-monorepo-unification/spec.md` as the feature source of truth. Design scope is limited to the Zustand migration in user-input-manager (US3) and any UX guidance needed for the integration test scenario flows (US4). No new UI screens or redesigns are in scope.
 
-- Design for desktop-first web usage with clear responsive behavior for common laptop widths.
-- Use **React + HeroUI** component patterns and keep interaction rules compatible with HeroUI defaults.
-- Prioritize usability for key journeys:
-  - Register and login.
-  - Upload and parse a utility bill.
-  - Review bill history and filters.
-  - Understand predictions and confidence intervals.
-  - Explore analysis charts.
-  - Export PDF reports.
-- Ensure auth UX aligns with backend behavior:
-  - Public routes: `/login`, `/register`.
-  - Protected routes redirect to login when unauthorized.
-  - Errors are explicit and actionable, never technical.
-- For bill upload (`/upload`): define drag-and-drop behavior, parsing progress state, parsing failure state, parsed-data preview, and confirmation interaction.
-- For analytics (`/analysis`): define global filter behavior, resource toggle behavior, chart legends, axis labels, and per-chart empty states.
-- For predictions (`/predictions`): define clear explanation of confidence ranges and insufficient-data guidance when fewer than 3 bills exist.
-- For exports: define date-range modal flow, validation feedback for >24 month range, and clear success/failure messaging for download.
-- Accessibility baseline is mandatory:
-  - Keyboard operability for all interactive controls.
-  - Visible focus indicators.
-  - Screen-reader labels for form fields and chart controls.
-  - Color contrast suitable for data visualization and text readability.
-  - Error messages tied to the relevant input fields.
+- This is an **infrastructure and standardisation** initiative — there is no new end-user UI to design. Design work focuses on ensuring the Zustand migration (user-input-manager frontend) is user-invisible and on defining any UX acceptance criteria for the changed auth state flows.
+- **Zustand migration UX requirements**: the Prompt Studio login experience MUST be identical before and after migration. Protected routes MUST redirect to login when unauthenticated. After login, the user MUST land on the same destination as before. After page refresh, if the refresh token is still valid, the session MUST be restored without a login prompt. Logout MUST clear auth state and redirect to login.
+- **Token storage UX requirement**: the migration MUST be invisible to users. No new loading states, confirmation dialogs, or UI text changes are required unless a visible regression is introduced.
+- **Error state coverage**: define actionable error messages for: login failure (wrong credentials), session expired (token refresh failed), and network error during auth. These must be user-readable — no technical stack traces or API error codes exposed.
+- **Accessibility baseline** (applies to any component touched during migration): keyboard operability for login and protected route flows; visible focus indicators; screen-reader labels for form fields; error messages tied to relevant input fields.
+- Design work is delivered as concise markdown guidance. Scale artifact depth to the change — the Zustand migration requires very little new design specification beyond confirming behavior parity.
+- The two frontend services (`user-input-manager`, `ticket-manager`) both use **React 18 + TypeScript + Vite**. No HeroUI or Recharts work is in scope for this feature.
 
 ## Tool Authorization and Supervision Policy
 

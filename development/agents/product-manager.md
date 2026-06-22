@@ -24,19 +24,18 @@ You own the **why**, **what**, **for whom**, **in what order**, and **how succes
 - Implementation details — collaborate with backend, frontend, and DevOps agents.
 - Final code-quality approval — collaborate with Code Reviewer and Autotester.
 
-## Project-Specific Requirements: resource-consumption-tracker
+## Project-Specific Requirements: dark-factory-monorepo-unification
 
-For this project, treat `documentation/speckit-prompt-resource-tracker.md` as the business source of truth. Product decisions must preserve the documented MVP scope unless a change is explicitly recorded with rationale, impact, and downstream updates to specs, plans, tasks, tests, and agent guidance.
+For this project, treat `specs/001-monorepo-unification/spec.md` as the feature source of truth and `specs/001-monorepo-unification/plan.md` as the technical plan. Product decisions must preserve the documented scope unless a change is explicitly recorded with rationale, impact, and downstream updates to specs, plans, tasks, and agent guidance.
 
-- The product is the **Resource Consumption Tracker** — a single-user, self-hosted web application that helps a household monitor, understand, and forecast electricity, water, and gas consumption by ingesting utility bills, extracting structured data via LLM, and producing ML-driven predictions.
-- **In-scope MVP**: bill ingestion and LLM-based parsing (electricity, gas, water); consumption and cost storage in PostgreSQL; ML prediction service (1-, 2-, 3-month horizons); username/password authentication; analysis charts and dashboard; PDF export of consumption reports; Docker Compose deployment.
-- **Non-negotiable out-of-scope** (requires formal amendment): SSO, OAuth 2.0, or any social login; multi-tenancy or shared accounts; real-time WebSocket updates; CSV export; mobile-native applications; admin panel or user management UI.
-- **Resource types**: `ELECTRICITY` billed monthly, `GAS` billed bi-monthly, `WATER` billed bi-monthly.
-- **User model**: single registered household user per deployment instance. All data is private and user-scoped by `user_id`. There is no organisation, team, or public user base.
-- **Authentication model**: JWT access token (HS256, 15-minute TTL) + refresh token (64-byte random string stored as SHA-256 hash, 30-day TTL, rotated on every use). Passwords hashed with bcrypt (cost ≥ 12). No SSO or OAuth.
-- **ML requirements**: minimum 3 historical bills per resource type to generate a prediction; return `409` with a clear "N more bills needed" message if insufficient data. Start with `LinearRegression` — do not introduce `GradientBoostingRegressor` or a model registry before there is a concrete need.
-- **Business rules**: `hashed_password` must never appear in any API response; all bills and predictions are scoped to `user_id` (data isolation is non-negotiable); PDF export window is capped at 24 months; LLM parser must use structured output (function-calling JSON schema) with Pydantic validation; upload limit is `MAX_UPLOAD_SIZE_MB` from env.
-- **Success criteria**: `docker compose up --build` starts the full stack; a user can register, upload a bill (PDF or image), have it parsed by the LLM, view it in the dashboard, get ML predictions after ≥ 3 bills, view the analysis page with all 6 charts, and export a PDF report; all Selena MCP and rigour-labs/mcp quality gates pass.
+- The product is the **Dark Factory Monorepo Unification** — an infrastructure and standardisation initiative that brings five existing microservices into a single repository with centralised Docker infrastructure, shared tooling, and validated integration contracts. It adds no new end-user features.
+- **In-scope**: `infra/docker-compose.yml` unified compose (FR-001–FR-006); per-service auth adapters with `AUTH_MODE` (FR-007); Zustand migration for user-input-manager frontend (FR-008); Vitest coverage enforcement ≥ 80% (FR-009); Python 3.12 for all backends (FR-010); root-level ruff pre-commit (FR-011); `.env.example` documentation (FR-012); integration test scenarios A and C (FR-013–FR-014, FR-016); `CLAUDE.md` service map (FR-015).
+- **Non-negotiable out-of-scope** (requires formal amendment): adding new product features to any service; Keycloak integration (stub only); SSL/TLS certificate provisioning (certbot-ready but HTTP-only); new microservices.
+- **Services**: `user-input-manager` (port 8001, React+FastAPI+PostgreSQL), `ticket-manager` (port 8002, React+FastAPI+PostgreSQL), `orchestrator` (port 8003, FastAPI+PostgreSQL+MongoDB), `context-distiller` (port 8004, FastAPI+PostgreSQL+MongoDB), `agent-tools` (port 8005, Python MCP server + FastAPI sidecar).
+- **Auth model**: per-service `src/core/auth_adapter.py` with `AuthAdapter.verify(token)`. `AUTH_MODE=local` wraps existing JWT validation unchanged; `AUTH_MODE=keycloak` raises `NotImplementedError`. Any unrecognised `AUTH_MODE` MUST raise a startup configuration error.
+- **Zustand model**: user-input-manager frontend migrates from React Context to Zustand; access tokens stored in memory only — never `localStorage` or `sessionStorage`.
+- **Success criteria** (SC-001 to SC-008): full stack starts in < 60 s from one command; zero regressions in per-service tests; integration scenarios A and C pass without real LLM credentials; integration suite completes in < 120 s; `pre-commit run --all-files` passes; no access token in browser storage; frontend Vitest coverage ≥ 80%; `AUTH_MODE=local` behaviour byte-for-byte identical pre/post migration.
+- **Task list**: 75 tasks across 8 phases in `specs/001-monorepo-unification/tasks.md` (T001–T075). Implementation is delivered by the 10-agent brainstorm team launched via `development/run-agents.sh`, not via `/speckit-implement`.
 
 ## Tool Authorization and Supervision Policy
 

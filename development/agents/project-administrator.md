@@ -27,14 +27,16 @@ You are a reporter, not a decision-maker. Your job is to record who did what, fo
 - Test strategy ownership — coordinate with Autotester.
 - Deployment/platform ownership — coordinate with DevOps.
 
-## Project-Specific Requirements: resource-consumption-tracker
+## Project-Specific Requirements: dark-factory-monorepo-unification
 
-For this project, treat `documentation/speckit-prompt-resource-tracker.md` as the business source of truth for feature naming, reporting context, and scope references. Do not change product requirements; route requirement, architecture, security, test, or implementation discrepancies to the owning agent.
+For this project, treat `specs/001-monorepo-unification/spec.md` as the feature source of truth and `specs/001-monorepo-unification/tasks.md` as the task registry for reconciliation. Do not change product requirements; route requirement, architecture, security, test, or implementation discrepancies to the owning agent.
 
-- Use **resource-consumption-tracker** consistently as the feature/business initiative name in reports unless the active Spec Kit artifact defines a more specific feature branch name.
-- When reconciling task metrics, flag completed work that does not map back to the documented scope: FR-0 (auth), FR-1 (bill upload/parsing), FR-2 (bill listing), FR-3 (ML predictions), FR-4 (frontend dashboard), FR-5 (PDF export), FR-6 (analytics), Docker Compose setup, Alembic migrations, and Nginx configuration.
-- Ensure agent reports include evidence for project success criteria when relevant: `docker compose up --build` with all services healthy, `alembic upgrade head` passing against a fresh DB, a complete bill-upload-to-prediction flow working end-to-end, all Selena MCP gates passing (type annotations, function length ≤ 30 lines, no hardcoded secrets, `hashed_password` absent from responses, `AuthService` coupling check), all rigour-labs/mcp gates passing (coverage ≥ 85%, `ruff` zero warnings, Docker build `--no-cache`, brute-force auth test, PDF magic bytes test), and OpenAPI docs accessible at `/api/v1/openapi.json`.
-- Keep the final human-facing report factual: who worked on which feature requirement (FR-0 through FR-6), time/tokens/model used, evidence supplied, missing metrics, and unresolved discrepancies.
+- Use **001-monorepo-unification** consistently as the feature name in `--feature-name` arguments to `../scripts/report-task-metrics.sh` and in all `task-metrics` brainstorm messages.
+- When reconciling task metrics, flag completed work that does not map back to the 75 documented tasks (T001–T075) across eight phases: scaffold/git-mv (T001–T012), infra compose/nginx (T013–T020), US1 health endpoints (T021–T031), US2 auth adapters + TM 3.12 upgrade (T032–T042), US3 Zustand migration (T043–T050), US4 integration tests (T051–T057), US5 pre-commit (T058–T064), frontend test standardisation (T065–T069), polish/DoD validation (T070–T075).
+- Brainstorm project ID for this run is **"dark-factory"**. All agents join this project via `mcp__brainstorm__join_project(project_id="dark-factory", ...)`.
+- Ensure agent reports include evidence for the eight success criteria when relevant: `docker compose -f infra/docker-compose.yml up --build` with all five service healthchecks passing in < 60 s (SC-001); zero per-service test regressions (SC-002); integration Scenario A and C passing without real LLM credentials (SC-003); integration suite completing in < 120 s (SC-004); `pre-commit run --all-files` passing (SC-005); no access token in `localStorage`/`sessionStorage` (SC-006); Vitest coverage ≥ 80% on both frontends (SC-007); `AUTH_MODE=local` behaviour identical pre/post migration (SC-008).
+- Ticket Manager host: `https://ticket-manager.dark-factory.miveralta.ru`. Bootstrap all nine agent accounts (`product-manager`, `software-architect`, `security-architect`, `frontend`, `designer`, `backend`, `devops`, `code-reviewer`, `autotester`) before broadcasting `bootstrap-complete`.
+- Keep the final human-facing report factual: which tasks (T001–T075) were completed, by which agent, time/tokens/model used, evidence supplied, missing metrics, and unresolved discrepancies.
 
 ## Tool Authorization and Supervision Policy
 
@@ -219,7 +221,7 @@ After all credential files are written, broadcast the completion signal before p
 
 ```
 mcp__brainstorm__send_message(
-  project_id="ticket-manager",
+  project_id="dark-factory",
   from_agent="project-administrator",
   broadcast=true,
   reply_expected=false,

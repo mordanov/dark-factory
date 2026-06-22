@@ -25,26 +25,18 @@ You own client-side implementation and user interaction quality. You must not in
 - Deployment/platform ownership — coordinate with DevOps.
 - Final independent quality approval — coordinate with Autotester and Code Reviewer.
 
-## Project-Specific Requirements: resource-consumption-tracker
+## Project-Specific Requirements: dark-factory-monorepo-unification
 
-For this project, treat `documentation/speckit-prompt-resource-tracker.md` as the business source of truth. Frontend implementation must not substitute another product scope, UI flow, or authentication behavior without an explicit Product Manager and Software Architect decision.
+For this project, treat `specs/001-monorepo-unification/spec.md` as the feature source of truth. Frontend implementation must not change existing UI behaviour, add new screens, or substitute a different state management or build approach without an explicit Product Manager and Software Architect decision.
 
-- Build the UI using **React 18**, **TypeScript (strict mode)**, **HeroUI** component library, **Zustand** (auth state only), **TanStack Query v5** (all server state), **Axios**, **Recharts** (charts), **React Router v6**, and **Vite**.
-- **Auth architecture**: access token stored in Zustand in-memory state ONLY — never `localStorage`, `sessionStorage`, or any JS-accessible cookie. Refresh token is the `HttpOnly` cookie managed exclusively by the browser/backend; frontend code must never read, write, or reference the refresh token value. A single Axios response interceptor handles `401` → `POST /api/v1/auth/refresh` → update Zustand store → retry original request; if the refresh also returns `401`, clear auth state and redirect to `/login`.
-- **Route protection**: all routes except `/login` and `/register` MUST be wrapped in a `<ProtectedRoute>` component that redirects unauthenticated users to `/login`.
-- Implement all 7 pages per the spec:
-  - **Login** (`/login`) — username + password fields, "Sign in" button, link to `/register`. Redirect to `/` on success.
-  - **Register** (`/register`) — username, email, password, confirm-password fields; client-side password policy feedback; redirect to `/login` on success.
-  - **Dashboard** (`/`) — summary cards per resource (last bill amount, date, trend arrow); consumption line chart (toggle per resource); "Upload Bill" CTA.
-  - **Bill Upload** (`/upload`) — drag-and-drop PDF/image zone; `resource_type` selector; progress indicator during parse; preview parsed result before saving; toast on success/error. Upload button MUST be disabled during processing.
-  - **Bills History** (`/bills`) — filterable, sortable table; row click → bill detail modal; "Export PDF" button.
-  - **Predictions** (`/predictions`) — horizon selector (1/2/3 months); per-resource prediction cards with confidence range; "Insufficient data" empty state with guidance.
-  - **Analysis** (`/analysis`) — global date-range filter and resource type toggle; 6 Recharts charts (consumption trend, monthly cost stacked bar, price/unit trend, year-over-year, cumulative YTD, consumption heatmap); per-chart PNG export via `canvas.toBlob`; "Export Full Report" PDF button; empty state per chart when < 2 data points.
-- **Server state discipline**: ALL server data (bills, predictions, analytics, auth user) MUST use React Query. No `useEffect` + `useState` for data fetching. All query keys defined as constants in `src/lib/queryKeys.ts`.
-- **Error handling**: every React Query mutation MUST have an `onError` handler that displays a HeroUI toast with the RFC 7807 `detail` message from the server response. Silent failures are prohibited.
-- **Empty states**: every data-displaying component MUST render a meaningful empty state (not `null` or indefinite spinner) when there are zero records.
-- **No direct `fetch()` calls**: all HTTP calls go through the configured Axios instance with the token-refresh interceptor.
-- **TypeScript discipline**: `strict: true`; no `any` types; no inline JSX styles except for dynamic values not expressible via Tailwind/HeroUI; functional components with hooks only (no class components).
+- Implement the frontend tasks for the **Dark Factory Monorepo Unification** across two React frontends: `user-input-manager` (Prompt Studio) and `ticket-manager` (Ticket Manager UI). Both services use **React 18**, **TypeScript (strict mode)**, **Vite 6**, and **Vitest 2** with coverage enforcement.
+- **Zustand migration (FR-008, user-input-manager only)**: migrate auth state from React Context API to Zustand 5. Access tokens MUST be held in Zustand in-memory state only — never `localStorage`, `sessionStorage`, or any JS-accessible cookie. Mirror the store pattern from `ticket-manager`. Existing protected route behavior, logout, and token refresh flows MUST work identically to before migration. The migration MUST be invisible to end users.
+- **Token storage invariant**: after migration, opening browser DevTools on Prompt Studio and inspecting `localStorage` or `sessionStorage` MUST show no access token. A page refresh MUST restore the session via refresh token only (not from storage).
+- **Vitest coverage (FR-009)**: both frontends MUST enforce ≥ 80% line and function coverage in `vite.config.ts` via `coverage.thresholds`. Use `@vitest/coverage-v8` as the provider. Tests run with `vitest run --coverage`.
+- **Multi-stage Dockerfile (FR-005a)**: each frontend has a two-stage Dockerfile — Node 20-alpine build stage runs `vite build` producing `dist/`; nginx alpine stage copies `dist/` to `/var/www/html`. The unified compose is fully self-contained with no host bind-mounts for static assets.
+- **Canonical frontend versions** (no deviations): react=18.3.1, react-dom=18.3.1, react-router-dom=6.28.0, typescript=5.7.2, vite=6.0.3, vitest=2.1.8, zustand=5.0.2, axios=1.7.9, i18next=24.0.5.
+- **TypeScript discipline**: `strict: true`; no `any` types; functional components only; no class components.
+- **No new features**: this is infrastructure and standardisation only. Do not add UI screens, modify API calls, or change visual behaviour beyond what the Zustand migration requires.
 
 ## Tool Authorization and Supervision Policy
 

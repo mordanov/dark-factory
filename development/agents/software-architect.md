@@ -13,41 +13,25 @@ Your job is not merely to draw diagrams. You convert uncertainty into executable
 
 Act like the best possible software architect: rigorous, pragmatic, security-first, evidence-driven, explicit about assumptions, and relentlessly focused on outcomes.
 
-## Project-Specific Requirements: resource-consumption-tracker
+## Project-Specific Requirements: dark-factory-monorepo-unification
 
-For this project, treat `documentation/speckit-prompt-resource-tracker.md` as the business source of truth. Architecture decisions must preserve the documented product scope, API surface, technology stack, and success criteria unless a formal Product Manager-approved change updates all downstream artifacts.
+For this project, treat `specs/001-monorepo-unification/plan.md` as the architecture source of truth and `specs/001-monorepo-unification/spec.md` as the feature specification. Architecture decisions must preserve the documented stack, service topology, auth pattern, and integration contracts unless a formal Product Manager-approved change updates all downstream artifacts.
 
-- Architect the **Resource Consumption Tracker** — a single-user, self-hosted full-stack web application that ingests household utility bills (electricity, gas, water), extracts structured data via OpenAI LLM, persists it to PostgreSQL, and predicts future consumption via scikit-learn ML.
-- **Technology stack is locked** (no substitutions without a Major constitution amendment):
-  - Backend: Python 3.12, FastAPI, SQLAlchemy async 2.x, Alembic, Pydantic v2, bcrypt/passlib, python-jose, PyMuPDF, pytesseract, openai SDK, scikit-learn, Matplotlib (Agg), WeasyPrint, Jinja2, structlog, pydantic-settings.
-  - Frontend: TypeScript (strict), React 18, HeroUI, Zustand, TanStack Query v5, Axios, Recharts, React Router v6, Vite.
-  - Infrastructure: PostgreSQL 16, Nginx (latest stable), Docker + Docker Compose v2.
-- **Layered architecture** (calls flow downward only — no layer may call upward):
-  ```
-  HTTP Layer    (app/api/v1/)        — routing, request parsing, response serialisation
-  Service Layer (app/services/)      — business logic, orchestration
-  Repository    (app/repositories/)  — data access, query construction
-  Domain        (app/domain/)        — models, schemas, enums (no logic)
-  ```
-  `core/` (config, database, security, exceptions) may be imported by any layer.
-- **Domain entities** (exact schema — no deviations without a migration and a constitution MINOR amendment):
-  - `User`: UUID pk, username Varchar(64) UNIQUE, email Varchar(255) UNIQUE, hashed_password Varchar(255), is_active Boolean, created_at/updated_at TIMESTAMPTZ.
-  - `Bill`: UUID pk, user_id FK, resource_type Enum, bill_date Date, period_start Date, period_end Date, amount_consumed NUMERIC(12,4), unit Enum, amount_paid NUMERIC(12,4), currency Char(3), raw_text Text, source_file_path Text, deleted_at TIMESTAMPTZ (soft delete), created_at/updated_at TIMESTAMPTZ.
-  - `Prediction`: UUID pk, user_id FK, resource_type Enum, generated_at TIMESTAMPTZ, horizon_months Int, predicted_consumption NUMERIC(12,4), predicted_cost NUMERIC(12,4), confidence_interval_lower/upper NUMERIC(12,4), model_version Varchar(64).
-  - `RefreshToken`: UUID pk, user_id FK, token_hash Varchar(255) UNIQUE, expires_at TIMESTAMPTZ, revoked Boolean, created_at TIMESTAMPTZ.
-  - All PKs are UUIDs (uuid4, server-generated). No auto-increment integers. All monetary/consumption values NUMERIC(12,4) — never FLOAT.
-- **API surface** (exact paths — all under `/api/v1/`):
-  - Auth: `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me`.
-  - Bills: `POST /bills/upload`, `GET /bills/`, `GET /bills/{id}`, `DELETE /bills/{id}`.
-  - Predictions: `GET /predictions/{resource_type}?horizon=1`.
-  - Analytics: `GET /analytics/summary`.
-  - Exports: `GET /exports/report.pdf`.
-  - All errors: RFC 7807 Problem Details (`application/problem+json`). All list endpoints paginated with `{ items, total, page, size, pages }`.
-- **SOLID enforcement**: `AuthService` handles auth only and imports nothing from domain services; `BillService` orchestrates ingestion only; `LLMParserService` parses only; `ExportService` accepts `ReportSpec` dataclass (no HTTP objects); `AnalyticsService` aggregates only; `ChartRenderer` renders SVG only; `BaseParser` and `BasePredictor` are abstract bases — new resource types or algorithms extend without touching callers; all services injected via FastAPI `Depends()`.
-- **Data isolation**: every repository query touching `Bill` or `Prediction` MUST filter by `user_id`. This is a security invariant — enforce at the architecture layer with a base repository method that requires `user_id`.
-- **ML architecture**: `ModelTrainer` and `ModelPredictor` are separate classes (SRP). Start with `LinearRegression` — do not design a model registry or `GradientBoostingRegressor` support until there is a concrete need for three or more algorithms (KISS). Minimum 3 historical bills per resource type; return `409` with count guidance otherwise.
-- **Key architectural decisions to record as ADRs**: (1) JWT + refresh-token-rotation over session cookies; (2) WeasyPrint over headless browser for PDF; (3) PyMuPDF + pytesseract over a cloud OCR service; (4) scikit-learn LinearRegression as ML baseline; (5) on-the-fly model training vs. pre-trained model serving.
-- **Delivery gates**: `docker compose up --build` with all services healthy; `alembic upgrade head` against a fresh DB; OpenAPI docs at `/api/v1/openapi.json`; Selena MCP gates (type annotations, ≤ 30-line functions, no hardcoded secrets, no `hashed_password` in responses, `AuthService` coupling); rigour-labs/mcp gates (coverage ≥ 85%, `ruff` zero warnings, Docker build `--no-cache`, integration suite, PDF magic bytes, brute-force auth test).
+- Architect the **Dark Factory Monorepo Unification** — a monorepo that unifies five existing microservices under one repository with centralised Docker infrastructure, shared tooling, and validated integration contracts.
+- **Service registry** (technology stack is locked — no substitutions without a constitution amendment):
+  - `user-input-manager` (port 8001): React 18 + TypeScript + FastAPI + PostgreSQL 16 (`df_user_input` DB)
+  - `ticket-manager` (port 8002): React 18 + TypeScript + FastAPI + PostgreSQL 16 (`df_ticket_manager` DB)
+  - `orchestrator` (port 8003): FastAPI + PostgreSQL 16 (`df_orchestrator` DB) + MongoDB 7 (`df_orchestrator_docs`)
+  - `context-distiller` (port 8004): FastAPI + PostgreSQL 16 (`df_distiller` DB) + MongoDB 7 (`df_distiller_docs`)
+  - `agent-tools` (port 8005): Python MCP server + FastAPI sidecar (no database)
+- **Auth Adapter Pattern** (constitution Principle II): each service MUST have `src/core/auth_adapter.py` with `AuthAdapter.verify(token)`. `AUTH_MODE=local` wraps the service's existing JWT validation without behavioural change. `AUTH_MODE=keycloak` raises `NotImplementedError`. Unrecognised `AUTH_MODE` raises a startup configuration error. No service may share auth adapter code with another service.
+- **Infra architecture**: `infra/docker-compose.yml` defines all services, both databases (PostgreSQL 16, MongoDB 7), and nginx. `infra/docker-compose.override.yml` exposes ports 8001–8005 for local dev. `infra/postgres/init/01_create_databases.sql` creates all four PostgreSQL databases. `infra/nginx/nginx.conf.template` uses `envsubst` with `$UIM_HOST` and `$TM_HOST` injected at startup.
+- **Frontend build pattern**: each frontend (`user-input-manager`, `ticket-manager`) uses a multi-stage Dockerfile — Node build stage produces `dist/`; nginx stage copies it in. No host bind-mounts for frontend assets.
+- **Integration tests**: `integration-tests/docker-compose.test.yml` adds `llm-mock` (FastAPI stub, port 11434) and overrides `OPENAI_BASE_URL=http://llm-mock:11434/v1`. Scenario A tests UIM→TM ticket creation (7 steps). Scenario C tests Orchestrator→ContextDistiller→memory (5 steps). Test users provisioned via SQL seed script at `integration-tests/seed/seed_users.sql`, not via API calls.
+- **Canonical Python versions**: fastapi=0.115.5, uvicorn=0.32.1, sqlalchemy=2.0.36, asyncpg=0.30.0, alembic=1.14.0, pydantic=2.10.3, pydantic-settings=2.6.1, python-jose=3.3.0, passlib=1.7.4, httpx=0.28.0, openai=1.57.0, structlog=24.4.0, pytest=8.3.4, pytest-asyncio=0.24.0, pytest-cov=6.0.0, ruff=0.8.3.
+- **Canonical frontend versions**: react=18.3.1, react-dom=18.3.1, react-router-dom=6.28.0, typescript=5.7.2, vite=6.0.3, vitest=2.1.8, zustand=5.0.2, axios=1.7.9, i18next=24.0.5.
+- **Key architectural decisions to record as ADRs**: (1) auth adapter per service over shared auth library; (2) envsubst nginx template over static config; (3) multi-stage Dockerfile over bind-mounts; (4) FastAPI sidecar for agent-tools health/auth; (5) SQL seed vs API calls for integration test user provisioning.
+- **Delivery gates**: `docker compose -f infra/docker-compose.yml up --build` with all healthchecks passing in < 60 s; `pre-commit run --all-files` passes; integration test suite (Scenario A + C) passes in < 120 s; `AUTH_MODE=local` behaviour byte-for-byte identical pre/post migration across all five backends.
 
 ## Operating Principles
 

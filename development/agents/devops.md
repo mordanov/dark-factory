@@ -24,25 +24,20 @@ You own delivery infrastructure, automation, release reliability, runtime config
 - Test strategy ownership — coordinate with Autotester.
 - Final code-quality approval — coordinate with Code Reviewer.
 
-## Project-Specific Requirements: resource-consumption-tracker
+## Project-Specific Requirements: dark-factory-monorepo-unification
 
-For this project, treat `documentation/speckit-prompt-resource-tracker.md` as the business source of truth. Platform work must support the documented stack and deployment topology — do not introduce alternate databases, runtimes, or PDF generation libraries without a formal constitution amendment.
+For this project, treat `specs/001-monorepo-unification/plan.md` as the platform source of truth. Platform work must support the documented stack and deployment topology — do not introduce alternate databases, runtimes, or build tools without a formal constitution amendment.
 
-- Provide local orchestration with **Docker Compose v2** for all services: `backend` (FastAPI, port 8000), `frontend` (React/Vite, port 3000), `db` (PostgreSQL 16, port 5432), and `nginx` (reverse proxy). `docker compose up --build` must start the full stack with no manual steps beyond `.env` setup.
-- **Nginx configuration**: proxy `/api/` to `backend:8000` and `/` to `frontend:3000`. The PDF export route (`/api/v1/exports/report.pdf`) must support streaming responses — ensure `proxy_buffering off` and appropriate `proxy_read_timeout` for LLM-parsing latency (≤ 15 s) and ML/export endpoints.
-- **Alembic on startup**: the backend container MUST run `alembic upgrade head` before starting the FastAPI server. `alembic upgrade head` must succeed against a fresh database with no manual intervention.
-- **Test profile**: define a `test` profile in Docker Compose that spins up an isolated PostgreSQL instance for the integration and quality-gate test suite. The test DB is seeded fresh with Alembic migrations per test session.
-- **Environment variables** — document and protect all of the following (provide `.env.example` with placeholder values; never commit actual values):
-  - `DATABASE_URL=postgresql+asyncpg://user:pass@db:5432/resource_tracker`
-  - `OPENAI_API_KEY`, `OPENAI_MODEL`
-  - `MAX_UPLOAD_SIZE_MB`
-  - `CORS_ORIGINS`
-  - `JWT_SECRET_KEY` (≥ 256 bits of entropy), `JWT_ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `REFRESH_TOKEN_EXPIRE_DAYS`
-- **Secrets discipline**: no secret, credential, or API key may appear in source code, Docker image layers, CI logs, or build artifacts. `JWT_SECRET_KEY` and `OPENAI_API_KEY` must come from environment injection only. Credential files (`*/credentials.json`) are gitignored.
-- **Health checks**: define Docker Compose `healthcheck` for the `db` service (pg_isready) and the `backend` service (HTTP GET on a `/health` or `/api/v1/openapi.json` endpoint). Backend and frontend containers should declare `depends_on` with condition `service_healthy` for `db`.
-- **CI/CD**: define a CI pipeline that runs `docker compose build --no-cache`, `alembic upgrade head` against the test profile DB, `ruff` lint, `mypy --strict`, the full `pytest` suite (unit + integration + quality-gate), and asserts overall coverage ≥ 85%.
-- **Observability**: structured JSON logs from the backend (via structlog) must be collected and inspectable. Ensure request IDs are propagated. Document how to tail backend logs locally.
-- **Rollback**: document a rollback procedure — `docker compose down`, apply `alembic downgrade -1` if a migration was included, and `docker compose up --build` from the previous image tag.
+- Provide unified orchestration with **Docker Compose v2** for all five services: `user-input-manager` (8001), `ticket-manager` (8002), `orchestrator` (8003), `context-distiller` (8004), `agent-tools` (8005), PostgreSQL 16, MongoDB 7, and nginx. `docker compose -f infra/docker-compose.yml up --build` MUST start the full platform with no manual steps beyond `cp infra/.env.example infra/.env` and filling credentials. All healthchecks must pass within 60 seconds.
+- **Compose topology**: `infra/docker-compose.yml` is the unified compose. `infra/docker-compose.override.yml` exposes ports 8001–8005 for local dev. Each service also has its own `docker-compose.yml` for standalone development. All services use `depends_on` with `condition: service_healthy` for their database dependencies.
+- **Nginx (FR-005, FR-006)**: `infra/nginx/nginx.conf.template` uses `envsubst` to inject `$UIM_HOST` and `$TM_HOST` at container startup. Every server block MUST include `location /.well-known/acme-challenge/`. SSL and HTTPS-redirect stanzas MUST be present but commented. Proxy settings live in `infra/nginx/snippets/proxy.conf` and `snippets/ssl.conf`.
+- **Multi-stage Dockerfiles (FR-005a)**: each frontend (`user-input-manager`, `ticket-manager`) uses a two-stage Dockerfile — Node build stage produces `dist/`; nginx stage copies it in. No host bind-mounts for frontend assets in compose.
+- **PostgreSQL init (FR-004)**: `infra/postgres/init/01_create_databases.sql` creates all four databases (`df_user_input`, `df_ticket_manager`, `df_orchestrator`, `df_distiller`) and their dedicated users on first postgres container boot.
+- **Integration test environment**: `integration-tests/docker-compose.test.yml` adds the `llm-mock` service (FastAPI stub at port 11434) and overrides `OPENAI_BASE_URL=http://llm-mock:11434/v1` for all backend services. SQL seed script at `integration-tests/seed/seed_users.sql` runs before `pytest`. Suite must complete in < 120 s.
+- **Pre-commit (FR-011)**: root-level `.pre-commit-config.yaml` runs `ruff check` and `ruff format` across all Python files in `services/` and `integration-tests/`. Per-service `.pre-commit-config.yaml` files also exist for service-level development.
+- **Environment variables (FR-012)**: `infra/.env.example` MUST document every required variable with inline comments explaining purpose, which services use it, and its default. Required groups: postgres superuser credentials, per-service DB credentials, per-service `SECRET_KEY`, `AUTH_MODE` (default `local`), `UIM_HOST`, `TM_HOST`, `OPENAI_API_KEY`. Never commit actual credentials.
+- **Healthchecks**: every service container MUST have a `healthcheck` — backends via `curl -f http://localhost:<port>/health`; postgres via `pg_isready`; mongo via `mongosh --eval 'db.runCommand({ping:1})'`; nginx via checking localhost response.
+- **Secrets discipline**: no secret, credential, or API key may appear in source code, Docker image layers, CI logs, or build artifacts. All credential files (`*/credentials.json`) are gitignored.
 
 ## Tool Authorization and Supervision Policy
 
