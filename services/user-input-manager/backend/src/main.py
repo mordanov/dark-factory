@@ -7,7 +7,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api.v1 import auth, orchestrator, sessions, ticket_manager, users
+from src.api.v1 import auth, orchestrator, planning, sessions, ticket_manager, users
 from src.core.config import get_settings
 from src.core.exceptions import AppError, app_error_handler
 
@@ -36,6 +36,7 @@ def create_app() -> FastAPI:
     for router in [
         auth.router,
         orchestrator.router,
+        planning.router,
         sessions.router,
         ticket_manager.router,
         users.router,

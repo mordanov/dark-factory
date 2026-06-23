@@ -67,3 +67,25 @@ class AdrStatusResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: Literal["ok"]
     service: str
+
+
+class AgentOverride(BaseModel):
+    agent_id: str
+    override_text: str
+
+
+class AgentConfigRequest(BaseModel):
+    project_id: str
+    tech_stack: list[str] = []
+    agent_overrides: list[AgentOverride] = []
+
+
+class AgentConfigResponse(BaseModel):
+    project_id: str
+    tech_stack: list[str]
+    agent_overrides: list[AgentOverride]
+
+
+class AgentConfigStored(BaseModel):
+    project_id: str
+    stored_at: datetime

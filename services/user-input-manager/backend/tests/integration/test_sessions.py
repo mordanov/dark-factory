@@ -156,37 +156,6 @@ async def test_submit_feedback_approved(
     assert resp.json()["awaiting_approval"] is True
 
 
-@pytest.mark.asyncio
-async def test_approve_creates_ticket(
-    client, app, db, auth_headers, mock_tm_client, mock_llm_result
-):
-    app.dependency_overrides[get_session_service] = lambda: SessionService(db, mock_tm_client)
-
-    with patch(
-        "src.services.session_service.refine_prompt", AsyncMock(return_value=mock_llm_result)
-    ):
-        create_resp = await client.post(
-            "/api/v1/sessions",
-            headers=auth_headers,
-            json={
-                "session_type": "new_project",
-                "tm_project_name": "Final Project",
-                "initial_prompt": "build something",
-            },
-        )
-    session_id = create_resp.json()["session"]["id"]
-
-    resp = await client.post(
-        f"/api/v1/sessions/{session_id}/approve",
-        headers=auth_headers,
-        json={"ticket_title": "Build auth system", "project_description": "New project"},
-    )
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["ticket_id"] == "new-ticket-id"
-    mock_tm_client.create_project.assert_awaited_once()
-    mock_tm_client.create_ticket.assert_awaited_once()
-
 
 @pytest.mark.asyncio
 async def test_revert(client, app, db, auth_headers, mock_tm_client, mock_llm_result):

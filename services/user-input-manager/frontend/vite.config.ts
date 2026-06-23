@@ -26,7 +26,6 @@ export default defineConfig({
         'src/store/**',
         'src/components/auth/**',
         'src/components/layout/**',
-        'src/components/sessions/ApproveModal.tsx',
         'src/components/sessions/NewSessionModal.tsx',
         'src/components/factory/AuditTrailPage.tsx',
         'src/components/factory/JobsPage.tsx',

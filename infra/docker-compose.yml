@@ -70,6 +70,9 @@ services:
       INITIAL_ADMIN_EMAIL: ${UIM_ADMIN_EMAIL:-admin@dark-factory.local}
       INITIAL_ADMIN_PASSWORD: ${UIM_ADMIN_PASSWORD:-ChangeMe123!}
       CORS_ALLOW_ORIGINS: '["http://localhost","http://${UIM_HOST:-localhost}"]'
+      PLANNING_MODEL: ${PLANNING_MODEL:-gpt-4o-mini}
+      CONTEXT_DISTILLER_BASE_URL: ${CONTEXT_DISTILLER_BASE_URL:-http://context-distiller:8000}
+      CONTEXT_DISTILLER_TIMEOUT_SECONDS: ${CONTEXT_DISTILLER_TIMEOUT_SECONDS:-10}
       ENVIRONMENT: production
     depends_on:
       postgres:

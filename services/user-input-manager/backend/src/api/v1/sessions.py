@@ -5,7 +5,6 @@ from fastapi import APIRouter, Depends, Query
 from src.api.dependencies import get_current_user, get_session_service
 from src.models.models import User
 from src.schemas.schemas import (
-    ApproveRequest,
     IterationResponse,
     RevertRequest,
     SessionCreate,
@@ -73,13 +72,3 @@ async def revert(
     svc: SessionService = Depends(get_session_service),
 ):
     return await svc.revert(session_id, current_user.id, payload)
-
-
-@router.post("/{session_id}/approve")
-async def approve(
-    session_id: uuid.UUID,
-    payload: ApproveRequest,
-    current_user: User = Depends(get_current_user),
-    svc: SessionService = Depends(get_session_service),
-):
-    return await svc.approve_and_create_ticket(session_id, current_user.id, payload)

@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { sessionsApi, extractError, type Iteration, type Session } from '../../api/client'
-import { ApproveModal } from './ApproveModal'
+import { usePlanStore } from '../../store/planStore'
+import { PlanningModal } from './PlanningModal'
 
 export function SessionDetailPage() {
   const { t } = useTranslation()
@@ -14,29 +15,11 @@ export function SessionDetailPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [comment, setComment] = useState('')
-  const [showApprove, setShowApprove] = useState(false)
-  const [ticketCreated, setTicketCreated] = useState<string | null>(null)
+  const [showPlanning, setShowPlanning] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  const reload = async () => {
-    if (!sessionId) return
-    setLoading(true)
-    try {
-      const [{ data: sess }, { data: iters }] = await Promise.all([
-        sessionsApi.list().then(r => ({ data: r.data.items.find(s => s.id === sessionId)! })),
-        sessionsApi.getIterations(sessionId),
-      ])
-      // Fall back to individual get if not found in list (e.g. paging)
-      setSession(sess || null)
-      setIterations(iters)
-    } catch (err) {
-      setError(extractError(err))
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { reset: resetPlan } = usePlanStore()
 
-  // Simpler load: get session info from iterations + list
   const loadFull = async () => {
     if (!sessionId) return
     setLoading(true)
@@ -70,14 +53,11 @@ export function SessionDetailPage() {
     setSubmitting(true)
     setError('')
     try {
-      const { data } = await sessionsApi.feedback(sessionId, {
+      await sessionsApi.feedback(sessionId, {
         is_approved: isApproved,
         comment: comment || undefined,
       })
       setComment('')
-      if (data.awaiting_approval) {
-        setShowApprove(true)
-      }
       await loadFull()
     } catch (err) {
       setError(extractError(err))
@@ -99,16 +79,37 @@ export function SessionDetailPage() {
     }
   }
 
-  const handleApproved = async (ticketId: string) => {
-    setShowApprove(false)
-    setTicketCreated(ticketId)
+  const handleOpenPlanning = () => {
+    resetPlan()
+    setShowPlanning(true)
+  }
+
+  const handlePlanningClose = async () => {
+    setShowPlanning(false)
     await loadFull()
+  }
+
+  const statusBadgeClass = (status: Session['status']) => {
+    switch (status) {
+      case 'approved':
+      case 'plan_ready':
+        return 'badge-green'
+      case 'in_progress':
+      case 'planning':
+      case 'plan_confirmed':
+        return 'badge-amber'
+      case 'tickets_created':
+        return 'badge-green'
+      default:
+        return 'badge-muted'
+    }
   }
 
   if (loading) return <div className="empty-state"><span className="spinner" /></div>
   if (!session) return <div className="error-banner">{t('common.error')}</div>
 
-  const suggestedTitle = lastAssistant?.llm_suggested_title || session.tm_ticket_title || ''
+  const planningStatuses: Array<Session['status']> = ['planning', 'plan_ready', 'plan_confirmed', 'tickets_created']
+  const sessionPlanActive = planningStatuses.includes(session.status)
 
   return (
     <div>
@@ -119,16 +120,34 @@ export function SessionDetailPage() {
           </div>
           <h1 className="page-title">{session.tm_ticket_title || t('session.new')}</h1>
         </div>
-        <span className={`badge ${session.status === 'approved' ? 'badge-green' : session.status === 'in_progress' ? 'badge-amber' : 'badge-muted'}`}>
-          {t(`session.status_${session.status}`)}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span className={`badge ${statusBadgeClass(session.status)}`}>
+            {t(`session.status_${session.status}`, { defaultValue: session.status })}
+          </span>
+          {session.status === 'approved' && (
+            <button className="btn btn-primary" onClick={handleOpenPlanning}>
+              {t('planning.generate_plan')}
+            </button>
+          )}
+          {sessionPlanActive && session.status !== 'tickets_created' && (
+            <button className="btn btn-secondary" onClick={handleOpenPlanning}>
+              {t('planning.plan_title')}
+            </button>
+          )}
+        </div>
       </div>
 
       {error && <div className="error-banner mb-16">{error}</div>}
 
-      {ticketCreated && (
-        <div className="success-box mb-16">
-          {t('session.ticket_created')} — {t('session.ticket_id')}: <span className="mono">{ticketCreated}</span>
+      {/* Tickets created success banner */}
+      {session.status === 'tickets_created' && (
+        <div className="success-box mb-16" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>{t('planning.tickets_created', { count: session.tm_ticket_id ? 1 : 0 })}</span>
+          {session.tm_project_id && (
+            <a href={`/ticket-manager/projects/${session.tm_project_id}`} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
+              {t('planning.view_in_tm')} ↗
+            </a>
+          )}
         </div>
       )}
 
@@ -149,7 +168,6 @@ export function SessionDetailPage() {
                 </span>
                 <span>{t('session.version')} {iter.iteration_number}</span>
                 {iter.is_approved === true && <span className="badge badge-green">✓</span>}
-                {/* Revert button for non-current assistant iterations */}
                 {isAssistant && !isCurrent && isInProgress && (
                   <button
                     className="btn btn-ghost btn-sm"
@@ -229,12 +247,11 @@ export function SessionDetailPage() {
 
       <div ref={bottomRef} />
 
-      {showApprove && session && (
-        <ApproveModal
-          session={session}
-          suggestedTitle={suggestedTitle}
-          onClose={() => setShowApprove(false)}
-          onApproved={handleApproved}
+      {showPlanning && session && (
+        <PlanningModal
+          sessionId={session.id}
+          tmProjectId={session.tm_project_id}
+          onClose={handlePlanningClose}
         />
       )}
     </div>

@@ -17,6 +17,9 @@ from src.schemas.schemas import (
     AdrStatusResponse,
     AdrStatusUpdate,
     AdrSummary,
+    AgentConfigRequest,
+    AgentConfigResponse,
+    AgentConfigStored,
     MemoryResponse,
 )
 
@@ -113,3 +116,45 @@ async def update_adr_status(
     except ConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
     return AdrStatusResponse(**result)
+
+
+@router.post(
+    "/memory/{project_id}/agent-config",
+    response_model=AgentConfigStored,
+    status_code=201,
+)
+async def upsert_agent_config(
+    project_id: str,
+    body: AgentConfigRequest,
+    mongo: MongoDep,
+    _user: UserDep,
+) -> AgentConfigStored:
+    now = datetime.utcnow()
+    doc = {
+        "_id": project_id,
+        "project_id": project_id,
+        "tech_stack": body.tech_stack,
+        "agent_overrides": [o.model_dump() for o in body.agent_overrides],
+        "stored_at": now.isoformat(),
+    }
+    await mongo["agent_configs"].replace_one({"_id": project_id}, doc, upsert=True)
+    return AgentConfigStored(project_id=project_id, stored_at=now)
+
+
+@router.get("/memory/{project_id}/agent-config", response_model=AgentConfigResponse)
+async def get_agent_config(
+    project_id: str,
+    mongo: MongoDep,
+    _user: UserDep,
+) -> AgentConfigResponse:
+    doc = await mongo["agent_configs"].find_one({"_id": project_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Agent config not found")
+    return AgentConfigResponse(
+        project_id=doc["project_id"],
+        tech_stack=doc.get("tech_stack", []),
+        agent_overrides=[
+            {"agent_id": o["agent_id"], "override_text": o["override_text"]}
+            for o in doc.get("agent_overrides", [])
+        ],
+    )

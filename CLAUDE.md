@@ -1,7 +1,7 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/002-agent-dispatcher/plan.md`
+`specs/003-planning-agent/plan.md`
 <!-- SPECKIT END -->
 
 # Dark Factory Monorepo
