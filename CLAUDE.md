@@ -1,7 +1,7 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/001-monorepo-unification/plan.md`
+`specs/002-agent-dispatcher/plan.md`
 <!-- SPECKIT END -->
 
 # Dark Factory Monorepo
@@ -15,6 +15,7 @@ shell commands, and other important information, read the current plan:
 | orchestrator | `services/orchestrator` | 8003 | `df_orchestrator` (PostgreSQL + MongoDB `df_orchestrator_docs`) | `http://orchestrator:8000` |
 | context-distiller | `services/context-distiller` | 8004 | `df_distiller` (PostgreSQL + MongoDB `df_distiller_docs`) | `http://context-distiller:8000` |
 | agent-tools | `services/agent-tools` | 8005 | none | `http://agent-tools:8000` |
+| agent-dispatcher | `services/agent-dispatcher` | 8006 | `df_dispatcher` (PostgreSQL) | `http://agent-dispatcher:8000` |
 
 ## Infrastructure
 

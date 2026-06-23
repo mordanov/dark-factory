@@ -1,0 +1,89 @@
+"""Agent Dispatcher — FastAPI application."""
+
+from __future__ import annotations
+
+from contextlib import asynccontextmanager
+
+import structlog
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from src.api.v1 import runs
+from src.core.config import get_settings
+from src.core.exceptions import AppError
+from src.db.session import AsyncSessionLocal
+
+logger = structlog.get_logger(__name__)
+settings = get_settings()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from src.repositories.run_repo import AgentRunRepository
+    from src.schemas.schemas import AgentResult
+    from src.services.reporter import Reporter
+    from src.workers.dispatch_worker import DispatchWorker
+
+    async with AsyncSessionLocal() as db:
+        repo = AgentRunRepository(db)
+        orphaned = await repo.sweep_orphaned_running()
+        await db.commit()
+        if orphaned:
+            logger.info("Swept orphaned runs on startup", count=len(orphaned))
+            reporter = Reporter()
+            for ticket_id, project_id in orphaned:
+                try:
+                    await reporter.report_result(
+                        ticket_id=ticket_id,
+                        project_id=project_id,
+                        result=AgentResult(
+                            status="needs_review",
+                            tm_comment="Service restarted; run orphaned",
+                        ),
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to report orphaned run", ticket_id=ticket_id, error=str(exc)
+                    )
+
+    worker = DispatchWorker()
+    await worker.start()
+    yield
+    await worker.stop()
+
+
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title=settings.app_name,
+        version="1.0.0",
+        docs_url="/api/docs",
+        openapi_url="/api/openapi.json",
+        lifespan=lifespan,
+    )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_allow_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    @app.exception_handler(AppError)
+    async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+        )
+
+    app.include_router(runs.router, prefix="/api/v1")
+
+    @app.get("/api/health", tags=["health"])
+    async def health():
+        return {"status": "ok", "runner_mode": settings.agent_runner_mode}
+
+    return app
+
+
+app = create_app()

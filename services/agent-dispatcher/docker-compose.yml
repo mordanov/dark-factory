@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: df_dispatcher
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  agent-dispatcher:
+    build: .
+    ports:
+      - "8006:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/df_dispatcher
+      JWT_SECRET_KEY: dev-secret-key-change-in-prod
+      AUTH_MODE: local
+      AGENT_RUNNER_MODE: claude_code
+      ORCHESTRATOR_BASE_URL: http://localhost:8003
+      TICKET_MANAGER_BASE_URL: http://localhost:8002
+      CONTEXT_DISTILLER_BASE_URL: http://localhost:8004
+      POLL_INTERVAL_SECONDS: "10"
+      WORKER_MAX_CONCURRENT_RUNS: "3"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+volumes:
+  postgres_data:

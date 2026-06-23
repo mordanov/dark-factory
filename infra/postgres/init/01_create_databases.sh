@@ -38,3 +38,6 @@ create_db_and_user "df_orchestrator" "${ORCH_DB_USER}" "${ORCH_DB_PASSWORD}"
 
 # context-distiller
 create_db_and_user "df_distiller" "${DISTILLER_DB_USER}" "${DISTILLER_DB_PASSWORD}"
+
+# agent-dispatcher
+create_db_and_user "df_dispatcher" "${DISPATCHER_DB_USER}" "${DISPATCHER_DB_PASSWORD}"

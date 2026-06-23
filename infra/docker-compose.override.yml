@@ -24,6 +24,10 @@ services:
     ports:
       - "8005:8000"
 
+  agent-dispatcher:
+    ports:
+      - "8006:8000"
+
   postgres:
     ports:
       - "5432:5432"
