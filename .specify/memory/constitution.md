@@ -1,25 +1,26 @@
 <!--
   Sync Impact Report
-  Version change: 1.0.0 → 1.1.0
-  Modified principles: None — existing principles I–X unchanged
+  Version change: 1.1.0 → 1.2.0
+  Modified principles: None — existing principles I–XII unchanged
   Added sections:
-    - Principle XI: Agent Dispatcher — FSM Sovereignty and Run Isolation
-    - Principle XII: Agent Dispatcher — Operational Safety Contracts
-    - agent-dispatcher entry in Service Registry and Monorepo Structure
-    - df_dispatcher database entry in Infrastructure section
-    - Agent Dispatcher items in Definition of Done (items 14–17)
+    - Principle XIII: Planning Agent — Plan Persistence Before User Exposure
+    - Principle XIV: Planning Agent — User Confirmation Gate for LLM Output
+    - Principle XV: Planning Agent — Ticket Creation Is All-or-None with Retry
+    - Principle XVI: Planning Agent — Agent Config Is Best-Effort, Never Blocking
+    - Planning Agent entry in Monorepo Structure note (extension to user-input-manager)
+    - Planning Agent items in Definition of Done (items 18–21)
     - Four new Non-Negotiable Constraints under Governance
   Removed sections: None
   Templates requiring updates:
-    ✅ .specify/memory/constitution.md — fully updated for v1.1.0
+    ✅ .specify/memory/constitution.md — fully updated for v1.2.0
     ✅ .specify/templates/plan-template.md — Constitution Check gates remain valid; no structural change required
     ✅ .specify/templates/spec-template.md — no constitution-specific changes required
     ✅ .specify/templates/tasks-template.md — no constitution-specific changes required
     ✅ .specify/templates/commands/ — directory not present, no action required
   Deferred TODOs: None
-  Version bump rationale: MINOR — two new principles added (XI, XII) and the
-    agent-dispatcher service registered with its database and DoD criteria.
-    Existing principles I–X are fully preserved and unmodified.
+  Version bump rationale: MINOR — four new principles added (XIII–XVI) covering the
+    Planning Agent feature (prompt-plan persistence, confirmation gate, transactional
+    ticket creation, best-effort agent config). Existing principles I–XII fully preserved.
 -->
 
 # Dark Factory Monorepo Constitution
@@ -155,6 +156,61 @@ the service.
 in agent run logs, in the `raw_output` field, or in any API response. The Dispatcher MUST
 redact or exclude these values before persisting or returning run records.
 
+### XIII. Planning Agent — Plan Persistence Before User Exposure
+
+A generated plan MUST be persisted in the `prompt_plans` PostgreSQL table before it is
+shown to the user. Plans that exist only in memory or in an LLM API response are not
+acceptable. Users MUST be able to close the browser and return to find their plan intact.
+The plan status lifecycle (`draft → ready → confirmed → tickets_created`) MUST be
+durably tracked in the database so the frontend can always reconstruct the current state
+from a GET request alone.
+
+No plan generation endpoint MUST return a plan payload to the client without first
+writing it to the database. If the database write fails, the endpoint MUST return an
+error and NOT surface the LLM output to the user.
+
+### XIV. Planning Agent — User Confirmation Gate for LLM Output
+
+LLM-generated plan content MUST NEVER be automatically submitted to Ticket Manager.
+The user MUST review the plan (`plan_ready` state) and explicitly confirm it
+(`POST /sessions/{id}/plan/confirm`) before any ticket creation begins. No background
+task, hook, or timer may bypass this confirmation gate.
+
+Between `plan_ready` and `plan_confirmed`, the user MUST be able to edit any node
+(title, description, `ticket_type`) and delete any Story or Task. The service MUST
+validate the edited plan against the schema before saving. Adding new nodes is
+deferred to a future phase and MUST NOT be implemented in v1.
+
+### XV. Planning Agent — Ticket Creation Is All-or-None with Retry
+
+Ticket creation in TM MUST be treated as an atomic operation at the plan level: either
+all tickets are created, or the system records how many were created and presents a
+recoverable error state (`plan_confirmed` with `created_ticket_ids` populated). Partial
+success is NOT a terminal state — the user MUST have a "Retry ticket creation" path.
+
+On retry, already-created tickets (tracked in `prompt_plans.created_ticket_ids`) MUST be
+skipped. This makes creation idempotent across retries. The service MUST NEVER create
+duplicate tickets by re-submitting IDs already in `created_ticket_ids`.
+
+Dependencies between tasks MUST use TM ticket IDs (not local plan IDs) after creation.
+The `local_id → tm_ticket_id` mapping MUST be stored in `prompt_plans.ticket_id_map`
+(JSONB) and used when setting `depends_on` in TM.
+
+### XVI. Planning Agent — Agent Config Is Best-Effort, Never Blocking
+
+Agent configuration generation (project-specific overrides for each Dark Factory agent)
+MUST NOT block or delay ticket creation. If the LLM call for agent config fails, times
+out, or returns invalid JSON:
+- The failure MUST be logged.
+- `prompt_plans.agent_config` MUST be set to `null`.
+- Ticket creation MUST proceed without the agent config.
+- The Orchestrator will use base agent prompts without project overrides.
+
+Agent config, when generated successfully, MUST be written to the ContextDistiller
+Document Store via `POST /memory/{project_id}/agent-config` after ticket creation
+succeeds. `user-input-manager` MUST NEVER write directly to MongoDB — all agent config
+storage MUST go through the ContextDistiller HTTP API.
+
 ## Monorepo Structure & Service Registry
 
 The monorepo layout is fixed and MUST NOT deviate. Services retain their own internal
@@ -167,6 +223,9 @@ This is a mono**repo**, not a mono**lith**.
 dark-factory/
 ├── services/
 │   ├── user-input-manager/   ← port 8001 | frontend yes | PG: df_user_input      | DNS: UIM_HOST
+│   │                            Note: Planning Agent is an EXTENSION of this service,
+│   │                            not a separate container. It adds endpoints and a
+│   │                            new DB table (prompt_plans) to user-input-manager.
 │   ├── ticket-manager/       ← port 8002 | frontend yes | PG: df_ticket_manager  | DNS: TM_HOST
 │   ├── orchestrator/         ← port 8003 | frontend no  | PG: df_orchestrator    | Mongo: df_orchestrator_docs
 │   ├── context-distiller/    ← port 8004 | frontend no  | PG: df_distiller       | Mongo: df_distiller_docs
@@ -249,6 +308,14 @@ HTTPS (443) is added by the operator post-certbot. Built from `infra/nginx/Docke
 16. In `api` mode: the LLM API is called with system prompt and context; result is parsed.
 17. After any agent run completes: the TM ticket has a new comment and an Orchestrator
     evaluation job has been triggered. No FSM state is modified by the Dispatcher directly.
+18. Planning Agent: session status flow works end-to-end (`approved → planning → plan_ready
+    → plan_confirmed → tickets_created`).
+19. Planning Agent: generated plan is persisted in `prompt_plans` before being shown to the
+    user; user can close the browser and return to the plan intact.
+20. Planning Agent: tickets are created in TM with correct hierarchy (Epic → Stories →
+    Tasks with `depends_on` using TM IDs); partial creation is retryable without duplicates.
+21. Planning Agent: agent config is written to ContextDistiller Document Store after
+    successful ticket creation; config failure does not block ticket creation.
 
 ## Governance
 
@@ -257,8 +324,8 @@ Any practice that conflicts with a principle stated here MUST yield to the const
 
 **Amendment procedure:** Amendments require (1) a written rationale, (2) a description
 of any migration plan for affected services, and (3) a version increment per the policy
-below. Amendments must be committed to `development/documentation/monorepo-constitution.md`
-and propagated to `.specify/memory/constitution.md` via `/speckit-constitution`.
+below. Amendments must be committed to `development/documentation/` and propagated to
+`.specify/memory/constitution.md` via `/speckit-constitution`.
 
 **Versioning policy:**
 - MAJOR: Backward-incompatible changes — removing or fundamentally redefining a principle
@@ -266,7 +333,7 @@ and propagated to `.specify/memory/constitution.md` via `/speckit-constitution`.
 - MINOR: Adding a new principle, section, or materially expanding guidance.
 - PATCH: Clarifications, wording fixes, non-semantic refinements.
 
-**Compliance:** All PRs and code reviews MUST verify adherence to Core Principles I–XII.
+**Compliance:** All PRs and code reviews MUST verify adherence to Core Principles I–XVI.
 Complexity introductions MUST be justified. The monorepo `CLAUDE.md` serves as the runtime
 development guide and MUST remain in sync with this constitution.
 
@@ -283,5 +350,10 @@ development guide and MUST remain in sync with this constitution.
 - A ticket MUST NEVER have two simultaneous agent runs. Check before every dispatch.
 - Agent prompts MUST NEVER be cached. Read from disk on each run without exception.
 - `SERVICE_JWT` and service passwords MUST NEVER appear in logs or API responses.
+- A plan MUST be persisted to the database before it is shown to the user. No ephemeral plans.
+- LLM output MUST NEVER be sent to Ticket Manager without explicit user confirmation.
+- Ticket creation is all-or-none with retry. NEVER leave orphaned tickets without a recovery path.
+- Agent config failure MUST NEVER block ticket creation. Best-effort only.
+- `user-input-manager` MUST NEVER write directly to MongoDB. All agent config via ContextDistiller API.
 
-**Version**: 1.1.0 | **Ratified**: 2026-06-22 | **Last Amended**: 2026-06-22
+**Version**: 1.2.0 | **Ratified**: 2026-06-22 | **Last Amended**: 2026-06-23

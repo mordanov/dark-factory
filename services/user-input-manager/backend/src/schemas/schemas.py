@@ -196,3 +196,95 @@ class ApproveRequest(BaseModel):
     ticket_title: str = Field(min_length=1, max_length=500)
     # For new projects only
     project_description: str | None = Field(default=None, max_length=2000)
+
+
+# ---------------------------------------------------------------------------
+# Planning Agent — Plan tree nodes
+# ---------------------------------------------------------------------------
+
+
+class PlanTask(BaseModel):
+    local_id: str = Field(pattern=r"^task-\d+-\d+$")
+    title: str = Field(min_length=1, max_length=200)
+    description: str = Field(max_length=500)
+    ticket_type: Literal["task", "implementation", "investigation"] = "task"
+    complexity: Literal["S", "M", "L", "XL"] = "M"
+    depends_on: list[str] = Field(default_factory=list)
+
+
+class PlanStory(BaseModel):
+    local_id: str = Field(pattern=r"^story-\d+$")
+    title: str = Field(min_length=1, max_length=200)
+    description: str = Field(max_length=500)
+    ticket_type: Literal["story"] = "story"
+    tasks: list[PlanTask] = Field(default_factory=list, max_length=10)
+
+
+class PlanEpic(BaseModel):
+    local_id: Literal["epic-1"] = "epic-1"
+    title: str = Field(min_length=1, max_length=200)
+    description: str = Field(max_length=500)
+    ticket_type: Literal["epic"] = "epic"
+
+
+class PlanContent(BaseModel):
+    epic: PlanEpic
+    stories: list[PlanStory] = Field(min_length=1, max_length=10)
+
+
+# ---------------------------------------------------------------------------
+# Planning Agent — Agent configuration
+# ---------------------------------------------------------------------------
+
+
+class AgentOverride(BaseModel):
+    agent_id: str
+    override_text: str = Field(max_length=2000)
+
+
+class AgentConfig(BaseModel):
+    project_id: str
+    tech_stack: list[str] = Field(default_factory=list)
+    agent_overrides: list[AgentOverride] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Planning Agent — API DTOs
+# ---------------------------------------------------------------------------
+
+
+class PlanResponse(OrmModel):
+    id: uuid.UUID
+    session_id: uuid.UUID
+    status: str
+    plan_content: dict | None = None
+    agent_config: dict | None = None
+    validation_errors: list[str] | None = None
+    created_ticket_ids: list[str] | None = None
+    ticket_id_map: dict | None = None
+    tm_epic_id: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class PlanUpdateRequest(BaseModel):
+    plan_content: dict
+
+
+class PlanStatusResponse(BaseModel):
+    status: str
+    created_count: int
+    total: int
+    errors: list[str] = Field(default_factory=list)
+
+
+class PlanGenerateResponse(BaseModel):
+    session_id: uuid.UUID
+    plan_id: uuid.UUID
+    status: str
+
+
+class PlanConfirmResponse(BaseModel):
+    session_id: uuid.UUID
+    plan_id: uuid.UUID
+    status: str

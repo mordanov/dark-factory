@@ -1,4 +1,5 @@
 """Auth adapter — thin seam between FastAPI auth dependency and the validation backend."""
+
 from __future__ import annotations
 
 from src.core.config import Settings

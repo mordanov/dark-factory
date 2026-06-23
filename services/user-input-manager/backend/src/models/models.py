@@ -10,6 +10,7 @@ import uuid
 from datetime import UTC, datetime, timezone
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     DateTime,
     Enum,
@@ -68,13 +69,32 @@ class SessionStatus(str):
     IN_PROGRESS = "in_progress"
     APPROVED = "approved"
     CANCELLED = "cancelled"
+    PLANNING = "planning"
+    PLAN_READY = "plan_ready"
+    PLAN_CONFIRMED = "plan_confirmed"
+    TICKETS_CREATED = "tickets_created"
 
 
 SESSION_STATUS_ENUM = Enum(
     "in_progress",
     "approved",
     "cancelled",
+    "planning",
+    "plan_ready",
+    "plan_confirmed",
+    "tickets_created",
     name="session_status",
+    create_type=False,
+)
+
+
+PLAN_STATUS_ENUM = Enum(
+    "draft",
+    "ready",
+    "confirmed",
+    "tickets_created",
+    "error",
+    name="plan_status",
     create_type=False,
 )
 
@@ -114,6 +134,9 @@ class PromptSession(Base):
         back_populates="session",
         cascade="all, delete-orphan",
         order_by="PromptIteration.iteration_number",
+    )
+    plan: Mapped[PromptPlan | None] = relationship(
+        back_populates="session", uselist=False, cascade="all, delete-orphan"
     )
 
 
@@ -157,3 +180,34 @@ class PromptIteration(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     session: Mapped[PromptSession] = relationship(back_populates="iterations")
+
+
+# ---------------------------------------------------------------------------
+# Prompt Plans
+# ---------------------------------------------------------------------------
+
+
+class PromptPlan(Base):
+    """Work breakdown plan generated from an approved prompt session."""
+
+    __tablename__ = "prompt_plans"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("prompt_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    status: Mapped[str] = mapped_column(PLAN_STATUS_ENUM, nullable=False, default="draft")
+    plan_content: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    agent_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    validation_errors: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    created_ticket_ids: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    ticket_id_map: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    tm_epic_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now
+    )
+
+    session: Mapped[PromptSession] = relationship(back_populates="plan")

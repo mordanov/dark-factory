@@ -17,12 +17,12 @@
 </head>
 <body>
 <h1>Agent Metrics Report — auth-app</h1>
-<p class="generated">Generated: 2026-06-23 04:34 UTC</p>
+<p class="generated">Generated: 2026-06-23 09:41 UTC</p>
 
 <div class="summary-box">
-  <strong>Total events:</strong> 64 &nbsp;|&nbsp;
-  <strong>Total time:</strong> 78,733s &nbsp;|&nbsp;
-  <strong>Total tokens:</strong> 1,276,900
+  <strong>Total events:</strong> 65 &nbsp;|&nbsp;
+  <strong>Total time:</strong> 78,853s &nbsp;|&nbsp;
+  <strong>Total tokens:</strong> 1,278,100
 </div>
 
 <h2>By Agent</h2>
@@ -35,7 +35,7 @@
 <tr><td>devops</td><td>10</td><td>6900</td><td>159,000</td></tr>
 <tr><td>frontend</td><td>4</td><td>9900</td><td>125,000</td></tr>
 <tr><td>product-manager</td><td>3</td><td>9420</td><td>95,000</td></tr>
-<tr><td>project-administrator</td><td>3</td><td>270</td><td>7,400</td></tr>
+<tr><td>project-administrator</td><td>4</td><td>390</td><td>8,600</td></tr>
 <tr><td>security-architect</td><td>7</td><td>7140</td><td>44,800</td></tr>
 <tr><td>software-architect</td><td>5</td><td>6420</td><td>143,700</td></tr>
 </table>
@@ -45,6 +45,7 @@
 <tr><th>Feature</th><th>Tasks</th><th>Time (s)</th><th>Tokens</th></tr>
 <tr><td>001-monorepo-unification</td><td>37</td><td>25740</td><td>471,200</td></tr>
 <tr><td>002-agent-dispatcher</td><td>24</td><td>43693</td><td>695,700</td></tr>
+<tr><td>003-planning-agent</td><td>1</td><td>120</td><td>1,200</td></tr>
 <tr><td>FR-008-zustand-auth-migration</td><td>1</td><td>7200</td><td>85,000</td></tr>
 <tr><td>FR-009-frontend-test-standardisation</td><td>2</td><td>2100</td><td>25,000</td></tr>
 </table>
@@ -120,6 +121,7 @@
 <tr><td>2026-06-23T04:32:17</td><td>security-architect</td><td>002-agent-dispatcher</td><td>DISP-002-SA-FIX2</td><td>Fix verify_access_token type check: revert from 'access|service' to 'access' only — matches orchestrator pattern</td><td>60</td><td>800</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
 <tr><td>2026-06-23T04:34:35</td><td>backend</td><td>002-agent-dispatcher</td><td>T058</td><td>Write README.md for agent-dispatcher service with all required sections</td><td>120</td><td>2000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
 <tr><td>2026-06-23T04:34:35</td><td>backend</td><td>002-agent-dispatcher</td><td>T001-T057</td><td>Full agent-dispatcher service implementation: scaffold, config, DB models, repositories, runners, context builder, poller, dispatcher service, brainstorm coordinator, API endpoints, tests, infra wiring</td><td>7200</td><td>85000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-23T09:40:24</td><td>project-administrator</td><td>003-planning-agent</td><td></td><td>Bootstrap: init metrics DB, validate 9 agent credentials, create TM project PLAN-003</td><td>120</td><td>1200</td><td>claude-sonnet-4-6</td><td>self-reported</td><td>completed</td><td>Startup work: credentials validated for all 9 agents, user_id fields patched</td></tr>
 </table>
 </body>
 </html>

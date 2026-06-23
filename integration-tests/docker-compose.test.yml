@@ -69,10 +69,15 @@ services:
       ENVIRONMENT: test
       INITIAL_ADMIN_EMAIL: admin@uim.example.com
       INITIAL_ADMIN_PASSWORD: AdminPass123!
+      PLANNING_MODEL: gpt-4o-mini
+      CONTEXT_DISTILLER_BASE_URL: http://context-distiller:8000
+      CONTEXT_DISTILLER_TIMEOUT_SECONDS: "10"
     depends_on:
       postgres:
         condition: service_healthy
       llm-mock:
+        condition: service_healthy
+      context-distiller:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')\" || exit 1"]

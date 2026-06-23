@@ -61,6 +61,11 @@ class Settings(BaseSettings):
     ticket_manager_context_max_tickets: int = Field(default=50)
     ticket_manager_context_max_chars: int = Field(default=6000)
 
+    # --- Planning Agent ---
+    planning_model: str = Field(default="gpt-4o-mini")
+    context_distiller_base_url: str = Field(default="http://context-distiller:8000")
+    context_distiller_timeout_seconds: float = Field(default=10.0, ge=1, le=60)
+
     @field_validator("cors_allow_origins", mode="before")
     @classmethod
     def _split_csv(cls, value):

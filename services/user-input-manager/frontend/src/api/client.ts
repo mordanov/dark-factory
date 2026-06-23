@@ -69,9 +69,70 @@ export interface Session {
   tm_project_name: string | null
   tm_ticket_id: string | null
   tm_ticket_title: string | null
-  status: 'in_progress' | 'approved' | 'cancelled'
+  status: 'in_progress' | 'approved' | 'cancelled' | 'planning' | 'plan_ready' | 'plan_confirmed' | 'tickets_created'
   created_at: string
   updated_at: string
+}
+
+export interface PlanTask {
+  local_id: string
+  title: string
+  description: string
+  ticket_type: 'task' | 'implementation' | 'investigation'
+  complexity: 'S' | 'M' | 'L' | 'XL'
+  depends_on: string[]
+}
+
+export interface PlanStory {
+  local_id: string
+  title: string
+  description: string
+  ticket_type: 'story'
+  tasks: PlanTask[]
+}
+
+export interface PlanEpic {
+  local_id: string
+  title: string
+  description: string
+  ticket_type: 'epic'
+}
+
+export interface PlanContent {
+  epic: PlanEpic
+  stories: PlanStory[]
+}
+
+export interface AgentOverride {
+  agent_id: string
+  override_text: string
+}
+
+export interface AgentConfig {
+  project_id: string
+  tech_stack: string[]
+  agent_overrides: AgentOverride[]
+}
+
+export interface PlanResponse {
+  id: string
+  session_id: string
+  status: 'draft' | 'ready' | 'confirmed' | 'tickets_created' | 'error'
+  plan_content: PlanContent | null
+  agent_config: AgentConfig | null
+  validation_errors: string[] | null
+  created_ticket_ids: string[] | null
+  ticket_id_map: Record<string, string> | null
+  tm_epic_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface PlanStatusResponse {
+  status: 'confirmed' | 'tickets_created' | 'error'
+  created_count: number
+  total: number
+  errors: string[]
 }
 
 export interface Iteration {
@@ -110,6 +171,23 @@ export const usersApi = {
 
 export const tmApi = {
   listProjects: () => api.get<TmProject[]>('/ticket-manager/projects'),
+}
+
+export const planningApi = {
+  trigger: (sessionId: string) =>
+    api.post<{ session_id: string; plan_id: string; status: string }>(
+      `/sessions/${sessionId}/plan`
+    ),
+  get: (sessionId: string) =>
+    api.get<PlanResponse>(`/sessions/${sessionId}/plan`),
+  update: (sessionId: string, content: PlanContent) =>
+    api.put<PlanResponse>(`/sessions/${sessionId}/plan`, { plan_content: content }),
+  confirm: (sessionId: string) =>
+    api.post<{ session_id: string; plan_id: string; status: string }>(
+      `/sessions/${sessionId}/plan/confirm`
+    ),
+  getStatus: (sessionId: string) =>
+    api.get<PlanStatusResponse>(`/sessions/${sessionId}/plan/status`),
 }
 
 export const sessionsApi = {
