@@ -23,6 +23,8 @@ services:
       ORCH_DB_PASSWORD: ${ORCH_DB_PASSWORD:?ORCH_DB_PASSWORD is required}
       DISTILLER_DB_USER: ${DISTILLER_DB_USER:?DISTILLER_DB_USER is required}
       DISTILLER_DB_PASSWORD: ${DISTILLER_DB_PASSWORD:?DISTILLER_DB_PASSWORD is required}
+      DISPATCHER_DB_USER: ${DISPATCHER_DB_USER:?DISPATCHER_DB_USER is required}
+      DISPATCHER_DB_PASSWORD: ${DISPATCHER_DB_PASSWORD:?DISPATCHER_DB_PASSWORD is required}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
@@ -197,6 +199,45 @@ services:
       timeout: 5s
       retries: 6
       start_period: 20s
+    expose:
+      - "8000"
+    networks:
+      - internal
+
+  agent-dispatcher:
+    build:
+      context: ../services/agent-dispatcher
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DISPATCHER_DB_USER:?DISPATCHER_DB_USER is required}:${DISPATCHER_DB_PASSWORD:?DISPATCHER_DB_PASSWORD is required}@postgres:5432/df_dispatcher
+      JWT_SECRET_KEY: ${DISPATCHER_SECRET_KEY:?DISPATCHER_SECRET_KEY is required}
+      AUTH_MODE: ${DISPATCHER_AUTH_MODE:-local}
+      ORCHESTRATOR_BASE_URL: ${DISPATCHER_ORCHESTRATOR_URL:-http://orchestrator:8000}
+      TICKET_MANAGER_BASE_URL: ${DISPATCHER_TM_URL:-http://ticket-manager:8000}
+      CONTEXT_DISTILLER_BASE_URL: ${DISPATCHER_DISTILLER_URL:-http://context-distiller:8000}
+      AGENT_RUNNER_MODE: ${AGENT_RUNNER_MODE:-claude_code}
+      AGENT_PROMPTS_DIR: ${AGENT_PROMPTS_DIR:-/app/prompts}
+      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-10}
+      WORKER_MAX_CONCURRENT_RUNS: ${WORKER_MAX_CONCURRENT_RUNS:-3}
+      AGENT_TIMEOUT_DEFAULT: ${AGENT_TIMEOUT_DEFAULT:-300}
+      BRAINSTORM_MAX_ROUNDS: ${BRAINSTORM_MAX_ROUNDS:-3}
+      BRAINSTORM_AGENTS: ${BRAINSTORM_AGENTS:-software_architect,security_architect}
+      CONTEXT_MAX_TOKENS: ${CONTEXT_MAX_TOKENS:-6000}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      CORS_ALLOW_ORIGINS: '["http://localhost"]'
+      ENVIRONMENT: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
     expose:
       - "8000"
     networks:

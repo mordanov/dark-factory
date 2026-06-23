@@ -1,20 +1,25 @@
 <!--
   Sync Impact Report
-  Version change: (new) → 1.0.0
-  Modified principles: N/A — initial fill from template
+  Version change: 1.0.0 → 1.1.0
+  Modified principles: None — existing principles I–X unchanged
   Added sections:
-    - Core Principles (10 principles)
-    - Monorepo Structure & Service Registry
-    - Infrastructure, Integration Tests & Definition of Done
-    - Governance (with Non-Negotiable Constraints)
-  Removed sections: N/A
+    - Principle XI: Agent Dispatcher — FSM Sovereignty and Run Isolation
+    - Principle XII: Agent Dispatcher — Operational Safety Contracts
+    - agent-dispatcher entry in Service Registry and Monorepo Structure
+    - df_dispatcher database entry in Infrastructure section
+    - Agent Dispatcher items in Definition of Done (items 14–17)
+    - Four new Non-Negotiable Constraints under Governance
+  Removed sections: None
   Templates requiring updates:
-    ✅ .specify/memory/constitution.md — fully filled from monorepo-constitution.md
-    ✅ .specify/templates/plan-template.md — Constitution Check gates updated
+    ✅ .specify/memory/constitution.md — fully updated for v1.1.0
+    ✅ .specify/templates/plan-template.md — Constitution Check gates remain valid; no structural change required
     ✅ .specify/templates/spec-template.md — no constitution-specific changes required
     ✅ .specify/templates/tasks-template.md — no constitution-specific changes required
     ✅ .specify/templates/commands/ — directory not present, no action required
   Deferred TODOs: None
+  Version bump rationale: MINOR — two new principles added (XI, XII) and the
+    agent-dispatcher service registered with its database and DoD criteria.
+    Existing principles I–X are fully preserved and unmodified.
 -->
 
 # Dark Factory Monorepo Constitution
@@ -41,7 +46,7 @@ is a separate future phase; this phase only prepares the seam.
 
 ### III. Python 3.12 Everywhere — No Exceptions
 
-All five backend services MUST run on Python 3.12. The Dockerfile base image for every
+All backend services MUST run on Python 3.12. The Dockerfile base image for every
 service MUST be `python:3.12-slim`. Any dependency that does not support Python 3.12 MUST
 be replaced or removed. `ticket-manager` currently runs on 3.11 and must be upgraded as
 part of this phase.
@@ -98,7 +103,7 @@ enforced in `vite.config.ts`.
 
 ### VIII. ruff for All Python Linting and Formatting
 
-All five backend services MUST have `.pre-commit-config.yaml` at their service root using
+All backend services MUST have `.pre-commit-config.yaml` at their service root using
 ruff for both linting and formatting. A shared root-level `.pre-commit-config.yaml` also
 applies to all Python files in the repo. Pre-commit hooks (pinned to `ruff==0.8.3`):
 `ruff` (lint with `--fix`) and `ruff-format` (format, replaces black). No other Python
@@ -119,6 +124,37 @@ Each service owns exactly one PostgreSQL database and one MongoDB database (wher
 No service may query another service's database directly. Cross-service data access MUST
 always be via HTTP API. No shared collections. No cross-service MongoDB queries.
 
+### XI. Agent Dispatcher — FSM Sovereignty and Run Isolation
+
+The Agent Dispatcher MUST NEVER modify FSM state directly. All FSM transitions remain the
+exclusive responsibility of the Orchestrator service. The Dispatcher executes what the
+Orchestrator decided and reports outcomes only: it POSTs comments to TM and triggers a new
+Orchestrator evaluation via `POST /api/v1/orchestrator/jobs/trigger`.
+
+A given ticket MUST NEVER have two simultaneous agent runs. Before starting any run the
+Dispatcher MUST check `agent_runs` for an existing `running` row with the same `ticket_id`;
+if found the ticket MUST be skipped in that poll cycle.
+
+The polling loop MUST NOT be blocked by a slow agent run. Every run MUST be dispatched as
+an async task governed by `asyncio.Semaphore(WORKER_MAX_CONCURRENT_RUNS)`. The polling
+interval continues independently of running tasks.
+
+### XII. Agent Dispatcher — Operational Safety Contracts
+
+**Graceful degradation on missing output:** If an agent's `[RESULT]` block is absent or
+contains invalid JSON, the Dispatcher MUST NOT fail the run as an error. It MUST treat
+`status` as `needs_review` and set `tm_comment` to the raw stdout (truncated to 2000 chars).
+A run MUST only be marked `failed` on explicit error conditions (non-zero exit, timeout,
+subprocess failure), never on parse failures alone.
+
+**No prompt caching:** Agent system prompts MUST be read from disk on every run. Caching
+prompt files is forbidden so that prompt updates take effect immediately without restarting
+the service.
+
+**Secret hygiene:** `SERVICE_JWT` and `TICKET_MANAGER_SERVICE_PASSWORD` MUST NEVER appear
+in agent run logs, in the `raw_output` field, or in any API response. The Dispatcher MUST
+redact or exclude these values before persisting or returning run records.
+
 ## Monorepo Structure & Service Registry
 
 The monorepo layout is fixed and MUST NOT deviate. Services retain their own internal
@@ -130,11 +166,12 @@ This is a mono**repo**, not a mono**lith**.
 ```
 dark-factory/
 ├── services/
-│   ├── user-input-manager/   ← port 8001 | frontend yes | PG: df_user_input  | DNS: UIM_HOST
-│   ├── ticket-manager/       ← port 8002 | frontend yes | PG: df_ticket_manager | DNS: TM_HOST
-│   ├── orchestrator/         ← port 8003 | frontend no  | PG: df_orchestrator | Mongo: df_orchestrator_docs
-│   ├── context-distiller/    ← port 8004 | frontend no  | PG: df_distiller | Mongo: df_distiller_docs
-│   └── agent-tools/          ← port 8005 | frontend no  | no DB
+│   ├── user-input-manager/   ← port 8001 | frontend yes | PG: df_user_input      | DNS: UIM_HOST
+│   ├── ticket-manager/       ← port 8002 | frontend yes | PG: df_ticket_manager  | DNS: TM_HOST
+│   ├── orchestrator/         ← port 8003 | frontend no  | PG: df_orchestrator    | Mongo: df_orchestrator_docs
+│   ├── context-distiller/    ← port 8004 | frontend no  | PG: df_distiller       | Mongo: df_distiller_docs
+│   ├── agent-tools/          ← port 8005 | frontend no  | no DB
+│   └── agent-dispatcher/     ← port 8006 | frontend no  | PG: df_dispatcher
 ├── infra/
 │   ├── docker-compose.yml
 │   ├── docker-compose.override.yml
@@ -159,17 +196,19 @@ dark-factory/
 ```
 
 Internal service-to-service URLs follow the pattern `http://{service-name}:{port}`
-(e.g., `http://orchestrator:8003`).
+(e.g., `http://orchestrator:8003`, `http://agent-dispatcher:8006`).
 
 ## Infrastructure, Integration Tests & Definition of Done
 
 **PostgreSQL 16** — single instance (`postgres` compose service). Databases created by
 `infra/postgres/init/01_create_databases.sql` on first boot. Each service connects with
 its own dedicated user and password supplied via env vars. Passwords MUST NOT be hardcoded
-in committed files.
+in committed files. Current databases: `df_user_input`, `df_ticket_manager`,
+`df_orchestrator`, `df_distiller`, `df_dispatcher`.
 
 **MongoDB 7** — single instance (`mongo` compose service). Each service that uses Mongo
 connects to its own database by name. No shared collections. No cross-service queries.
+Current databases: `df_orchestrator_docs`, `df_distiller_docs`.
 
 **Nginx** — single container as the external entry point for all traffic. Port `80:80` only.
 HTTPS (443) is added by the operator post-certbot. Built from `infra/nginx/Dockerfile` using
@@ -188,7 +227,7 @@ HTTPS (443) is added by the operator post-certbot. Built from `infra/nginx/Docke
 
 **This unification phase is Done when ALL of the following are true:**
 
-1. `docker compose -f infra/docker-compose.yml up --build` starts all five services with
+1. `docker compose -f infra/docker-compose.yml up --build` starts all services with
    no errors and all healthchecks pass.
 2. Both frontend services are accessible via nginx at their configured DNS names.
 3. All existing unit and integration tests in each service pass unchanged.
@@ -203,6 +242,13 @@ HTTPS (443) is added by the operator post-certbot. Built from `infra/nginx/Docke
 11. `infra/.env.example` is complete and every line is commented.
 12. `nginx.conf.template` has certbot-ready blocks (commented).
 13. `CLAUDE.md` at monorepo root documents service map, ports, and database names.
+14. Agent Dispatcher detects a ticket with `assigned_agent` set within `POLL_INTERVAL_SECONDS`
+    and starts a run; the run is recorded in `agent_runs` with correct status transitions.
+15. In `claude_code` mode: subprocess is spawned with the correct system prompt and context;
+    exit is detected; result is parsed from the `[RESULT]` block.
+16. In `api` mode: the LLM API is called with system prompt and context; result is parsed.
+17. After any agent run completes: the TM ticket has a new comment and an Orchestrator
+    evaluation job has been triggered. No FSM state is modified by the Dispatcher directly.
 
 ## Governance
 
@@ -220,7 +266,7 @@ and propagated to `.specify/memory/constitution.md` via `/speckit-constitution`.
 - MINOR: Adding a new principle, section, or materially expanding guidance.
 - PATCH: Clarifications, wording fixes, non-semantic refinements.
 
-**Compliance:** All PRs and code reviews MUST verify adherence to Core Principles I–X.
+**Compliance:** All PRs and code reviews MUST verify adherence to Core Principles I–XII.
 Complexity introductions MUST be justified. The monorepo `CLAUDE.md` serves as the runtime
 development guide and MUST remain in sync with this constitution.
 
@@ -233,5 +279,9 @@ development guide and MUST remain in sync with this constitution.
 - Integration tests MUST use real services, not mocks (except LLM calls).
 - Service internals MUST NOT be reorganised beyond what standardisation requires.
 - Nginx MUST use `nginx.conf.template` with `envsubst`. DNS names MUST NOT be hardcoded.
+- The Agent Dispatcher MUST NEVER modify FSM state directly. Only the Orchestrator does.
+- A ticket MUST NEVER have two simultaneous agent runs. Check before every dispatch.
+- Agent prompts MUST NEVER be cached. Read from disk on each run without exception.
+- `SERVICE_JWT` and service passwords MUST NEVER appear in logs or API responses.
 
-**Version**: 1.0.0 | **Ratified**: 2026-06-22 | **Last Amended**: 2026-06-22
+**Version**: 1.1.0 | **Ratified**: 2026-06-22 | **Last Amended**: 2026-06-22
