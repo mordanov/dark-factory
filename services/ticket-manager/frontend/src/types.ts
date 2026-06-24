@@ -22,11 +22,23 @@ export interface ProjectTicketCounts {
   done: number;
 }
 
+export interface ProjectGroup {
+  id: string;
+  identifier: string;
+  name: string;
+  description: string | null;
+  is_system: boolean;
+  created_at: string;
+  project_count: number;
+}
+
 export interface ProjectSummary {
   id: string;
   name: string;
   slug: string;
   code: string | null;
+  group_id: string;
+  group: ProjectGroup;
   created_at: string;
   ticket_counts: ProjectTicketCounts;
 }
@@ -62,6 +74,7 @@ export interface TicketResponse {
   assignees: AssigneeSummary[];
   follow_up_count?: number;
   tags: TagResponse[];
+  tokens_spent: number;
 }
 
 export interface TicketListResponse {

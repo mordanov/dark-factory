@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getTicket, listProgress, listTicketEvents, submitProgress,
   deleteTicket, updateTicket, createFollowUp, assignUser, unassignUser, addTag, removeTag,
+  incrementTokensSpent,
 } from "@/api/tickets";
 import { AssigneeProgressList } from "@/components/tickets/AssigneeProgressList";
 import { StatusTransitionButton } from "@/components/tickets/StatusTransitionButton";
@@ -43,6 +44,9 @@ export function TicketDetailPage() {
   const [tagError, setTagError] = useState<string | null>(null);
   const [pendingTags, setPendingTags] = useState<string[] | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [tokensAmount, setTokensAmount] = useState("100");
+  const [tokensLoading, setTokensLoading] = useState(false);
+  const [tokensError, setTokensError] = useState<string | null>(null);
 
   const { data: ticket, isLoading, isError } = useQuery({
     queryKey: ["ticket", ticketId],
@@ -154,6 +158,22 @@ export function TicketDetailPage() {
       setPendingTags(null);
     } catch {
       setTagError(t("tickets.tags.failed"));
+    }
+  }
+
+  async function handleIncrementTokens() {
+    const amount = parseInt(tokensAmount, 10);
+    if (!amount || amount <= 0) { setTokensError("Amount must be a positive integer."); return; }
+    setTokensError(null);
+    setTokensLoading(true);
+    try {
+      await incrementTokensSpent(ticketId!, amount);
+      await queryClient.invalidateQueries({ queryKey: ["ticket", ticketId] });
+      await queryClient.invalidateQueries({ queryKey: ["ticket-events", ticketId] });
+    } catch {
+      setTokensError("Failed to update tokens spent.");
+    } finally {
+      setTokensLoading(false);
     }
   }
 
@@ -345,6 +365,33 @@ export function TicketDetailPage() {
                 onChange={(newTags) => { setPendingTags(newTags); handleTagChange(newTags); }}
               />
               {tagError && <p role="alert" className="text-sm text-destructive mt-2">{tagError}</p>}
+            </CardContent>
+          </Card>
+
+          {/* Tokens Spent */}
+          <Card>
+            <CardHeader><CardTitle className="text-sm font-semibold">Tokens Spent</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              <p className="text-2xl font-bold tabular-nums">{ticket.tokens_spent.toLocaleString()}</p>
+              {isAssignee && (
+                <>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="number"
+                      min={1}
+                      value={tokensAmount}
+                      onChange={(e) => setTokensAmount(e.target.value)}
+                      disabled={tokensLoading}
+                      className="border rounded px-2 py-1 text-sm w-24"
+                      aria-label="Tokens to add"
+                    />
+                    <Button size="sm" variant="outline" onClick={handleIncrementTokens} disabled={tokensLoading}>
+                      {tokensLoading ? "Adding…" : "+ Add"}
+                    </Button>
+                  </div>
+                  {tokensError && <p role="alert" className="text-sm text-destructive">{tokensError}</p>}
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

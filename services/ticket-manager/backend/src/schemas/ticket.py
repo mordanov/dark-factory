@@ -91,6 +91,7 @@ class TicketResponse(BaseModel):
     bugfix: bool = False
     time_spent: int = 0
     tokens_consumed: int = 0
+    tokens_spent: int = 0
     created_by: UserSummary
     created_at: datetime
     updated_at: datetime
@@ -104,6 +105,17 @@ class TicketResponse(BaseModel):
 class TicketListResponse(BaseModel):
     tickets: list[TicketResponse]
     total: int
+
+
+class TokensSpentIncrementRequest(BaseModel):
+    amount: int = Field(gt=0, description="Positive integer to add to tokens_spent")
+
+
+class TokensSpentIncrementResponse(BaseModel):
+    ticket_id: UUID
+    tokens_spent: int
+    amount_added: int
+    event_id: UUID
 
 
 class TagAddRequest(BaseModel):

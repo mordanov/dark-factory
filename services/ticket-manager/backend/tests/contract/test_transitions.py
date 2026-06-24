@@ -5,7 +5,6 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.security import create_access_token, hash_password
-from src.models.progress_update import ProgressUpdate
 from src.models.project import Project
 from src.models.ticket import Ticket, TicketStatus
 from src.models.ticket_assignment import TicketAssignment
@@ -40,29 +39,24 @@ def _h(u: User) -> dict:
 
 
 @pytest.mark.asyncio
-async def test_transition_blocked_422_missing_progress(
+async def test_transition_success_without_progress_200(
     client: AsyncClient, db_session: AsyncSession
 ):
-    owner, assignee2, ticket = await _setup(db_session)
-    progress = ProgressUpdate(ticket_id=ticket.id, user_id=owner.id, content="My update")
-    db_session.add(progress)
-    await db_session.commit()
+    """Assignee can transition without any progress update — progress gate removed (FR-010)."""
+    owner, _, ticket = await _setup(db_session)
 
     resp = await client.post(
         f"/api/v1/tickets/{ticket.id}/transitions",
         json={"to_status": "IN_PROGRESS"},
         headers=_h(owner),
     )
-    assert resp.status_code == 422
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "IN_PROGRESS"
 
 
 @pytest.mark.asyncio
 async def test_transition_success_200(client: AsyncClient, db_session: AsyncSession):
-    owner, assignee2, ticket = await _setup(db_session)
-    p1 = ProgressUpdate(ticket_id=ticket.id, user_id=owner.id, content="u1")
-    p2 = ProgressUpdate(ticket_id=ticket.id, user_id=assignee2.id, content="u2")
-    db_session.add_all([p1, p2])
-    await db_session.commit()
+    owner, _, ticket = await _setup(db_session)
 
     resp = await client.post(
         f"/api/v1/tickets/{ticket.id}/transitions",
@@ -76,9 +70,6 @@ async def test_transition_success_200(client: AsyncClient, db_session: AsyncSess
 @pytest.mark.asyncio
 async def test_transition_invalid_409(client: AsyncClient, db_session: AsyncSession):
     owner, _, ticket = await _setup(db_session)
-    p = ProgressUpdate(ticket_id=ticket.id, user_id=owner.id, content="done")
-    db_session.add(p)
-    await db_session.commit()
 
     resp = await client.post(
         f"/api/v1/tickets/{ticket.id}/transitions",
@@ -90,7 +81,6 @@ async def test_transition_invalid_409(client: AsyncClient, db_session: AsyncSess
 
 @pytest.mark.asyncio
 async def test_transition_403_non_assignee(client: AsyncClient, db_session: AsyncSession):
-    """Non-assignee is rejected with 403 before the progress gate (T013 RBAC check)."""
     owner, _, ticket = await _setup(db_session)
     outsider = User(
         email=f"{uuid4()}@t.com", hashed_password=hash_password("pw"), role=UserRole.user
@@ -108,7 +98,6 @@ async def test_transition_403_non_assignee(client: AsyncClient, db_session: Asyn
 
 @pytest.mark.asyncio
 async def test_transition_403_admin_non_assignee(client: AsyncClient, db_session: AsyncSession):
-    """Administrator who is not an assignee is also rejected with 403 (applies to all roles)."""
     owner, _, ticket = await _setup(db_session)
     admin = User(
         email=f"{uuid4()}@t.com",

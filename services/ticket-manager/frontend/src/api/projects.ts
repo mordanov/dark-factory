@@ -1,13 +1,18 @@
 import { apiClient } from "./client";
 import type { ProjectSummary, TicketListResponse } from "../types";
 
-export async function listProjects(): Promise<ProjectSummary[]> {
-  const { data } = await apiClient.get<{ items: ProjectSummary[] }>("/projects");
+export async function listProjects(params?: { group_id?: string }): Promise<ProjectSummary[]> {
+  const { data } = await apiClient.get<{ items: ProjectSummary[] }>("/projects", { params });
   return data.items;
 }
 
-export async function createProject(body: { name: string; code: string }): Promise<ProjectSummary> {
+export async function createProject(body: { name: string; code?: string; group_id?: string }): Promise<ProjectSummary> {
   const { data } = await apiClient.post<ProjectSummary>("/projects", body);
+  return data;
+}
+
+export async function updateProject(id: string, body: { group_id: string }): Promise<ProjectSummary> {
+  const { data } = await apiClient.patch<ProjectSummary>(`/projects/${id}`, body);
   return data;
 }
 

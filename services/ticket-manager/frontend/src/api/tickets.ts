@@ -12,6 +12,13 @@ import type {
   TagResponse,
 } from "../types";
 
+export interface TokensSpentIncrementResponse {
+  ticket_id: string;
+  tokens_spent: number;
+  amount_added: number;
+  event_id: string;
+}
+
 export async function createTicket(
   projectId: string,
   data: TicketCreate
@@ -141,6 +148,17 @@ export async function addTag(ticketId: string, name: string): Promise<TicketResp
 export async function removeTag(ticketId: string, name: string): Promise<TicketResponse> {
   const { data } = await apiClient.delete<TicketResponse>(
     `/tickets/${ticketId}/tags/${encodeURIComponent(name)}`
+  );
+  return data;
+}
+
+export async function incrementTokensSpent(
+  ticketId: string,
+  amount: number
+): Promise<TokensSpentIncrementResponse> {
+  const { data } = await apiClient.post<TokensSpentIncrementResponse>(
+    `/tickets/${ticketId}/tokens-spent`,
+    { amount }
   );
   return data;
 }
