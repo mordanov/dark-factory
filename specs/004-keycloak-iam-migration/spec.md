@@ -78,11 +78,19 @@ All existing tickets, projects, sessions, and agent runs survive the migration. 
 ### Edge Cases
 
 - What happens when the identity provider is unavailable at service startup? Services must fail to start (not start in a degraded mode accepting any token).
+- What happens when the identity provider becomes unavailable while services are already running? Services continue serving requests using the cached public key material until the cache TTL expires (minimum 5 minutes). Each failed refresh attempt is logged as a warning. Once the cache expires without a successful refresh, new token validations begin failing with a 503 error until the identity provider is reachable again.
 - What happens when a token expires mid-request? The request must return a 401; the client refreshes the token automatically and retries.
 - What happens when Google login is enabled in the identity provider but the user's Google account email doesn't match an existing account? A new account is created in the identity provider on first login.
 - What happens if a service's machine credential secret is leaked? The secret can be rotated in the identity console without redeploying the service (via environment variable update and restart).
 - What happens when a new service is added to the system? It must obtain its own machine credential from the identity provider before it can call other services.
 - What happens when a user has the same email in both local accounts and a Google-linked account? The identity provider's duplicate email prevention rejects the second registration.
+
+## Clarifications
+
+### Session 2026-06-24
+
+- Q: When Keycloak becomes unavailable at runtime (services already running), should services use the stale JWKS cache or fail immediately? → A: Continue using stale JWKS cache for the remainder of the cached TTL, log a warning on each failed refresh; begin failing new token validations with 503 only after the cache expires without a successful refresh.
+- Q: Implementation team structure — which agent coordinates and how is work split across the 10-agent team? → A: Default split. product-manager coordinates. devops owns infra files (T001–T006). backend owns all 6 backend auth adapter rewrites, config changes, and KeycloakServiceClient. frontend owns both frontend keycloak-js streams. security-architect reviews all auth contracts before code ships. autotester writes unit tests. code-reviewer does final pass.
 
 ## Requirements *(mandatory)*
 
@@ -104,7 +112,7 @@ All existing tickets, projects, sessions, and agent runs survive the migration. 
 - **FR-014**: The identity provider MUST have Google login configured in the realm definition, disabled by default, and enableable without application redeployment.
 - **FR-015**: All services MUST enforce that the identity provider is healthy before accepting requests; a service MUST NOT start accepting traffic if it cannot reach the identity provider.
 - **FR-016**: Identity tokens MUST be validated using public key cryptography; no service may rely on a shared secret for validating user identity tokens in production.
-- **FR-017**: Token validation public keys MUST be cached for a minimum of 5 minutes to avoid per-request lookups.
+- **FR-017**: Token validation public keys MUST be cached for a minimum of 5 minutes to avoid per-request lookups. If the identity provider is unreachable during a cache refresh, the stale cache MUST continue to be used until it expires, with a warning logged on each failed refresh attempt. Once the cache expires without a successful refresh, new token validations MUST return a 503 error until the identity provider is reachable again.
 - **FR-018**: Frontend applications MUST store access tokens in memory only — never in browser storage (localStorage, sessionStorage, cookies accessible to JavaScript).
 - **FR-019**: The system MUST surface a "Connecting…" loading screen to users while the identity provider session is being established on app load; no application content is visible until authentication is confirmed.
 
