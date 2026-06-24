@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { GroupFilter } from "@/components/projects/GroupFilter";
 
 function randomCode(): string {
   const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -26,10 +27,11 @@ export function ProjectListPage() {
   const [code, setCode] = useState(() => randomCode());
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [groupFilter, setGroupFilter] = useState<string | undefined>(undefined);
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["projects"],
-    queryFn: listProjects,
+    queryKey: ["projects", groupFilter],
+    queryFn: () => listProjects(groupFilter ? { group_id: groupFilter } : undefined),
   });
 
   async function handleCreate(e: React.FormEvent) {
@@ -55,12 +57,15 @@ export function ProjectListPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-semibold">{t("projects.title")}</h1>
-        <Button
-          variant="outline"
-          onClick={() => { setShowForm((v) => !v); setCreateError(null); }}
-        >
-          {showForm ? t("projects.cancel") : t("projects.newProject")}
-        </Button>
+        <div className="flex items-center gap-2">
+          <GroupFilter value={groupFilter} onChange={setGroupFilter} />
+          <Button
+            variant="outline"
+            onClick={() => { setShowForm((v) => !v); setCreateError(null); }}
+          >
+            {showForm ? t("projects.cancel") : t("projects.newProject")}
+          </Button>
+        </div>
       </div>
 
       {showForm && (
@@ -140,6 +145,12 @@ function ProjectPlate({ project: p }: { project: ProjectSummary }) {
                 {p.code}
               </span>
             )}
+          </div>
+          <div className="text-xs text-muted-foreground mb-1">
+            <span className="inline-block bg-secondary text-secondary-foreground rounded px-1.5 py-0.5 mr-1.5">
+              {p.group.identifier}
+            </span>
+            {p.group.name}
           </div>
           <div className="text-xs text-muted-foreground mb-3">{t("projects.createdOn", { date })}</div>
           <div className="flex gap-2">

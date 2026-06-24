@@ -17,8 +17,8 @@ Tests are included for all three user stories (required by Constitution Principl
 
 **Purpose**: Database schema changes that all three user stories depend on.
 
-- [ ] T001 [P] Create migration 017_add_project_groups.py: create project_groups table, seed DEFAULT row, add nullable group_id to projects, backfill to DEFAULT, set NOT NULL + FK — in backend/alembic/versions/017_add_project_groups.py
-- [ ] T002 [P] Create migration 018_add_tokens_spent.py: add tokens_spent INTEGER NOT NULL DEFAULT 0 with CHECK (tokens_spent >= 0) to tickets — in backend/alembic/versions/018_add_tokens_spent.py
+- [X] T001 [P] Create migration 017_add_project_groups.py: create project_groups table, seed DEFAULT row, add nullable group_id to projects, backfill to DEFAULT, set NOT NULL + FK — in backend/alembic/versions/017_add_project_groups.py
+- [X] T002 [P] Create migration 018_add_tokens_spent.py: add tokens_spent INTEGER NOT NULL DEFAULT 0 with CHECK (tokens_spent >= 0) to tickets — in backend/alembic/versions/018_add_tokens_spent.py
 
 ---
 
@@ -28,12 +28,12 @@ Tests are included for all three user stories (required by Constitution Principl
 
 **⚠️ CRITICAL**: No user story implementation can begin until this phase is complete.
 
-- [ ] T003 [P] Create ProjectGroup ORM model (id, identifier, name, description, is_system, created_at, projects relationship) in backend/src/models/project_group.py
-- [ ] T004 [P] Add tokens_spent Mapped[int] column (default=0, server_default="0") to Ticket ORM model in backend/src/models/ticket.py
-- [ ] T005 Add group_id FK column and group: Mapped["ProjectGroup"] relationship (lazy="joined") to Project ORM model in backend/src/models/project.py (requires T003)
-- [ ] T006 [P] Create project_group schemas: ProjectGroupCreate (identifier, name, description), ProjectGroupUpdate (name, description), ProjectGroupResponse (all fields + project_count), ProjectGroupListResponse (items, total) in backend/src/schemas/project_group.py
-- [ ] T007 [P] Add tokens_spent: int field to TicketResponse; add TokensSpentIncrementRequest (amount: int > 0) and TokensSpentIncrementResponse (ticket_id, tokens_spent, amount_added, event_id) in backend/src/schemas/ticket.py
-- [ ] T008 Update project schemas: add optional group_id: UUID | None to ProjectCreate; add group_id: UUID and group: ProjectGroupResponse to ProjectResponse in backend/src/schemas/project.py (requires T006)
+- [X] T003 [P] Create ProjectGroup ORM model (id, identifier, name, description, is_system, created_at, projects relationship) in backend/src/models/project_group.py
+- [X] T004 [P] Add tokens_spent Mapped[int] column (default=0, server_default="0") to Ticket ORM model in backend/src/models/ticket.py
+- [X] T005 Add group_id FK column and group: Mapped["ProjectGroup"] relationship (lazy="joined") to Project ORM model in backend/src/models/project.py (requires T003)
+- [X] T006 [P] Create project_group schemas: ProjectGroupCreate (identifier, name, description), ProjectGroupUpdate (name, description), ProjectGroupResponse (all fields + project_count), ProjectGroupListResponse (items, total) in backend/src/schemas/project_group.py
+- [X] T007 [P] Add tokens_spent: int field to TicketResponse; add TokensSpentIncrementRequest (amount: int > 0) and TokensSpentIncrementResponse (ticket_id, tokens_spent, amount_added, event_id) in backend/src/schemas/ticket.py
+- [X] T008 Update project schemas: add optional group_id: UUID | None to ProjectCreate; add group_id: UUID and group: ProjectGroupResponse to ProjectResponse in backend/src/schemas/project.py (requires T006)
 
 **Checkpoint**: Models and schemas ready — user story implementation can proceed.
 
@@ -45,20 +45,20 @@ Tests are included for all three user stories (required by Constitution Principl
 
 **Independent Test**: Create group "TEAM1", create project in TEAM1, filter project list by TEAM1 — only that project appears. Attempt to delete DEFAULT group — 409 returned.
 
-- [ ] T009 [P] [US1] Create project_group_service.py with create_group (normalize identifier to uppercase, raise 409 on duplicate), list_groups (with project_count subquery), get_group (raise 404 if missing), update_group (name/description only), delete_group (raise 409 if is_system or has projects) in backend/src/services/project_group_service.py
-- [ ] T010 [P] [US1] Create groups API router with 5 endpoints: POST /api/v1/groups (201), GET /api/v1/groups (200), GET /api/v1/groups/{group_id} (200/404), PATCH /api/v1/groups/{group_id} (200/404), DELETE /api/v1/groups/{group_id} (204/409) in backend/src/api/v1/groups.py
-- [ ] T011 [US1] Update projects API router: add optional group_id query param to GET /api/v1/projects; add PATCH /api/v1/projects/{project_id} endpoint for group reassignment; update POST /api/v1/projects to auto-assign DEFAULT group if group_id omitted in backend/src/api/v1/projects.py
-- [ ] T012 [US1] Register groups router (prefix="/api/v1") and tokens_spent router in backend/src/main.py (stub tokens_spent import for now — will be filled in Phase 5)
-- [ ] T013 [P] [US1] Contract tests for group CRUD: test create (201), duplicate identifier (409), list (includes DEFAULT), get (200/404), update (200), delete system group (409), delete group with projects (409), delete empty group (204) in backend/tests/contract/test_groups.py
-- [ ] T014 [P] [US1] Integration tests for project_group_service: test identifier normalization (lowercase input → uppercase stored), test project_count on list, test auto-assign DEFAULT group when group_id omitted on project create in backend/tests/integration/test_project_group_service.py
+- [X] T009 [P] [US1] Create project_group_service.py with create_group (normalize identifier to uppercase, raise 409 on duplicate), list_groups (with project_count subquery), get_group (raise 404 if missing), update_group (name/description only), delete_group (raise 409 if is_system or has projects) in backend/src/services/project_group_service.py
+- [X] T010 [P] [US1] Create groups API router with 5 endpoints: POST /api/v1/groups (201), GET /api/v1/groups (200), GET /api/v1/groups/{group_id} (200/404), PATCH /api/v1/groups/{group_id} (200/404), DELETE /api/v1/groups/{group_id} (204/409) in backend/src/api/v1/groups.py
+- [X] T011 [US1] Update projects API router: add optional group_id query param to GET /api/v1/projects; add PATCH /api/v1/projects/{project_id} endpoint for group reassignment; update POST /api/v1/projects to auto-assign DEFAULT group if group_id omitted in backend/src/api/v1/projects.py
+- [X] T012 [US1] Register groups router (prefix="/api/v1") and tokens_spent router in backend/src/main.py (stub tokens_spent import for now — will be filled in Phase 5)
+- [X] T013 [P] [US1] Contract tests for group CRUD: test create (201), duplicate identifier (409), list (includes DEFAULT), get (200/404), update (200), delete system group (409), delete group with projects (409), delete empty group (204) in backend/tests/contract/test_groups.py
+- [X] T014 [P] [US1] Integration tests for project_group_service: test identifier normalization (lowercase input → uppercase stored), test project_count on list, test auto-assign DEFAULT group when group_id omitted on project create in backend/tests/integration/test_project_group_service.py
 
 **Checkpoint**: US1 backend complete and independently testable via quickstart.md US1 walkthrough.
 
-- [ ] T015 [P] [US1] Add ProjectGroup TypeScript interface and update Project interface (add group_id, group) in frontend/src/types.ts
-- [ ] T016 [P] [US1] Add groupsApi object (list, create, update, delete) and update projectsApi: add group_id param to list(), add updateGroup() method to frontend/src/api/ (client file or new groupsApi.ts)
-- [ ] T017 [P] [US1] Create GroupFilter component: dropdown of all groups plus "All" option; calls onChange with selected group_id or null in frontend/src/components/projects/GroupFilter.tsx
-- [ ] T018 [US1] Update ProjectListPage: add GroupFilter, hold selected group in local state, pass group_id to projectsApi.list() query, show each project's group name in project list in frontend/src/pages/ProjectListPage.tsx
-- [ ] T019 [P] [US1] Add i18n keys for groups and tokens_spent in frontend/src/locales/en.json and frontend/src/locales/ru.json
+- [X] T015 [P] [US1] Add ProjectGroup TypeScript interface and update Project interface (add group_id, group) in frontend/src/types.ts
+- [X] T016 [P] [US1] Add groupsApi object (list, create, update, delete) and update projectsApi: add group_id param to list(), add updateGroup() method to frontend/src/api/ (client file or new groupsApi.ts)
+- [X] T017 [P] [US1] Create GroupFilter component: dropdown of all groups plus "All" option; calls onChange with selected group_id or null in frontend/src/components/projects/GroupFilter.tsx
+- [X] T018 [US1] Update ProjectListPage: add GroupFilter, hold selected group in local state, pass group_id to projectsApi.list() query, show each project's group name in project list in frontend/src/pages/ProjectListPage.tsx
+- [X] T019 [P] [US1] Add i18n keys for groups and tokens_spent in frontend/src/locales/en.json and frontend/src/locales/ru.json
 
 **Checkpoint**: US1 complete end-to-end — group filter visible in UI, project group displayed.
 
@@ -70,9 +70,9 @@ Tests are included for all three user stories (required by Constitution Principl
 
 **Independent Test**: Assign a user to a ticket. Without submitting any progress update, transition the ticket — it succeeds. Non-assignee attempt returns 403. (No 422 transition_blocked is ever returned.)
 
-- [ ] T020 [US2] Remove progress gate block from transition_service.py: delete the ProgressUpdate query (lines ~53–64), the missing-list construction (lines ~65–75), the "ticket.transition_blocked" event emission (lines ~76–85), and the 422 raise (line ~86). Keep the assignee check (lines 41–46) and status_changed event emission intact in backend/src/services/transition_service.py
-- [ ] T021 [P] [US2] Update transition contract tests: remove test cases that expect 422 transition_blocked / missing_updates; add test confirming transition succeeds for assignee without any progress update submitted in backend/tests/contract/test_transitions.py
-- [ ] T022 [P] [US2] Add integration test: confirm that (a) assignee can transition without progress update and (b) non-assignee still gets 403 after progress gate removal in backend/tests/integration/test_transition_no_gate.py
+- [X] T020 [US2] Remove progress gate block from transition_service.py: delete the ProgressUpdate query (lines ~53–64), the missing-list construction (lines ~65–75), the "ticket.transition_blocked" event emission (lines ~76–85), and the 422 raise (line ~86). Keep the assignee check (lines 41–46) and status_changed event emission intact in backend/src/services/transition_service.py
+- [X] T021 [P] [US2] Update transition contract tests: remove test cases that expect 422 transition_blocked / missing_updates; add test confirming transition succeeds for assignee without any progress update submitted in backend/tests/contract/test_transitions.py
+- [X] T022 [P] [US2] Add integration test: confirm that (a) assignee can transition without progress update and (b) non-assignee still gets 403 after progress gate removal in backend/tests/integration/test_transition_no_gate.py
 
 **Checkpoint**: US2 complete — transition contract tests pass; no 422 transition_blocked emitted.
 
@@ -84,16 +84,16 @@ Tests are included for all three user stories (required by Constitution Principl
 
 **Independent Test**: Ticket starts at tokens_spent=0. Increment by 500 → total 500, event emitted. Increment by 200 → total 700, second event emitted. Attempt amount=0 or amount=-10 → 422. GET /tickets/{id} shows tokens_spent: 700.
 
-- [ ] T023 [P] [US3] Create tokens_spent_service.py: increment_tokens_spent(session, ticket_id, amount, actor) — validate amount > 0, atomic UPDATE tickets SET tokens_spent = tokens_spent + :amount, emit TicketEvent "ticket.tokens_spent_incremented" with prev/new state and metadata.amount, return TokensSpentIncrementResponse in backend/src/services/tokens_spent_service.py
-- [ ] T024 [P] [US3] Create tokens_spent API router: POST /api/v1/tickets/{ticket_id}/tokens-spent (200); validate amount > 0 (422 on ≤0); 404 if ticket not found/deleted in backend/src/api/v1/tokens_spent.py
-- [ ] T025 [US3] Register tokens_spent router in backend/src/main.py (complete the import stubbed in T012)
-- [ ] T026 [P] [US3] Contract tests for tokens_spent endpoint: test increment (200 + new total), amount=0 (422), amount negative (422), non-existent ticket (404), two sequential increments accumulate correctly in backend/tests/contract/test_tokens_spent.py
-- [ ] T027 [P] [US3] Integration tests for tokens_spent_service: test atomic increment under concurrent calls, test TicketEvent emitted with correct prev_state/new_state/metadata in backend/tests/integration/test_tokens_spent_service.py
+- [X] T023 [P] [US3] Create tokens_spent_service.py: increment_tokens_spent(session, ticket_id, amount, actor) — validate amount > 0, atomic UPDATE tickets SET tokens_spent = tokens_spent + :amount, emit TicketEvent "ticket.tokens_spent_incremented" with prev/new state and metadata.amount, return TokensSpentIncrementResponse in backend/src/services/tokens_spent_service.py
+- [X] T024 [P] [US3] Create tokens_spent API router: POST /api/v1/tickets/{ticket_id}/tokens-spent (200); validate amount > 0 (422 on ≤0); 404 if ticket not found/deleted in backend/src/api/v1/tokens_spent.py
+- [X] T025 [US3] Register tokens_spent router in backend/src/main.py (complete the import stubbed in T012)
+- [X] T026 [P] [US3] Contract tests for tokens_spent endpoint: test increment (200 + new total), amount=0 (422), amount negative (422), non-existent ticket (404), two sequential increments accumulate correctly in backend/tests/contract/test_tokens_spent.py
+- [X] T027 [P] [US3] Integration tests for tokens_spent_service: test atomic increment under concurrent calls, test TicketEvent emitted with correct prev_state/new_state/metadata in backend/tests/integration/test_tokens_spent_service.py
 
 **Checkpoint**: US3 complete — tokens_spent endpoint live; each increment visible in /events.
 
-- [ ] T028 [P] [US3] Add tokensSpentApi.increment() method to frontend/src/api/
-- [ ] T029 [US3] Update TicketDetailPage: display tokens_spent field; add "Add Tokens Spent" button with amount input; call tokensSpentApi.increment() on submit; invalidate ticket query on success in frontend/src/pages/TicketDetailPage.tsx
+- [X] T028 [P] [US3] Add tokensSpentApi.increment() method to frontend/src/api/
+- [X] T029 [US3] Update TicketDetailPage: display tokens_spent field; add "Add Tokens Spent" button with amount input; call tokensSpentApi.increment() on submit; invalidate ticket query on success in frontend/src/pages/TicketDetailPage.tsx
 
 **Checkpoint**: All three user stories complete end-to-end.
 
@@ -101,9 +101,9 @@ Tests are included for all three user stories (required by Constitution Principl
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T030 Run ruff linting and fix all issues across changed backend files (ruff check --fix backend/src/ backend/tests/)
-- [ ] T031 [P] Verify docs/api-updates.md is complete and matches contracts/api.md: all 6 new endpoints documented, modified endpoints documented, removed 422 transition_blocked response documented in docs/api-updates.md
-- [ ] T032 [P] Run quickstart.md end-to-end validation: verify all curl commands in quickstart.md work against a local running instance; fix any discrepancies between quickstart and implementation
+- [X] T030 Run ruff linting and fix all issues across changed backend files (ruff check --fix backend/src/ backend/tests/)
+- [X] T031 [P] Verify docs/api-updates.md is complete and matches contracts/api.md: all 6 new endpoints documented, modified endpoints documented, removed 422 transition_blocked response documented in docs/api-updates.md
+- [X] T032 [P] Run quickstart.md end-to-end validation: verify all curl commands in quickstart.md work against a local running instance; fix any discrepancies between quickstart and implementation
 
 ---
 

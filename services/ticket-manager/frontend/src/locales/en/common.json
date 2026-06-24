@@ -24,6 +24,18 @@
     "admin": "Admin",
     "openMenu": "Open navigation menu"
   },
+  "groups": {
+    "filter_label": "Filter by group",
+    "all_groups": "All groups",
+    "identifier": "Identifier",
+    "name": "Name",
+    "description": "Description",
+    "create": "Create group",
+    "creating": "Creating…",
+    "loadingFailed": "Failed to load groups.",
+    "createFailed": "Failed to create group.",
+    "deleteFailed": "Failed to delete group."
+  },
   "projects": {
     "title": "Projects",
     "newProject": "+ New Project",
@@ -182,7 +194,8 @@
         "ticket_unassigned": "User unassigned",
         "ticket_status_changed": "Status changed",
         "ticket_progress_updated": "Progress updated",
-        "ticket_transition_blocked": "Transition blocked"
+        "ticket_transition_blocked": "Transition blocked",
+        "ticket.tokens_spent_incremented": "Tokens spent updated"
       }
     },
     "loading": "Loading…",

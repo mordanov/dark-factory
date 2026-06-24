@@ -8,16 +8,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db
 from src.core.security import get_current_user
 from src.models.project import Project
+from src.models.project_group import ProjectGroup
 from src.models.ticket import Ticket, TicketStatus
 from src.models.user import User
-from src.schemas.project import ProjectCreate, ProjectResponse, ProjectTicketCounts
+from src.schemas.project import ProjectCreate, ProjectResponse, ProjectTicketCounts, ProjectUpdate
+from src.schemas.project_group import ProjectGroupResponse
 from src.schemas.ticket import (
     TicketCreate,
     TicketFsmListResponse,
     TicketListResponse,
     TicketResponse,
 )
-from src.services import ticket_service
+from src.services import project_group_service, ticket_service
 
 router = APIRouter(tags=["Projects"])
 
@@ -46,15 +48,42 @@ async def _ticket_counts(db: AsyncSession, project_id: UUID) -> ProjectTicketCou
     )
 
 
+def _group_response(group: ProjectGroup) -> ProjectGroupResponse:
+    return ProjectGroupResponse(
+        id=group.id,
+        identifier=group.identifier,
+        name=group.name,
+        description=group.description,
+        is_system=group.is_system,
+        created_at=group.created_at,
+        project_count=0,
+    )
+
+
+async def _project_response(db: AsyncSession, project: Project) -> ProjectResponse:
+    counts = await _ticket_counts(db, project.id)
+    return ProjectResponse(
+        id=project.id,
+        name=project.name,
+        slug=project.slug,
+        code=project.code,
+        group_id=project.group_id,
+        group=_group_response(project.group),
+        created_at=project.created_at,
+        ticket_counts=counts,
+    )
+
+
 @router.post("/projects", response_model=ProjectResponse, status_code=201)
 async def create_project(
     body: ProjectCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> ProjectResponse:
-    existing_code = await db.execute(select(Project).where(Project.code == body.code))
-    if existing_code.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="Project code already in use.")
+    if body.code is not None:
+        existing_code = await db.execute(select(Project).where(Project.code == body.code))
+        if existing_code.scalar_one_or_none():
+            raise HTTPException(status_code=409, detail="Project code already in use.")
 
     slug_base = _slugify(body.name)
     slug = slug_base
@@ -66,43 +95,69 @@ async def create_project(
         slug = f"{slug_base}-{counter}"
         counter += 1
 
-    project = Project(name=body.name, slug=slug, code=body.code, created_by=current_user.id)
+    # Resolve group: use provided group_id or fall back to DEFAULT
+    if body.group_id is not None:
+        group = await db.get(ProjectGroup, body.group_id)
+        if group is None:
+            raise HTTPException(status_code=404, detail="Project group not found")
+        group_id = body.group_id
+    else:
+        group_id = await project_group_service.get_default_group_id(db)
+
+    project = Project(
+        name=body.name,
+        slug=slug,
+        code=body.code,
+        group_id=group_id,
+        created_by=current_user.id,
+    )
     db.add(project)
     await db.commit()
     await db.refresh(project)
 
-    return ProjectResponse(
-        id=project.id,
-        name=project.name,
-        slug=project.slug,
-        code=project.code,
-        created_at=project.created_at,
-        ticket_counts=ProjectTicketCounts(open=0, active=0, done=0),
-    )
+    return await _project_response(db, project)
 
 
 @router.get("/projects", status_code=200)
 async def list_projects(
+    group_id: UUID | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> dict:
-    result = await db.execute(select(Project).order_by(Project.created_at.desc()))
+    query = select(Project).order_by(Project.created_at.desc())
+    if group_id is not None:
+        query = query.where(Project.group_id == group_id)
+
+    result = await db.execute(query)
     projects = result.scalars().all()
 
     items = []
     for p in projects:
-        counts = await _ticket_counts(db, p.id)
-        items.append(
-            ProjectResponse(
-                id=p.id,
-                name=p.name,
-                slug=p.slug,
-                code=p.code,
-                created_at=p.created_at,
-                ticket_counts=counts,
-            ).model_dump(mode="json")
-        )
+        resp = await _project_response(db, p)
+        items.append(resp.model_dump(mode="json"))
     return {"items": items}
+
+
+@router.patch("/projects/{project_id}", response_model=ProjectResponse, status_code=200)
+async def update_project(
+    project_id: UUID,
+    body: ProjectUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> ProjectResponse:
+    project = await db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if body.group_id is not None:
+        group = await db.get(ProjectGroup, body.group_id)
+        if group is None:
+            raise HTTPException(status_code=404, detail="Project group not found")
+        project.group_id = body.group_id
+
+    await db.commit()
+    await db.refresh(project)
+    return await _project_response(db, project)
 
 
 @router.get("/projects/{project_id}/tickets")

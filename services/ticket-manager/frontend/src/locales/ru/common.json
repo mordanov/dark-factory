@@ -21,6 +21,18 @@
     "backToProject": "← Назад к проекту",
     "openMenu": "Открыть меню навигации"
   },
+  "groups": {
+    "filter_label": "Фильтр по группе",
+    "all_groups": "Все группы",
+    "identifier": "Идентификатор",
+    "name": "Название",
+    "description": "Описание",
+    "create": "Создать группу",
+    "creating": "Создание…",
+    "loadingFailed": "Не удалось загрузить группы.",
+    "createFailed": "Не удалось создать группу.",
+    "deleteFailed": "Не удалось удалить группу."
+  },
   "projects": {
     "title": "Проекты",
     "newProject": "+ Новый проект",
@@ -179,7 +191,8 @@
         "ticket_unassigned": "Пользователь снят",
         "ticket_status_changed": "Статус изменён",
         "ticket_progress_updated": "Прогресс обновлён",
-        "ticket_transition_blocked": "Переход заблокирован"
+        "ticket_transition_blocked": "Переход заблокирован",
+        "ticket.tokens_spent_incremented": "Потраченные токены обновлены"
       }
     },
     "loading": "Загрузка…",
