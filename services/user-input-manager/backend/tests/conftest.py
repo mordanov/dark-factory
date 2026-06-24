@@ -2,20 +2,20 @@
 
 import asyncio
 from collections.abc import AsyncGenerator
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import select
+from jose import jwt
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
-from src.core.security import create_access_token, hash_password
 from src.db.session import Base, get_db
 from src.main import create_app
-from src.models.models import User
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+_TEST_JWT_SECRET = "test-secret-do-not-use-in-production"
 
 
 @pytest.fixture(scope="session")
@@ -60,56 +60,40 @@ async def client(app) -> AsyncGenerator[AsyncClient, None]:
 
 
 # ---------------------------------------------------------------------------
-# User factories
+# Auth fixtures (Keycloak-shaped HS256 tokens for AUTH_MODE=local)
 # ---------------------------------------------------------------------------
 
 
-@pytest_asyncio.fixture
-async def admin_user(db) -> User:
-    result = await db.execute(select(User).where(User.email == "admin@test.com"))
-    existing = result.scalar_one_or_none()
-    if existing:
-        return existing
-    user = User(
-        email="admin@test.com",
-        password_hash=hash_password("Admin1234!"),
-        full_name="Test Admin",
-        is_admin=True,
-        is_active=True,
-    )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-    return user
+@pytest.fixture(autouse=True)
+def set_auth_mode(monkeypatch):
+    monkeypatch.setenv("AUTH_MODE", "local")
+    monkeypatch.setenv("TEST_JWT_SECRET", _TEST_JWT_SECRET)
+    from src.core import config as cfg
+
+    cfg.get_settings.cache_clear()
+    yield
+    cfg.get_settings.cache_clear()
 
 
-@pytest_asyncio.fixture
-async def regular_user(db) -> User:
-    result = await db.execute(select(User).where(User.email == "user@test.com"))
-    existing = result.scalar_one_or_none()
-    if existing:
-        return existing
-    user = User(
-        email="user@test.com",
-        password_hash=hash_password("User1234!"),
-        full_name="Test User",
-        is_admin=False,
-        is_active=True,
-    )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-    return user
+def _make_token(sub: str, email: str, roles: list[str]) -> str:
+    payload = {
+        "sub": sub,
+        "email": email,
+        "preferred_username": email,
+        "realm_access": {"roles": roles},
+        "exp": datetime.now(UTC) + timedelta(hours=1),
+    }
+    return jwt.encode(payload, _TEST_JWT_SECRET, algorithm="HS256")
 
 
 @pytest.fixture
-def admin_token(admin_user) -> str:
-    return create_access_token(str(admin_user.id), is_admin=True)
+def user_token() -> str:
+    return _make_token("user-sub-001", "user@test.local", ["user"])
 
 
 @pytest.fixture
-def user_token(regular_user) -> str:
-    return create_access_token(str(regular_user.id), is_admin=False)
+def admin_token() -> str:
+    return _make_token("admin-sub-001", "admin@test.local", ["user", "administrator"])
 
 
 @pytest.fixture
@@ -203,11 +187,11 @@ VALID_PLAN_DICT = {
 
 
 @pytest_asyncio.fixture
-async def approved_session(db, regular_user):
+async def approved_session(db):
     from src.models.models import PromptSession
 
     session = PromptSession(
-        user_id=regular_user.id,
+        user_id="user-sub-001",
         session_type="new_project",
         tm_project_name="Test Project",
         tm_project_id="proj-test",
@@ -220,11 +204,11 @@ async def approved_session(db, regular_user):
 
 
 @pytest_asyncio.fixture
-async def prompt_plan(db, regular_user):
+async def prompt_plan(db):
     from src.models.models import PromptPlan, PromptSession
 
     session = PromptSession(
-        user_id=regular_user.id,
+        user_id="user-sub-001",
         session_type="new_project",
         tm_project_name="Test Project",
         tm_project_id="proj-test",

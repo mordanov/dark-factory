@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.v1 import audit, jobs, memory
+from src.core.auth_adapter import prefetch_jwks
 from src.core.config import get_settings
 from src.core.exceptions import AppError, app_error_handler
 from src.db.mongo import close_mongo
@@ -20,6 +21,7 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await prefetch_jwks()
     worker = get_worker()
     await worker.start()
     yield

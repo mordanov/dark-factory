@@ -1,0 +1,177 @@
+{
+  "realm": "dark-factory",
+  "enabled": true,
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "bruteForceProtected": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "sslRequired": "external",
+  "accessTokenLifespan": 300,
+  "ssoSessionMaxLifespan": 36000,
+  "ssoSessionIdleTimeout": 1800,
+  "roles": {
+    "realm": [
+      {
+        "name": "user",
+        "description": "Default role assigned to all accounts"
+      },
+      {
+        "name": "administrator",
+        "description": "Grants access to Keycloak Admin Console link in sidebar"
+      }
+    ]
+  },
+  "defaultRoles": [
+    "user"
+  ],
+  "clients": [
+    {
+      "clientId": "uim-frontend",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "redirectUris": [
+        "${UIM_FRONTEND_URL}/*"
+      ],
+      "webOrigins": [
+        "${UIM_FRONTEND_URL}"
+      ]
+    },
+    {
+      "clientId": "tm-frontend",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "redirectUris": [
+        "${TM_FRONTEND_URL}/*"
+      ],
+      "webOrigins": [
+        "${TM_FRONTEND_URL}"
+      ]
+    },
+    {
+      "clientId": "oauth2-proxy",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "${OAUTH2_PROXY_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "serviceAccountsEnabled": false
+    },
+    {
+      "clientId": "orchestrator",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "${KC_ORCHESTRATOR_CLIENT_SECRET}",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "attributes": {
+        "access.token.lifespan": "3600"
+      }
+    },
+    {
+      "clientId": "context-distiller",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "${KC_DISTILLER_CLIENT_SECRET}",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "attributes": {
+        "access.token.lifespan": "3600"
+      }
+    },
+    {
+      "clientId": "agent-dispatcher",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "${KC_DISPATCHER_CLIENT_SECRET}",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "attributes": {
+        "access.token.lifespan": "3600"
+      }
+    },
+    {
+      "clientId": "agent-tools",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "${KC_AGENT_TOOLS_CLIENT_SECRET}",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "attributes": {
+        "access.token.lifespan": "3600"
+      }
+    },
+    {
+      "clientId": "user-input-manager",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "${KC_UIM_CLIENT_SECRET}",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "attributes": {
+        "access.token.lifespan": "3600"
+      }
+    },
+    {
+      "clientId": "ticket-manager",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "${KC_TM_CLIENT_SECRET}",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "attributes": {
+        "access.token.lifespan": "3600"
+      }
+    }
+  ],
+  "identityProviders": [
+    {
+      "alias": "google",
+      "displayName": "Google",
+      "providerId": "google",
+      "enabled": false,
+      "trustEmail": true,
+      "config": {
+        "clientId": "${GOOGLE_CLIENT_ID}",
+        "clientSecret": "${GOOGLE_CLIENT_SECRET}",
+        "defaultScope": "openid email profile",
+        "useJwksUrl": "true"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "${KC_BOOTSTRAP_ADMIN_USERNAME}",
+      "email": "${KC_BOOTSTRAP_ADMIN_EMAIL}",
+      "enabled": true,
+      "emailVerified": true,
+      "realmRoles": [
+        "administrator",
+        "user"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${KC_BOOTSTRAP_ADMIN_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "firstName": "Admin",
+      "lastName": "User",
+      "clientRoles": {
+        "realm-management": [
+          "realm-admin"
+        ]
+      }
+    }
+  ]
+}

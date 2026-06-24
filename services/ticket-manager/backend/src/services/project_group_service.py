@@ -38,9 +38,7 @@ async def _get_or_404(session: AsyncSession, group_id: UUID) -> ProjectGroup:
 
 
 async def _count_projects(session: AsyncSession, group_id: UUID) -> int:
-    result = await session.execute(
-        select(func.count()).where(Project.group_id == group_id)
-    )
+    result = await session.execute(select(func.count()).where(Project.group_id == group_id))
     return result.scalar_one()
 
 
@@ -69,9 +67,7 @@ async def create_group(
 
 
 async def list_groups(session: AsyncSession) -> ProjectGroupListResponse:
-    groups_result = await session.execute(
-        select(ProjectGroup).order_by(ProjectGroup.created_at)
-    )
+    groups_result = await session.execute(select(ProjectGroup).order_by(ProjectGroup.created_at))
     groups = groups_result.scalars().all()
 
     items = []
@@ -129,9 +125,7 @@ async def delete_group(session: AsyncSession, group_id: UUID) -> None:
 
 
 async def get_default_group_id(session: AsyncSession) -> UUID:
-    result = await session.execute(
-        select(ProjectGroup).where(ProjectGroup.identifier == "DEFAULT")
-    )
+    result = await session.execute(select(ProjectGroup).where(ProjectGroup.identifier == "DEFAULT"))
     group = result.scalar_one_or_none()
     if group is None:
         raise HTTPException(

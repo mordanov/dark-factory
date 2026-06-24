@@ -5,7 +5,17 @@ import { I18nextProvider } from 'react-i18next'
 import i18n from '../src/i18n/i18n'
 import { QueuePage } from '../src/components/queue/QueuePage'
 import { useAuthStore } from '../src/store/auth'
-import type { User } from '../src/api/client'
+
+vi.mock('../src/keycloak', () => ({
+  default: {
+    init: vi.fn().mockResolvedValue(true),
+    updateToken: vi.fn().mockResolvedValue(true),
+    logout: vi.fn().mockResolvedValue(undefined),
+    token: 'mock-token',
+    tokenParsed: null,
+    onTokenExpired: undefined,
+  },
+}))
 
 // Mock orchestratorClient
 vi.mock('../src/api/orchestratorClient', () => ({
@@ -43,13 +53,10 @@ vi.mock('../src/api/orchestratorClient', () => ({
   },
 }))
 
-const mockUser: User = {
-  id: '1', email: 'user@test.com', full_name: 'Test',
-  is_admin: false, is_active: true, created_at: '', updated_at: '',
-}
+const mockUser = { sub: 'uid-1', email: 'user@test.com', username: 'user', isAdmin: false }
 
 function wrap() {
-  useAuthStore.setState({ currentUser: mockUser, accessToken: null, refreshToken: null, isRestoring: false })
+  useAuthStore.setState({ initialized: true, user: mockUser })
   return render(
     <I18nextProvider i18n={i18n}>
       <MemoryRouter>

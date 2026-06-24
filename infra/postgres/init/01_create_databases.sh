@@ -41,3 +41,6 @@ create_db_and_user "df_distiller" "${DISTILLER_DB_USER}" "${DISTILLER_DB_PASSWOR
 
 # agent-dispatcher
 create_db_and_user "df_dispatcher" "${DISPATCHER_DB_USER}" "${DISPATCHER_DB_PASSWORD}"
+
+# keycloak
+create_db_and_user "keycloak" "${KC_DB_USER}" "${KC_DB_PASSWORD}"

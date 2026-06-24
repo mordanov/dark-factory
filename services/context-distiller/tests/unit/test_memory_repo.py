@@ -10,7 +10,7 @@ from src.repositories.memory_repo import MemoryRepository
 _BASE_YAML = (
     "project_id: {pid}\nlast_updated: {ts}\nlast_ticket_id: {tid}\n"
     "architecture: []\nrecent_changes: []\nopen_risks: []\nknown_constraints: []\n"
-    "tech_stack: {backend: '', frontend: '', database: '', infra: ''}"
+    "tech_stack: {{backend: '', frontend: '', database: '', infra: ''}}"
 )
 
 

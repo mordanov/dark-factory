@@ -3,16 +3,13 @@
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.auth_adapter import AuthAdapter
-from src.core.config import get_settings
+from src.core.auth_adapter import KeycloakValidator, UnauthorizedError, UserClaims
 from src.db.session import get_db
 from src.repositories.run_repo import AgentRunRepository
 from src.schemas.schemas import AgentRunListResponse, AgentRunResponse
@@ -20,16 +17,15 @@ from src.schemas.schemas import AgentRunListResponse, AgentRunResponse
 logger = structlog.get_logger(__name__)
 router = APIRouter()
 security = HTTPBearer()
+_adapter = KeycloakValidator()
 
 
 async def _verify_token(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-) -> dict:
-    settings = get_settings()
-    adapter = AuthAdapter(settings)
+) -> UserClaims:
     try:
-        return await adapter.verify(credentials.credentials)
-    except (JWTError, NotImplementedError) as exc:
+        return await _adapter.verify(credentials.credentials)
+    except UnauthorizedError as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
 
 
@@ -40,7 +36,7 @@ async def list_runs(
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    _: dict = Depends(_verify_token),
+    _: UserClaims = Depends(_verify_token),
 ) -> AgentRunListResponse:
     repo = AgentRunRepository(db)
     runs, total = await repo.list_all(
@@ -58,7 +54,7 @@ async def list_runs(
 async def get_run(
     run_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: dict = Depends(_verify_token),
+    _: UserClaims = Depends(_verify_token),
 ) -> AgentRunResponse:
     repo = AgentRunRepository(db)
     run = await repo.get_by_id(run_id)

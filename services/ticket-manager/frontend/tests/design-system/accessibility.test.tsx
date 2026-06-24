@@ -104,36 +104,4 @@ describe("LanguageSwitcher accessibility", () => {
   });
 });
 
-// ─── LoginPage ────────────────────────────────────────────────────────────────
-
-// LoginPage uses useAuthStore internally — no mock needed for render-only tests
-import { LoginPage } from "../../src/pages/LoginPage";
-
-describe("LoginPage accessibility (FR-003)", () => {
-  it("email input has accessible label", () => {
-    render(
-      <MemoryRouter>
-        <LoginPage />
-      </MemoryRouter>
-    );
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-  });
-
-  it("password input has accessible label", () => {
-    render(
-      <MemoryRouter>
-        <LoginPage />
-      </MemoryRouter>
-    );
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
-  });
-
-  it("submit button has accessible name", () => {
-    render(
-      <MemoryRouter>
-        <LoginPage />
-      </MemoryRouter>
-    );
-    expect(screen.getByRole("button", { name: /sign in|log in|login/i })).toBeInTheDocument();
-  });
-});
+// LoginPage removed: authentication is now handled by Keycloak (redirect-based, no local login form)

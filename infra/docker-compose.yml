@@ -6,6 +6,82 @@
 
 services:
 
+  # ─── Identity / Auth Infrastructure ────────────────────────────────────────
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    restart: unless-stopped
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: ${KC_DB_USERNAME:?KC_DB_USERNAME is required}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD:?KC_DB_PASSWORD is required}
+      KC_HOSTNAME: ${KC_HOSTNAME:-localhost}
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY: edge
+      KC_LOG_LEVEL: INFO
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?KC_BOOTSTRAP_ADMIN_PASSWORD is required}
+      KC_BOOTSTRAP_ADMIN_EMAIL: ${KC_BOOTSTRAP_ADMIN_EMAIL:-admin@dark-factory.local}
+      UIM_FRONTEND_URL: ${UIM_FRONTEND_URL:-http://localhost:5173}
+      TM_FRONTEND_URL: ${TM_FRONTEND_URL:-http://localhost:5174}
+      OAUTH2_PROXY_CLIENT_SECRET: ${OAUTH2_PROXY_CLIENT_SECRET:?OAUTH2_PROXY_CLIENT_SECRET is required}
+      KC_ORCHESTRATOR_CLIENT_SECRET: ${KC_ORCHESTRATOR_CLIENT_SECRET:?KC_ORCHESTRATOR_CLIENT_SECRET is required}
+      KC_DISTILLER_CLIENT_SECRET: ${KC_DISTILLER_CLIENT_SECRET:?KC_DISTILLER_CLIENT_SECRET is required}
+      KC_DISPATCHER_CLIENT_SECRET: ${KC_DISPATCHER_CLIENT_SECRET:?KC_DISPATCHER_CLIENT_SECRET is required}
+      KC_AGENT_TOOLS_CLIENT_SECRET: ${KC_AGENT_TOOLS_CLIENT_SECRET:?KC_AGENT_TOOLS_CLIENT_SECRET is required}
+      KC_UIM_CLIENT_SECRET: ${KC_UIM_CLIENT_SECRET:?KC_UIM_CLIENT_SECRET is required}
+      KC_TM_CLIENT_SECRET: ${KC_TM_CLIENT_SECRET:?KC_TM_CLIENT_SECRET is required}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak-import-src/realm-export.json:ro
+      - ./keycloak/substitute-env.sh:/opt/keycloak-import-src/substitute-env.sh:ro
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        mkdir -p /opt/keycloak/data/import &&
+        bash /opt/keycloak-import-src/substitute-env.sh &&
+        exec /opt/keycloak/bin/kc.sh start --import-realm --db=postgres --db-url=jdbc:postgresql://postgres:5432/keycloak --db-username=$$KC_DB_USERNAME --db-password=$$KC_DB_PASSWORD --hostname=$$KC_HOSTNAME --hostname-strict=false --http-enabled=true --proxy=edge --log-level=INFO
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /realms/dark-factory HTTP/1.0\\r\\n\\r\\n' >&3 && head -1 <&3 | grep -q '200' && exec 3>&-"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+    expose:
+      - "8080"
+    networks:
+      - internal
+
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
+    restart: unless-stopped
+    environment:
+      OAUTH2_PROXY_CLIENT_SECRET: ${OAUTH2_PROXY_CLIENT_SECRET:?OAUTH2_PROXY_CLIENT_SECRET is required}
+      OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH2_PROXY_COOKIE_SECRET:?OAUTH2_PROXY_COOKIE_SECRET is required}
+    volumes:
+      - ./oauth2-proxy/config.cfg:/etc/oauth2-proxy/config.cfg:ro
+    command: ["--config=/etc/oauth2-proxy/config.cfg"]
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/bin/oauth2-proxy", "--version"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    expose:
+      - "4180"
+    networks:
+      - internal
+
   # ─── Databases ─────────────────────────────────────────────────────────────
 
   postgres:
@@ -25,6 +101,8 @@ services:
       DISTILLER_DB_PASSWORD: ${DISTILLER_DB_PASSWORD:?DISTILLER_DB_PASSWORD is required}
       DISPATCHER_DB_USER: ${DISPATCHER_DB_USER:?DISPATCHER_DB_USER is required}
       DISPATCHER_DB_PASSWORD: ${DISPATCHER_DB_PASSWORD:?DISPATCHER_DB_PASSWORD is required}
+      KC_DB_USER: ${KC_DB_USERNAME:?KC_DB_USERNAME is required}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD:?KC_DB_PASSWORD is required}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
@@ -60,15 +138,14 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+asyncpg://${UIM_DB_USER:?UIM_DB_USER is required}:${UIM_DB_PASSWORD:?UIM_DB_PASSWORD is required}@postgres:5432/df_user_input
-      JWT_SECRET_KEY: ${UIM_SECRET_KEY:?UIM_SECRET_KEY is required}
-      AUTH_MODE: ${UIM_AUTH_MODE:-local}
+      AUTH_MODE: keycloak
+      KEYCLOAK_BASE_URL: http://keycloak:8080
+      KEYCLOAK_REALM: dark-factory
+      KEYCLOAK_CLIENT_ID: user-input-manager
+      KEYCLOAK_CLIENT_SECRET: ${KC_UIM_CLIENT_SECRET:?KC_UIM_CLIENT_SECRET is required}
       OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       TICKET_MANAGER_BASE_URL: ${UIM_TM_URL:-http://ticket-manager:8000}
-      TICKET_MANAGER_SERVICE_EMAIL: ${TM_SERVICE_EMAIL:-}
-      TICKET_MANAGER_SERVICE_PASSWORD: ${TM_SERVICE_PASSWORD:-}
-      INITIAL_ADMIN_EMAIL: ${UIM_ADMIN_EMAIL:-admin@dark-factory.local}
-      INITIAL_ADMIN_PASSWORD: ${UIM_ADMIN_PASSWORD:-ChangeMe123!}
       CORS_ALLOW_ORIGINS: '["http://localhost","http://${UIM_HOST:-localhost}"]'
       PLANNING_MODEL: ${PLANNING_MODEL:-gpt-4o-mini}
       CONTEXT_DISTILLER_BASE_URL: ${CONTEXT_DISTILLER_BASE_URL:-http://context-distiller:8000}
@@ -76,6 +153,8 @@ services:
       ENVIRONMENT: production
     depends_on:
       postgres:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
@@ -95,18 +174,17 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+asyncpg://${TM_DB_USER:?TM_DB_USER is required}:${TM_DB_PASSWORD:?TM_DB_PASSWORD is required}@postgres:5432/df_ticket_manager
-      # TM config.py uses field 'secret_key' (pydantic maps to env var SECRET_KEY)
-      SECRET_KEY: ${TM_SECRET_KEY:?TM_SECRET_KEY is required}
-      REFRESH_TOKEN_SECRET: ${TM_REFRESH_SECRET:?TM_REFRESH_SECRET is required}
-      DEFAULT_ADMIN_EMAIL: ${TM_ADMIN_EMAIL:-admin@dark-factory.local}
-      DEFAULT_ADMIN_PASSWORD: ${TM_ADMIN_PASSWORD:-ChangeMe123!}
-      DEFAULT_USER_EMAIL: ${TM_USER_EMAIL:-user@dark-factory.local}
-      DEFAULT_USER_PASSWORD: ${TM_USER_PASSWORD:-ChangeMe123!}
-      AUTH_MODE: ${TM_AUTH_MODE:-local}
+      AUTH_MODE: keycloak
+      KEYCLOAK_BASE_URL: http://keycloak:8080
+      KEYCLOAK_REALM: dark-factory
+      KEYCLOAK_CLIENT_ID: ticket-manager
+      KEYCLOAK_CLIENT_SECRET: ${KC_TM_CLIENT_SECRET:?KC_TM_CLIENT_SECRET is required}
       CORS_ALLOW_ORIGINS: '["http://localhost","http://${TM_HOST:-localhost}"]'
       ENVIRONMENT: production
     depends_on:
       postgres:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
@@ -129,19 +207,22 @@ services:
       DATABASE_URL_SYNC: postgresql://${ORCH_DB_USER:?ORCH_DB_USER is required}:${ORCH_DB_PASSWORD:?ORCH_DB_PASSWORD is required}@postgres:5432/df_orchestrator
       MONGO_URL: mongodb://mongo:27017
       MONGO_DB_NAME: ${ORCH_MONGO_DB:-df_orchestrator_docs}
-      JWT_SECRET_KEY: ${ORCH_SECRET_KEY:?ORCH_SECRET_KEY is required}
-      AUTH_MODE: ${ORCH_AUTH_MODE:-local}
+      AUTH_MODE: keycloak
+      KEYCLOAK_BASE_URL: http://keycloak:8080
+      KEYCLOAK_REALM: dark-factory
+      KEYCLOAK_CLIENT_ID: orchestrator
+      KEYCLOAK_CLIENT_SECRET: ${KC_ORCHESTRATOR_CLIENT_SECRET:?KC_ORCHESTRATOR_CLIENT_SECRET is required}
       OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       TICKET_MANAGER_BASE_URL: http://ticket-manager:8000
-      TICKET_MANAGER_SERVICE_EMAIL: ${TM_SERVICE_EMAIL:-}
-      TICKET_MANAGER_SERVICE_PASSWORD: ${TM_SERVICE_PASSWORD:-}
       CORS_ALLOW_ORIGINS: '["http://localhost"]'
       ENVIRONMENT: production
     depends_on:
       postgres:
         condition: service_healthy
       mongo:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
@@ -163,19 +244,22 @@ services:
       DATABASE_URL: postgresql+asyncpg://${DISTILLER_DB_USER:?DISTILLER_DB_USER is required}:${DISTILLER_DB_PASSWORD:?DISTILLER_DB_PASSWORD is required}@postgres:5432/df_distiller
       MONGO_URL: mongodb://mongo:27017
       MONGO_DB_NAME: ${DISTILLER_MONGO_DB:-df_distiller_docs}
-      JWT_SECRET_KEY: ${DISTILLER_SECRET_KEY:?DISTILLER_SECRET_KEY is required}
-      AUTH_MODE: ${DISTILLER_AUTH_MODE:-local}
+      AUTH_MODE: keycloak
+      KEYCLOAK_BASE_URL: http://keycloak:8080
+      KEYCLOAK_REALM: dark-factory
+      KEYCLOAK_CLIENT_ID: context-distiller
+      KEYCLOAK_CLIENT_SECRET: ${KC_DISTILLER_CLIENT_SECRET:?KC_DISTILLER_CLIENT_SECRET is required}
       OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       TICKET_MANAGER_BASE_URL: http://ticket-manager:8000
-      TICKET_MANAGER_SERVICE_EMAIL: ${TM_SERVICE_EMAIL:-}
-      TICKET_MANAGER_SERVICE_PASSWORD: ${TM_SERVICE_PASSWORD:-}
       CORS_ALLOW_ORIGINS: '["http://localhost"]'
       ENVIRONMENT: production
     depends_on:
       postgres:
         condition: service_healthy
       mongo:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
@@ -194,8 +278,14 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
-      AUTH_MODE: ${AGENT_TOOLS_AUTH_MODE:-local}
-      JWT_SECRET_KEY: ${AGENT_TOOLS_SECRET_KEY:?AGENT_TOOLS_SECRET_KEY is required}
+      AUTH_MODE: keycloak
+      KEYCLOAK_BASE_URL: http://keycloak:8080
+      KEYCLOAK_REALM: dark-factory
+      KEYCLOAK_CLIENT_ID: agent-tools
+      KEYCLOAK_CLIENT_SECRET: ${KC_AGENT_TOOLS_CLIENT_SECRET:?KC_AGENT_TOOLS_CLIENT_SECRET is required}
+    depends_on:
+      keycloak:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
       interval: 10s
@@ -214,8 +304,11 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+asyncpg://${DISPATCHER_DB_USER:?DISPATCHER_DB_USER is required}:${DISPATCHER_DB_PASSWORD:?DISPATCHER_DB_PASSWORD is required}@postgres:5432/df_dispatcher
-      JWT_SECRET_KEY: ${DISPATCHER_SECRET_KEY:?DISPATCHER_SECRET_KEY is required}
-      AUTH_MODE: ${DISPATCHER_AUTH_MODE:-local}
+      AUTH_MODE: keycloak
+      KEYCLOAK_BASE_URL: http://keycloak:8080
+      KEYCLOAK_REALM: dark-factory
+      KEYCLOAK_CLIENT_ID: agent-dispatcher
+      KEYCLOAK_CLIENT_SECRET: ${KC_DISPATCHER_CLIENT_SECRET:?KC_DISPATCHER_CLIENT_SECRET is required}
       ORCHESTRATOR_BASE_URL: ${DISPATCHER_ORCHESTRATOR_URL:-http://orchestrator:8000}
       TICKET_MANAGER_BASE_URL: ${DISPATCHER_TM_URL:-http://ticket-manager:8000}
       CONTEXT_DISTILLER_BASE_URL: ${DISPATCHER_DISTILLER_URL:-http://context-distiller:8000}
@@ -234,6 +327,8 @@ services:
       ENVIRONMENT: production
     depends_on:
       postgres:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')\" || exit 1"]
@@ -300,6 +395,8 @@ services:
       uim-frontend:
         condition: service_healthy
       tm-frontend:
+        condition: service_healthy
+      oauth2-proxy:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/nginx-health || exit 1"]

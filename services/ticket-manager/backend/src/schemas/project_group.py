@@ -17,7 +17,9 @@ class ProjectGroupCreate(BaseModel):
     def normalize_identifier(cls, v: str) -> str:
         normalized = v.strip().upper()
         if not _IDENTIFIER_RE.match(normalized):
-            raise ValueError("identifier must be 4–8 alphanumeric characters (letters and digits only)")
+            raise ValueError(
+                "identifier must be 4–8 alphanumeric characters (letters and digits only)"
+            )
         return normalized
 
 

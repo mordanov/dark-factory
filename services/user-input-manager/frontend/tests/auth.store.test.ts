@@ -1,63 +1,120 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useAuthStore } from '../src/store/auth'
 
-const fakeToken = [
-  btoa(JSON.stringify({ alg: 'HS256' })),
-  btoa(JSON.stringify({ sub: 'uid-1', is_admin: false, type: 'access' })),
-  'signature',
-].join('.')
+const mockKeycloak = vi.hoisted(() => ({
+  init: vi.fn().mockResolvedValue(true),
+  updateToken: vi.fn().mockResolvedValue(true),
+  logout: vi.fn().mockResolvedValue(undefined),
+  token: 'mock-token' as string | undefined,
+  tokenParsed: {
+    sub: 'uid-1',
+    email: 'user@test.com',
+    preferred_username: 'user',
+    realm_access: { roles: ['user'] },
+  } as Record<string, unknown> | null,
+  onTokenExpired: undefined as (() => void) | undefined,
+}))
 
-const fakeUser = {
-  id: 'uid-1', email: 'user@test.com', full_name: '', is_admin: false,
-  is_active: true, created_at: '', updated_at: '',
-}
+vi.mock('../src/keycloak', () => ({ default: mockKeycloak }))
 
-describe('useAuthStore', () => {
+describe('useAuthStore (keycloak-js)', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
+    mockKeycloak.init.mockResolvedValue(true)
+    mockKeycloak.updateToken.mockResolvedValue(true)
+    mockKeycloak.logout.mockResolvedValue(undefined)
+    mockKeycloak.token = 'mock-token'
+    mockKeycloak.tokenParsed = {
+      sub: 'uid-1',
+      email: 'user@test.com',
+      preferred_username: 'user',
+      realm_access: { roles: ['user'] },
+    }
+    useAuthStore.setState({ initialized: false, initError: false, user: null })
+    localStorage.clear()
     sessionStorage.clear()
-    useAuthStore.setState({ accessToken: null, currentUser: null, refreshToken: null, isRestoring: false })
   })
-  afterEach(() => sessionStorage.clear())
 
-  it('starts with no token or user', () => {
+  it('starts uninitialized with no user', () => {
     const s = useAuthStore.getState()
-    expect(s.accessToken).toBeNull()
-    expect(s.currentUser).toBeNull()
-    expect(s.isRestoring).toBe(false)
+    expect(s.initialized).toBe(false)
+    expect(s.initError).toBe(false)
+    expect(s.user).toBeNull()
   })
 
-  it('login stores accessToken in memory only (not localStorage)', () => {
-    useAuthStore.getState().login(fakeToken, 'rt-value', fakeUser)
+  it('initialize() sets initialized=true and populates user', async () => {
+    await useAuthStore.getState().initialize()
     const s = useAuthStore.getState()
-    expect(s.accessToken).toBe(fakeToken)
-    expect(localStorage.getItem('access_token')).toBeNull()
-    expect(sessionStorage.getItem('rt')).toBe('rt-value')
+    expect(s.initialized).toBe(true)
+    expect(s.initError).toBe(false)
+    expect(s.user?.sub).toBe('uid-1')
+    expect(s.user?.email).toBe('user@test.com')
+    expect(s.user?.isAdmin).toBe(false)
   })
 
-  it('login sets currentUser', () => {
-    useAuthStore.getState().login(fakeToken, 'rt-value', fakeUser)
-    expect(useAuthStore.getState().currentUser?.email).toBe('user@test.com')
+  it('initialize() sets isAdmin=true for administrator role', async () => {
+    mockKeycloak.tokenParsed = {
+      sub: 'admin-1',
+      email: 'admin@test.com',
+      preferred_username: 'admin',
+      realm_access: { roles: ['user', 'administrator'] },
+    }
+    await useAuthStore.getState().initialize()
+    expect(useAuthStore.getState().user?.isAdmin).toBe(true)
   })
 
-  it('logout clears in-memory token and sessionStorage', () => {
-    useAuthStore.getState().login(fakeToken, 'rt-value', fakeUser)
-    useAuthStore.getState().logout()
+  it('initialize() sets initError=true when keycloak.init() rejects', async () => {
+    mockKeycloak.init.mockRejectedValue(new Error('Network Error'))
+    await useAuthStore.getState().initialize()
     const s = useAuthStore.getState()
-    expect(s.accessToken).toBeNull()
-    expect(s.currentUser).toBeNull()
-    expect(sessionStorage.getItem('rt')).toBeNull()
+    expect(s.initError).toBe(true)
+    expect(s.initialized).toBe(false)
+    expect(s.user).toBeNull()
   })
 
-  it('setAccessToken updates only the token', () => {
-    useAuthStore.getState().login(fakeToken, 'rt', fakeUser)
-    useAuthStore.getState().setAccessToken('new-token')
-    expect(useAuthStore.getState().accessToken).toBe('new-token')
-    expect(useAuthStore.getState().currentUser?.email).toBe('user@test.com')
+  it('logout() clears user and initialized before calling keycloak.logout', async () => {
+    useAuthStore.setState({ initialized: true, user: { sub: 'u1', email: 'a@b.com', username: 'a', isAdmin: false }, initError: false })
+    let capturedUser: unknown = 'not-called'
+    let capturedInitialized: unknown = 'not-called'
+    mockKeycloak.logout.mockImplementation(async () => {
+      capturedUser = useAuthStore.getState().user
+      capturedInitialized = useAuthStore.getState().initialized
+    })
+    await useAuthStore.getState().logout()
+    expect(capturedUser).toBeNull()
+    expect(capturedInitialized).toBe(false)
+    expect(mockKeycloak.logout).toHaveBeenCalledWith({ redirectUri: window.location.origin })
   })
 
-  it('setRestored sets isRestoring to false', () => {
-    useAuthStore.setState({ isRestoring: true })
-    useAuthStore.getState().setRestored()
-    expect(useAuthStore.getState().isRestoring).toBe(false)
+  it('getToken() returns token string', async () => {
+    const token = await useAuthStore.getState().getToken()
+    expect(token).toBe('mock-token')
+  })
+
+  it('getToken() returns null when keycloak.token is undefined', async () => {
+    mockKeycloak.token = undefined
+    const token = await useAuthStore.getState().getToken()
+    expect(token).toBeNull()
+  })
+
+  it('getAuthHeader() returns Authorization header', async () => {
+    const header = await useAuthStore.getState().getAuthHeader()
+    expect(header.Authorization).toMatch(/^Bearer /)
+  })
+
+  it('test_localStorage_never_written: localStorage.setItem not called during initialize() and logout() (FIND-02)', async () => {
+    const spy = vi.spyOn(localStorage, 'setItem')
+    await useAuthStore.getState().initialize()
+    await useAuthStore.getState().logout()
+    expect(spy).not.toHaveBeenCalled()
+    spy.mockRestore()
+  })
+
+  it('test_sessionStorage_never_written: sessionStorage.setItem not called during initialize() and logout() (FIND-02)', async () => {
+    const spy = vi.spyOn(sessionStorage, 'setItem')
+    await useAuthStore.getState().initialize()
+    await useAuthStore.getState().logout()
+    expect(spy).not.toHaveBeenCalled()
+    spy.mockRestore()
   })
 })

@@ -7,7 +7,7 @@ enough to reason about easily (KISS).
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     JSON,
@@ -18,7 +18,6 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -32,32 +31,6 @@ def _now() -> datetime:
 
 def _uuid() -> uuid.UUID:
     return uuid.uuid4()
-
-
-# ---------------------------------------------------------------------------
-# Users
-# ---------------------------------------------------------------------------
-
-
-class User(Base):
-    __tablename__ = "users"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
-    email: Mapped[str] = mapped_column(String(255), nullable=False)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    full_name: Mapped[str] = mapped_column(String(255), nullable=False, default="")
-    is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_now, onupdate=_now
-    )
-
-    sessions: Mapped[list[PromptSession]] = relationship(
-        back_populates="user", cascade="all, delete-orphan"
-    )
-
-    __table_args__ = (UniqueConstraint("email", name="uq_users_email"),)
 
 
 # ---------------------------------------------------------------------------
@@ -106,10 +79,8 @@ class PromptSession(Base):
 
     __tablename__ = "prompt_sessions"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(Text, nullable=False)
 
     # ticket-manager context
     session_type: Mapped[str] = mapped_column(SESSION_TYPE_ENUM, nullable=False)
@@ -129,7 +100,6 @@ class PromptSession(Base):
         DateTime(timezone=True), default=_now, onupdate=_now
     )
 
-    user: Mapped[User] = relationship(back_populates="sessions")
     iterations: Mapped[list[PromptIteration]] = relationship(
         back_populates="session",
         cascade="all, delete-orphan",

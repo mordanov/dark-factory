@@ -5,12 +5,12 @@ from pydantic import BaseModel
 
 
 class AssignRequest(BaseModel):
-    user_id: UUID
+    user_id: str
 
 
 class AssignmentResponse(BaseModel):
     ticket_id: UUID
-    user_id: UUID
+    user_id: str
     assigned_at: datetime
 
     model_config = {"from_attributes": True}

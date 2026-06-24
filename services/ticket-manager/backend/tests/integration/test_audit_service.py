@@ -187,9 +187,9 @@ def test_audit_service_exposes_no_update_or_delete():
         for f in public_functions
         if any(verb in f for verb in ("update", "delete", "remove", "patch", "modify"))
     ]
-    assert (
-        mutation_names == []
-    ), f"audit_service must not expose mutation functions; found: {mutation_names}"
+    assert mutation_names == [], (
+        f"audit_service must not expose mutation functions; found: {mutation_names}"
+    )
 
 
 # ---------------------------------------------------------------------------

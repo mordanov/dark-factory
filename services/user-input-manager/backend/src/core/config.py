@@ -27,16 +27,13 @@ class Settings(BaseSettings):
         description="SQLAlchemy async database URL.",
     )
 
-    # --- JWT / Auth ---
-    jwt_secret_key: str = Field(default="CHANGE_ME_INSECURE_DEFAULT")
-    jwt_algorithm: str = Field(default="HS256")
-    access_token_expires_minutes: int = Field(default=30)
-    refresh_token_expires_days: int = Field(default=7)
-    auth_mode: str = Field(default="local")
-
-    # --- Initial admin seed ---
-    initial_admin_email: str = Field(default="admin@dark-factory.local")
-    initial_admin_password: str = Field(default="ChangeMe123!")
+    # --- Keycloak / Auth ---
+    keycloak_base_url: str = Field(default="http://keycloak:8080")
+    keycloak_realm: str = Field(default="dark-factory")
+    keycloak_client_id: str = Field(default="")
+    keycloak_client_secret: str = Field(default="")
+    auth_mode: str = Field(default="keycloak")
+    test_jwt_secret: str = Field(default="test-secret-do-not-use-in-production")
 
     # --- CORS ---
     cors_allow_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
@@ -55,8 +52,6 @@ class Settings(BaseSettings):
     ticket_manager_base_url: AnyHttpUrl = Field(
         default="https://ticket-manager.dark-factory.miveralta.ru"
     )
-    ticket_manager_service_email: str = Field(default="")
-    ticket_manager_service_password: str = Field(default="")
     ticket_manager_timeout_seconds: float = Field(default=20.0)
     ticket_manager_context_max_tickets: int = Field(default=50)
     ticket_manager_context_max_chars: int = Field(default=6000)

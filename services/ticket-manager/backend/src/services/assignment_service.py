@@ -4,9 +4,9 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.auth_adapter import UserClaims
 from src.models.ticket import Ticket
 from src.models.ticket_assignment import TicketAssignment
-from src.models.user import User, UserRole
 from src.schemas.assignment import AssignmentResponse
 from src.services.event_service import emit_event
 
@@ -14,16 +14,12 @@ from src.services.event_service import emit_event
 async def assign_user(
     session: AsyncSession,
     ticket_id: UUID,
-    user_id: UUID,
-    actor: User,
+    user_id: str,
+    actor: UserClaims,
 ) -> AssignmentResponse:
     ticket = await session.get(Ticket, ticket_id)
     if ticket is None or ticket.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found")
-
-    user = await session.get(User, user_id)
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     existing = await session.execute(
         select(TicketAssignment).where(
@@ -37,7 +33,7 @@ async def assign_user(
     assignment = TicketAssignment(
         ticket_id=ticket_id,
         user_id=user_id,
-        assigned_by=actor.id,
+        assigned_by=actor.sub,
     )
     session.add(assignment)
     await session.flush()
@@ -48,7 +44,7 @@ async def assign_user(
         "ticket.assigned",
         actor,
         prev_state=None,
-        new_state={"user_id": str(user_id), "user_email": user.email},
+        new_state={"user_id": user_id},
     )
     await session.commit()
     await session.refresh(assignment)
@@ -58,19 +54,15 @@ async def assign_user(
 async def unassign_user(
     session: AsyncSession,
     ticket_id: UUID,
-    user_id: UUID,
-    actor: User,
+    user_id: str,
+    actor: UserClaims,
 ) -> None:
     ticket = await session.get(Ticket, ticket_id)
     if ticket is None or ticket.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found")
 
-    if actor.id != ticket.created_by and actor.role != UserRole.administrator:
+    if actor.sub != ticket.created_by and not actor.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
-
-    user = await session.get(User, user_id)
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     result = await session.execute(
         select(TicketAssignment).where(
@@ -87,7 +79,7 @@ async def unassign_user(
         ticket_id,
         "ticket.unassigned",
         actor,
-        prev_state={"user_id": str(user_id), "user_email": user.email},
+        prev_state={"user_id": user_id},
         new_state=None,
     )
     await session.delete(assignment)

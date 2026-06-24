@@ -1,34 +1,27 @@
 import { useEffect } from 'react'
 import { BrowserRouter } from 'react-router-dom'
 import { AppRoutes } from './pages/AppRoutes'
-import { authApi } from './api/client'
 import { useAuthStore } from './store/auth'
+import { LoadingScreen } from './components/layout/LoadingScreen'
+import { AuthErrorScreen } from './components/layout/AuthErrorScreen'
 import './i18n/i18n'
 import './styles/global.css'
 
-function AuthRestorer({ children }: { children: React.ReactNode }) {
-  const { refreshToken, setAccessToken, setRestored } = useAuthStore()
+export default function App() {
+  const initialized = useAuthStore((s) => s.initialized)
+  const initError = useAuthStore((s) => s.initError)
+  const initialize = useAuthStore((s) => s.initialize)
 
   useEffect(() => {
-    if (!refreshToken) {
-      setRestored()
-      return
-    }
-    authApi.refresh(refreshToken)
-      .then(({ data }) => setAccessToken(data.access_token))
-      .catch(() => useAuthStore.getState().logout())
-      .finally(() => setRestored())
-  }, []) // run once on mount
+    initialize()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  return <>{children}</>
-}
+  if (initError) return <AuthErrorScreen onRetry={() => void initialize()} />
+  if (!initialized) return <LoadingScreen />
 
-export default function App() {
   return (
     <BrowserRouter>
-      <AuthRestorer>
-        <AppRoutes />
-      </AuthRestorer>
+      <AppRoutes />
     </BrowserRouter>
   )
 }

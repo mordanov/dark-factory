@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from src.api.v1 import runs
+from src.core.auth_adapter import prefetch_jwks
 from src.core.config import get_settings
 from src.core.exceptions import AppError
 from src.db.session import AsyncSessionLocal
@@ -20,6 +21,7 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await prefetch_jwks()
     from src.repositories.run_repo import AgentRunRepository
     from src.schemas.schemas import AgentResult
     from src.services.reporter import Reporter

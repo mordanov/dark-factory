@@ -15,7 +15,7 @@ class ProgressUpdate(Base):
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     ticket_id: Mapped[UUID] = mapped_column(ForeignKey("tickets.id"), nullable=False)
-    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    user_id: Mapped[str] = mapped_column(Text, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -23,4 +23,3 @@ class ProgressUpdate(Base):
     )
 
     ticket = relationship("Ticket", back_populates="progress_updates")
-    user = relationship("User", back_populates="progress_updates")

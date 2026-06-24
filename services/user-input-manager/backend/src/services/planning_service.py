@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import asyncio
-import structlog
 import uuid
 
 import httpx
+import structlog
 from fastapi import BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,7 +35,7 @@ class PlanningService:
         self._session_repo = SessionRepository(db)
         self._tm = tm_client
 
-    async def _get_session_for_user(self, session_id: uuid.UUID, user_id: uuid.UUID):
+    async def _get_session_for_user(self, session_id: uuid.UUID, user_id: str):
         session = await self._session_repo.get_by_id(session_id)
         if not session:
             raise NotFoundError("Session not found")
@@ -43,7 +43,7 @@ class PlanningService:
             raise ForbiddenError()
         return session
 
-    async def generate(self, session_id: uuid.UUID, user_id: uuid.UUID) -> PlanGenerateResponse:
+    async def generate(self, session_id: uuid.UUID, user_id: str) -> PlanGenerateResponse:
         session = await self._get_session_for_user(session_id, user_id)
         if session.status != "approved":
             raise ConflictError(
@@ -75,7 +75,9 @@ class PlanningService:
             await self._session_repo.update(session, status="plan_ready")
             logger.info(
                 "plan.generated session_id=%s plan_id=%s user_id=%s",
-                session_id, plan.id, user_id,
+                session_id,
+                plan.id,
+                user_id,
             )
 
         except Exception as exc:
@@ -103,7 +105,7 @@ class PlanningService:
                 return it.prompt_text
         return ""
 
-    async def get_plan(self, session_id: uuid.UUID, user_id: uuid.UUID) -> PlanResponse:
+    async def get_plan(self, session_id: uuid.UUID, user_id: str) -> PlanResponse:
         await self._get_session_for_user(session_id, user_id)
         plan = await self._plan_repo.get_by_session_id(session_id)
         if not plan:
@@ -113,7 +115,7 @@ class PlanningService:
     async def update(
         self,
         session_id: uuid.UUID,
-        user_id: uuid.UUID,
+        user_id: str,
         plan_content_raw: dict,
     ) -> PlanResponse:
         await self._get_session_for_user(session_id, user_id)
@@ -135,7 +137,7 @@ class PlanningService:
     async def confirm(
         self,
         session_id: uuid.UUID,
-        user_id: uuid.UUID,
+        user_id: str,
         background_tasks: BackgroundTasks,
     ) -> PlanConfirmResponse:
         session = await self._get_session_for_user(session_id, user_id)
@@ -160,7 +162,9 @@ class PlanningService:
         await self._session_repo.update(session, status="plan_confirmed")
         logger.info(
             "plan.confirmed session_id=%s plan_id=%s user_id=%s",
-            session_id, plan.id, user_id,
+            session_id,
+            plan.id,
+            user_id,
         )
 
         background_tasks.add_task(self._create_tickets, session_id)
@@ -235,7 +239,10 @@ class PlanningService:
                 await self._session_repo.update(session, status="tickets_created")
                 logger.info(
                     "plan.tickets_created session_id=%s plan_id=%s ticket_count=%d tm_epic_id=%s",
-                    session_id, plan.id, len(plan.created_ticket_ids or []), plan.tm_epic_id,
+                    session_id,
+                    plan.id,
+                    len(plan.created_ticket_ids or []),
+                    plan.tm_epic_id,
                 )
 
                 agent_config_dict = plan.agent_config
@@ -280,9 +287,7 @@ class PlanningService:
         except Exception as exc:
             logger.warning("Failed to store agent config in ContextDistiller: %s", exc)
 
-    async def get_creation_status(
-        self, session_id: uuid.UUID, user_id: uuid.UUID
-    ) -> PlanStatusResponse:
+    async def get_creation_status(self, session_id: uuid.UUID, user_id: str) -> PlanStatusResponse:
         await self._get_session_for_user(session_id, user_id)
         plan = await self._plan_repo.get_by_session_id(session_id)
         if not plan:

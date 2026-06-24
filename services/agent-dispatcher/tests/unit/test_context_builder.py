@@ -33,6 +33,13 @@ def sample_context():
     )
 
 
+def _kc_mock(token="jwt-token"):
+    mock_kc = MagicMock()
+    mock_kc.get_token = AsyncMock(return_value=token)
+    mock_kc.async_auth_headers = AsyncMock(return_value={"Authorization": f"Bearer {token}"})
+    return patch("src.services.context_builder.get_kc_client", return_value=mock_kc)
+
+
 async def test_all_sections_present_when_services_respond(sample_ticket, tmp_path):
     prompts_dir = tmp_path / "prompts"
     prompts_dir.mkdir()
@@ -41,7 +48,7 @@ async def test_all_sections_present_when_services_respond(sample_ticket, tmp_pat
     with (
         patch("src.services.context_builder.get_settings") as mock_settings,
         patch("src.services.context_builder.httpx.AsyncClient") as mock_client_cls,
-        patch("src.services.context_builder.create_service_token", return_value="jwt-token"),
+        _kc_mock(),
     ):
         settings = MagicMock()
         settings.agent_prompts_dir = str(prompts_dir)
@@ -69,7 +76,7 @@ async def test_all_sections_present_when_services_respond(sample_ticket, tmp_pat
     assert "## Your Role" in context_str
     assert "## Ticket" in context_str
     assert "## Description" in context_str
-    assert "## Task Manager Access" in context_str
+    assert "## Service Token" in context_str
     assert "## Completion and Metrics Reporting" in context_str
     assert "report-task-metrics.sh" in context_str
     assert "task-metrics" in context_str
@@ -83,7 +90,7 @@ async def test_missing_project_memory_empty_section(sample_ticket, tmp_path):
     with (
         patch("src.services.context_builder.get_settings") as mock_settings,
         patch("src.services.context_builder.httpx.AsyncClient") as mock_client_cls,
-        patch("src.services.context_builder.create_service_token", return_value="jwt"),
+        _kc_mock(),
     ):
         settings = MagicMock()
         settings.agent_prompts_dir = str(prompts_dir)
@@ -92,11 +99,6 @@ async def test_missing_project_memory_empty_section(sample_ticket, tmp_path):
         settings.context_max_tokens = 4000
         settings.agent_runner_mode = "claude_code"
         mock_settings.return_value = settings
-
-        mock_resp = AsyncMock()
-        mock_resp.status_code = 404
-        mock_resp.raise_for_status.side_effect = Exception("404")
-        mock_resp.json.return_value = {}
 
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -119,7 +121,7 @@ async def test_service_jwt_absent_from_context_snapshot(sample_ticket, tmp_path)
     with (
         patch("src.services.context_builder.get_settings") as mock_settings,
         patch("src.services.context_builder.httpx.AsyncClient") as mock_client_cls,
-        patch("src.services.context_builder.create_service_token", return_value="SECRET_JWT"),
+        _kc_mock("SECRET_JWT"),
     ):
         settings = MagicMock()
         settings.agent_prompts_dir = str(prompts_dir)
@@ -153,7 +155,7 @@ async def test_context_max_tokens_truncation(sample_ticket, tmp_path):
     with (
         patch("src.services.context_builder.get_settings") as mock_settings,
         patch("src.services.context_builder.httpx.AsyncClient") as mock_client_cls,
-        patch("src.services.context_builder.create_service_token", return_value="jwt"),
+        _kc_mock(),
     ):
         settings = MagicMock()
         settings.agent_prompts_dir = str(prompts_dir)
@@ -190,7 +192,7 @@ async def test_completion_metrics_section_present(sample_ticket, tmp_path):
     with (
         patch("src.services.context_builder.get_settings") as mock_settings,
         patch("src.services.context_builder.httpx.AsyncClient") as mock_client_cls,
-        patch("src.services.context_builder.create_service_token", return_value="jwt"),
+        _kc_mock(),
     ):
         settings = MagicMock()
         settings.agent_prompts_dir = str(prompts_dir)

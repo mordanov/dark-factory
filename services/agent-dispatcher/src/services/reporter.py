@@ -7,7 +7,7 @@ import structlog
 
 from src.core.config import get_settings
 from src.core.exceptions import OrchestratorError
-from src.core.security import create_service_token
+from src.core.keycloak_client import get_kc_client
 from src.schemas.schemas import AgentResult
 
 logger = structlog.get_logger(__name__)
@@ -21,8 +21,7 @@ class Reporter:
         result: AgentResult,
     ) -> None:
         settings = get_settings()
-        token = create_service_token()
-        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        headers = {**await get_kc_client().async_auth_headers(), "Content-Type": "application/json"}
 
         await self._post_tm_comment(
             settings.ticket_manager_base_url,

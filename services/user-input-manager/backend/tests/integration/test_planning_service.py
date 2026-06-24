@@ -9,29 +9,16 @@ import pytest
 import pytest_asyncio
 from fastapi import BackgroundTasks
 from src.core.exceptions import ConflictError, NotFoundError, UpstreamError
-from src.core.security import hash_password
-from src.models.models import PromptPlan, PromptSession, User
+from src.models.models import PromptPlan, PromptSession
 from src.repositories.plan_repo import PlanRepository
 from src.repositories.session_repo import SessionRepository
 from src.schemas.schemas import PlanContent
 from src.services.planning_service import PlanningService
 
 
-@pytest_asyncio.fixture
-async def svc_user(db):
-    """Isolated user for planning service tests — unique email per run."""
-    unique = str(uuid.uuid4())[:8]
-    user = User(
-        email=f"svc-test-{unique}@test.com",
-        password_hash=hash_password("Test1234!"),
-        full_name="Svc Test User",
-        is_admin=False,
-        is_active=True,
-    )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-    return user
+@pytest.fixture
+def svc_user():
+    return "svc-test-user-sub-001"
 
 
 VALID_PLAN_DICT = {
@@ -72,25 +59,24 @@ VALID_PLAN_DICT = {
 
 @pytest_asyncio.fixture
 async def approved_session(db, svc_user):
+    from src.models.models import PromptIteration
+
     session = PromptSession(
-        user_id=svc_user.id,
+        user_id=svc_user,
         session_type="new_project",
         tm_project_name="Test Project",
         tm_project_id="proj-test",
         status="approved",
     )
     db.add(session)
+    await db.flush()
 
-    from src.models.models import PromptIteration
     iter1 = PromptIteration(
-        session_id=None,
+        session_id=session.id,
         iteration_number=1,
         role="assistant",
         prompt_text="Build an authentication system with JWT",
     )
-    db.add(session)
-    await db.flush()
-    iter1.session_id = session.id
     db.add(iter1)
     await db.commit()
     await db.refresh(session)
@@ -100,7 +86,7 @@ async def approved_session(db, svc_user):
 @pytest_asyncio.fixture
 async def ready_plan(db, svc_user):
     session = PromptSession(
-        user_id=svc_user.id,
+        user_id=svc_user,
         session_type="new_project",
         tm_project_name="Test Project",
         tm_project_id="proj-test-2",
@@ -144,7 +130,7 @@ async def test_generate_transitions_session_to_plan_ready(db, approved_session, 
         patch("src.services.planning_service.generate_agent_config", return_value=None),
     ):
         svc = PlanningService(db, tm)
-        response = await svc.generate(approved_session.id, svc_user.id)
+        response = await svc.generate(approved_session.id, svc_user)
 
     assert response.session_id == approved_session.id
     repo = PlanRepository(db)
@@ -167,7 +153,7 @@ async def test_generate_resets_session_on_llm_failure(db, approved_session, svc_
     ):
         svc = PlanningService(db, tm)
         with pytest.raises(UpstreamError):
-            await svc.generate(approved_session.id, svc_user.id)
+            await svc.generate(approved_session.id, svc_user)
 
     session_repo = SessionRepository(db)
     session = await session_repo.get_by_id(approved_session.id)
@@ -177,7 +163,7 @@ async def test_generate_resets_session_on_llm_failure(db, approved_session, svc_
 @pytest.mark.asyncio
 async def test_generate_raises_conflict_if_not_approved(db, svc_user):
     session = PromptSession(
-        user_id=svc_user.id,
+        user_id=svc_user,
         session_type="new_project",
         tm_project_name="X",
         status="in_progress",
@@ -189,7 +175,7 @@ async def test_generate_raises_conflict_if_not_approved(db, svc_user):
     tm = _mock_tm_client()
     svc = PlanningService(db, tm)
     with pytest.raises(ConflictError):
-        await svc.generate(session.id, svc_user.id)
+        await svc.generate(session.id, svc_user)
 
 
 # ---------------------------------------------------------------------------
@@ -205,7 +191,7 @@ async def test_update_saves_new_content(db, ready_plan, svc_user):
 
     new_content = dict(VALID_PLAN_DICT)
     new_content["epic"] = dict(VALID_PLAN_DICT["epic"], title="Updated Epic Title")
-    result = await svc.update(session.id, svc_user.id, new_content)
+    result = await svc.update(session.id, svc_user, new_content)
 
     assert result.plan_content["epic"]["title"] == "Updated Epic Title"
 
@@ -213,7 +199,7 @@ async def test_update_saves_new_content(db, ready_plan, svc_user):
 @pytest.mark.asyncio
 async def test_update_raises_conflict_if_plan_confirmed(db, svc_user):
     session = PromptSession(
-        user_id=svc_user.id,
+        user_id=svc_user,
         session_type="new_project",
         tm_project_name="X",
         tm_project_id="proj-x",
@@ -228,7 +214,7 @@ async def test_update_raises_conflict_if_plan_confirmed(db, svc_user):
     tm = _mock_tm_client()
     svc = PlanningService(db, tm)
     with pytest.raises(ConflictError):
-        await svc.update(session.id, svc_user.id, VALID_PLAN_DICT)
+        await svc.update(session.id, svc_user, VALID_PLAN_DICT)
 
 
 # ---------------------------------------------------------------------------
@@ -243,7 +229,7 @@ async def test_confirm_returns_immediately_without_tm_calls(db, ready_plan, svc_
     bg = BackgroundTasks()
     svc = PlanningService(db, tm)
 
-    result = await svc.confirm(session.id, svc_user.id, bg)
+    result = await svc.confirm(session.id, svc_user, bg)
 
     assert result.status == "confirmed"
     # No TM calls made synchronously
@@ -261,9 +247,9 @@ async def test_confirm_returns_immediately_without_tm_calls(db, ready_plan, svc_
 
 
 @pytest.mark.asyncio
-async def test_confirm_raises_conflict_if_not_ready(db, svc_user):
+async def test_confirm_returns_idempotent_for_already_confirmed(db, svc_user):
     session = PromptSession(
-        user_id=svc_user.id,
+        user_id=svc_user,
         session_type="new_project",
         tm_project_name="X",
         tm_project_id="proj-x",
@@ -277,8 +263,30 @@ async def test_confirm_raises_conflict_if_not_ready(db, svc_user):
 
     tm = _mock_tm_client()
     svc = PlanningService(db, tm)
+    # Already confirmed — idempotent: returns success without raising
+    result = await svc.confirm(session.id, svc_user, BackgroundTasks())
+    assert result.status == "confirmed"
+
+
+@pytest.mark.asyncio
+async def test_confirm_raises_conflict_if_tickets_already_created(db, svc_user):
+    session = PromptSession(
+        user_id=svc_user,
+        session_type="new_project",
+        tm_project_name="X",
+        tm_project_id="proj-x",
+        status="tickets_created",
+    )
+    db.add(session)
+    await db.flush()
+    plan = PromptPlan(session_id=session.id, status="tickets_created", plan_content=VALID_PLAN_DICT)
+    db.add(plan)
+    await db.commit()
+
+    tm = _mock_tm_client()
+    svc = PlanningService(db, tm)
     with pytest.raises(ConflictError):
-        await svc.confirm(session.id, svc_user.id, BackgroundTasks())
+        await svc.confirm(session.id, svc_user, BackgroundTasks())
 
 
 # ---------------------------------------------------------------------------
@@ -289,7 +297,7 @@ async def test_confirm_raises_conflict_if_not_ready(db, svc_user):
 @pytest.mark.asyncio
 async def test_create_tickets_full_success(db, svc_user):
     session = PromptSession(
-        user_id=svc_user.id,
+        user_id=svc_user,
         session_type="new_project",
         tm_project_name="TM Project",
         tm_project_id="proj-full",
@@ -321,7 +329,9 @@ async def test_create_tickets_full_success(db, svc_user):
     tm.create_story = AsyncMock(side_effect=mock_create_story)
     tm.create_task = AsyncMock(side_effect=mock_create_task)
 
-    with patch("src.services.planning_service.PlanningService._store_agent_config", new_callable=AsyncMock):
+    with patch(
+        "src.services.planning_service.PlanningService._store_agent_config", new_callable=AsyncMock
+    ):
         svc = PlanningService(db, tm)
         await svc._create_tickets(session.id)
 
@@ -345,7 +355,7 @@ async def test_create_tickets_full_success(db, svc_user):
 @pytest.mark.asyncio
 async def test_create_tickets_partial_failure_retry_no_duplicates(db, svc_user):
     session = PromptSession(
-        user_id=svc_user.id,
+        user_id=svc_user,
         session_type="new_project",
         tm_project_name="Retry Project",
         tm_project_id="proj-retry",
@@ -378,7 +388,9 @@ async def test_create_tickets_partial_failure_retry_no_duplicates(db, svc_user):
     tm.create_story = AsyncMock(return_value="tm-story-1")
     tm.create_task = AsyncMock(side_effect=mock_create_task_fail_second)
 
-    with patch("src.services.planning_service.PlanningService._store_agent_config", new_callable=AsyncMock):
+    with patch(
+        "src.services.planning_service.PlanningService._store_agent_config", new_callable=AsyncMock
+    ):
         svc = PlanningService(db, tm)
         await svc._create_tickets(session.id)
 
@@ -394,7 +406,9 @@ async def test_create_tickets_partial_failure_retry_no_duplicates(db, svc_user):
         side_effect=lambda project_id, task, story_tm_id, dep_tm_ids: f"tm-{task.local_id}"
     )
 
-    with patch("src.services.planning_service.PlanningService._store_agent_config", new_callable=AsyncMock):
+    with patch(
+        "src.services.planning_service.PlanningService._store_agent_config", new_callable=AsyncMock
+    ):
         svc2 = PlanningService(db, tm)
         await svc2._create_tickets(session.id)
 
@@ -412,7 +426,7 @@ async def test_create_tickets_partial_failure_retry_no_duplicates(db, svc_user):
 @pytest.mark.asyncio
 async def test_store_agent_config_failure_does_not_block(db, svc_user):
     session = PromptSession(
-        user_id=svc_user.id,
+        user_id=svc_user,
         session_type="new_project",
         tm_project_name="Config Fail Project",
         tm_project_id="proj-config-fail",
@@ -455,7 +469,7 @@ async def test_store_agent_config_failure_does_not_block(db, svc_user):
 @pytest.mark.asyncio
 async def test_get_creation_status_computes_total_correctly(db, svc_user):
     session = PromptSession(
-        user_id=svc_user.id,
+        user_id=svc_user,
         session_type="new_project",
         tm_project_name="Status Project",
         tm_project_id="proj-status",
@@ -474,7 +488,7 @@ async def test_get_creation_status_computes_total_correctly(db, svc_user):
 
     tm = _mock_tm_client()
     svc = PlanningService(db, tm)
-    status_resp = await svc.get_creation_status(session.id, svc_user.id)
+    status_resp = await svc.get_creation_status(session.id, svc_user)
 
     assert status_resp.total == 4  # 1 epic + 1 story + 2 tasks
     assert status_resp.created_count == 1
@@ -483,7 +497,7 @@ async def test_get_creation_status_computes_total_correctly(db, svc_user):
 @pytest.mark.asyncio
 async def test_get_creation_status_raises_not_found_for_missing_plan(db, svc_user):
     session = PromptSession(
-        user_id=svc_user.id,
+        user_id=svc_user,
         session_type="new_project",
         tm_project_name="No Plan",
         status="approved",
@@ -494,4 +508,4 @@ async def test_get_creation_status_raises_not_found_for_missing_plan(db, svc_use
     tm = _mock_tm_client()
     svc = PlanningService(db, tm)
     with pytest.raises(NotFoundError):
-        await svc.get_creation_status(session.id, svc_user.id)
+        await svc.get_creation_status(session.id, svc_user)

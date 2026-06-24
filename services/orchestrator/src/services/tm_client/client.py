@@ -13,6 +13,7 @@ import httpx
 
 from src.core.config import get_settings
 from src.core.exceptions import UpstreamError
+from src.core.keycloak_client import get_kc_client
 from src.schemas.schemas import TmTicket
 
 logger = logging.getLogger(__name__)
@@ -23,26 +24,9 @@ class TicketManagerClient:
     def __init__(self) -> None:
         self._base = str(settings.ticket_manager_base_url).rstrip("/")
         self._timeout = settings.ticket_manager_timeout_seconds
-        self._token: str | None = None
-
-    async def _login(self) -> None:
-        async with httpx.AsyncClient(timeout=self._timeout) as c:
-            resp = await c.post(
-                f"{self._base}/api/auth/login",
-                json={
-                    "email": settings.ticket_manager_service_email,
-                    "password": settings.ticket_manager_service_password,
-                },
-            )
-        if resp.status_code != 200:
-            raise UpstreamError(f"TM auth failed: {resp.status_code}")
-        data = resp.json()
-        self._token = data.get("token") or data.get("access_token")
 
     async def _headers(self) -> dict:
-        if not self._token:
-            await self._login()
-        return {"Authorization": f"Bearer {self._token}"}
+        return await get_kc_client().async_auth_headers()
 
     async def _request(self, method: str, path: str, **kwargs) -> Any:
         headers = await self._headers()
@@ -50,7 +34,6 @@ class TicketManagerClient:
         async with httpx.AsyncClient(timeout=self._timeout) as c:
             resp = await c.request(method, url, headers=headers, **kwargs)
             if resp.status_code == 401:
-                self._token = None
                 headers = await self._headers()
                 resp = await c.request(method, url, headers=headers, **kwargs)
         if resp.status_code >= 400:

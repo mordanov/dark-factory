@@ -4,14 +4,12 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from src.schemas.ticket import UserSummary
-
 
 class TicketEventResponse(BaseModel):
     id: UUID
     ticket_id: UUID
     event_type: str
-    actor: UserSummary
+    actor_id: str
     prev_state: dict[str, Any] | None = None
     new_state: dict[str, Any] | None = None
     metadata: dict[str, Any] | None = None

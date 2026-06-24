@@ -1,19 +1,30 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from src.api.v1.router import router
+from src.core.auth_adapter import prefetch_jwks
 from src.core.config import settings
 from src.core.database import engine
 from src.core.logging import RequestLoggingMiddleware, configure_logging
 
 configure_logging()
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await prefetch_jwks()
+    yield
+
+
 app = FastAPI(
     title="Ticket Management System",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # CORS: allow only the configured frontend origin — never use wildcard in production

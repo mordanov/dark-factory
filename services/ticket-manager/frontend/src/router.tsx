@@ -1,33 +1,24 @@
-import { createBrowserRouter, Navigate } from "react-router-dom";
-import { useAuthStore } from "./store/auth";
-import { ProtectedRoute } from "./components/common/ProtectedRoute";
-import { LoginPage } from "./pages/LoginPage";
+import { createBrowserRouter } from "react-router-dom";
+import { AppShell } from "./components/layout/AppShell";
 import { ProjectPage } from "./pages/ProjectPage";
 import { TicketDetailPage } from "./pages/TicketDetailPage";
 import { ProjectListPage } from "./pages/ProjectListPage";
-import { AdminUsersPage } from "./pages/AdminUsersPage";
-
-function AdminRoute() {
-  const currentUser = useAuthStore((s) => s.currentUser);
-  if (currentUser?.role !== "administrator") {
-    return <Navigate to="/projects" replace />;
-  }
-  return <AdminUsersPage />;
-}
 
 export const router = createBrowserRouter([
   {
-    path: "/login",
-    element: <LoginPage />,
+    element: <AppShell><ProjectListPage /></AppShell>,
+    path: "/projects",
   },
   {
-    element: <ProtectedRoute />,
-    children: [
-      { path: "/projects", element: <ProjectListPage /> },
-      { path: "/projects/:projectId", element: <ProjectPage /> },
-      { path: "/tickets/:ticketId", element: <TicketDetailPage /> },
-      { path: "/admin/users", element: <AdminRoute /> },
-      { path: "/", element: <ProjectListPage /> },
-    ],
+    element: <AppShell><ProjectPage /></AppShell>,
+    path: "/projects/:projectId",
+  },
+  {
+    element: <AppShell><TicketDetailPage /></AppShell>,
+    path: "/tickets/:ticketId",
+  },
+  {
+    element: <AppShell><ProjectListPage /></AppShell>,
+    path: "/",
   },
 ]);

@@ -2,20 +2,21 @@
 
 import asyncio
 from collections.abc import AsyncGenerator
-from datetime import UTC
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from jose import jwt
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 from src.db.postgres import Base, get_db
 from src.main import create_app
-from src.models.models import Job
 from src.schemas.schemas import TmTicket
 
 TEST_PG_URL = "sqlite+aiosqlite:///:memory:"
+_TEST_JWT_SECRET = "test-secret-do-not-use-in-production"
 
 
 @pytest.fixture(scope="session")
@@ -57,30 +58,58 @@ async def client(app) -> AsyncGenerator[AsyncClient, None]:
         yield c
 
 
-# --- JWT token for tests ---
-@pytest.fixture
-def user_token():
-    from datetime import datetime, timedelta, timezone
+# ---------------------------------------------------------------------------
+# Auth fixtures (Keycloak-shaped HS256 tokens for AUTH_MODE=local)
+# ---------------------------------------------------------------------------
 
-    from jose import jwt
-    from src.core.config import get_settings
 
-    s = get_settings()
+@pytest.fixture(autouse=True)
+def set_auth_mode(monkeypatch):
+    monkeypatch.setenv("AUTH_MODE", "local")
+    monkeypatch.setenv("TEST_JWT_SECRET", _TEST_JWT_SECRET)
+    from src.core import config as cfg
+
+    cfg.get_settings.cache_clear()
+    yield
+    cfg.get_settings.cache_clear()
+
+
+def _make_token(sub: str, email: str, roles: list[str]) -> str:
     payload = {
-        "sub": "uid-test",
-        "is_admin": False,
-        "type": "access",
+        "sub": sub,
+        "email": email,
+        "preferred_username": email,
+        "realm_access": {"roles": roles},
         "exp": datetime.now(UTC) + timedelta(hours=1),
     }
-    return jwt.encode(payload, s.jwt_secret_key, algorithm=s.jwt_algorithm)
+    return jwt.encode(payload, _TEST_JWT_SECRET, algorithm="HS256")
 
 
 @pytest.fixture
-def auth_headers(user_token):
+def user_token() -> str:
+    return _make_token("user-sub-001", "user@test.local", ["user"])
+
+
+@pytest.fixture
+def admin_token() -> str:
+    return _make_token("admin-sub-001", "admin@test.local", ["user", "administrator"])
+
+
+@pytest.fixture
+def auth_headers(user_token) -> dict:
     return {"Authorization": f"Bearer {user_token}"}
 
 
-# --- Mock Ticket Manager ---
+@pytest.fixture
+def admin_headers(admin_token) -> dict:
+    return {"Authorization": f"Bearer {admin_token}"}
+
+
+# ---------------------------------------------------------------------------
+# Mock external services
+# ---------------------------------------------------------------------------
+
+
 @pytest.fixture
 def mock_tm():
     tm = MagicMock()

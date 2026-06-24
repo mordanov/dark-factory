@@ -1,11 +1,21 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { I18nextProvider } from 'react-i18next'
 import i18n from '../src/i18n/i18n'
 import { Sidebar } from '../src/components/layout/Sidebar'
 import { useAuthStore } from '../src/store/auth'
-import type { User } from '../src/api/client'
+
+vi.mock('../src/keycloak', () => ({
+  default: {
+    init: vi.fn().mockResolvedValue(true),
+    updateToken: vi.fn().mockResolvedValue(true),
+    logout: vi.fn().mockResolvedValue(undefined),
+    token: 'mock-token',
+    tokenParsed: null,
+    onTokenExpired: undefined,
+  },
+}))
 
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
@@ -13,14 +23,11 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => mockNavigate }
 })
 
-const adminUser: User = {
-  id: '1', email: 'admin@test.com', full_name: 'Admin', is_admin: true,
-  is_active: true, created_at: '', updated_at: '',
-}
-const regularUser: User = { ...adminUser, is_admin: false, email: 'user@test.com' }
+const adminUser = { sub: 'uid-admin', email: 'admin@test.com', username: 'admin', isAdmin: true }
+const regularUser = { sub: 'uid-user', email: 'user@test.com', username: 'user', isAdmin: false }
 
-function wrap(user: User) {
-  useAuthStore.setState({ currentUser: user, accessToken: null, refreshToken: null, isRestoring: false })
+function wrap(user: typeof adminUser) {
+  useAuthStore.setState({ initialized: true, user })
   return render(
     <I18nextProvider i18n={i18n}>
       <MemoryRouter>
@@ -33,7 +40,7 @@ function wrap(user: User) {
 describe('Sidebar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    useAuthStore.setState({ currentUser: null, accessToken: null, refreshToken: null, isRestoring: false })
+    useAuthStore.setState({ initialized: false, user: null })
   })
 
   it('shows Sessions link for all users', () => {
@@ -41,26 +48,18 @@ describe('Sidebar', () => {
     expect(screen.getByText(/sessions/i)).toBeInTheDocument()
   })
 
-  it('shows Users link only for admins', () => {
+  it('shows admin link only for admin users', () => {
     wrap(adminUser)
-    expect(screen.getByText(/users/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /admin/i })).toBeInTheDocument()
   })
 
-  it('hides Users link for regular users', () => {
+  it('hides admin link for regular users', () => {
     wrap(regularUser)
-    expect(screen.queryByText(/^users$/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /admin/i })).not.toBeInTheDocument()
   })
 
   it('displays user email', () => {
     wrap(regularUser)
     expect(screen.getByText('user@test.com')).toBeInTheDocument()
-  })
-
-  it('calls logout and navigates on Log out click', () => {
-    const logoutSpy = vi.spyOn(useAuthStore.getState(), 'logout')
-    wrap(regularUser)
-    fireEvent.click(screen.getByText(/log out/i))
-    expect(logoutSpy).toHaveBeenCalled()
-    expect(mockNavigate).toHaveBeenCalledWith('/login')
   })
 })

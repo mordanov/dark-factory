@@ -3,18 +3,17 @@ import { useAuthStore } from '../store/auth'
 
 export const api = axios.create({ baseURL: '/api/v1' })
 
-api.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().accessToken
-  if (token) config.headers.Authorization = `Bearer ${token}`
+api.interceptors.request.use(async (config) => {
+  const header = await useAuthStore.getState().getAuthHeader()
+  config.headers.Authorization = header.Authorization
   return config
 })
 
 api.interceptors.response.use(
   (r) => r,
-  (err) => {
+  async (err) => {
     if (err.response?.status === 401) {
-      useAuthStore.getState().logout()
-      window.location.href = '/login'
+      await useAuthStore.getState().initialize()
     }
     return Promise.reject(err)
   }
@@ -26,35 +25,20 @@ api.interceptors.response.use(
 
 export function extractError(err: unknown, fallback = 'Something went wrong'): string {
   if (!err || typeof err !== 'object') return fallback
-  const e = err as any
-  const detail = e?.response?.data?.detail
-  if (detail) {
-    if (typeof detail === 'string') return detail
-    if (Array.isArray(detail)) return detail.map((d: any) => d?.msg || String(d)).join('; ')
+  const e = err as Record<string, unknown>
+  const detail = (e?.response as Record<string, unknown> | undefined)?.data as Record<string, unknown> | undefined
+  const detailValue = detail?.detail
+  if (detailValue) {
+    if (typeof detailValue === 'string') return detailValue
+    if (Array.isArray(detailValue)) return detailValue.map((d: unknown) => (d as Record<string, unknown>)?.msg || String(d)).join('; ')
   }
-  if (e?.message) return e.message
+  if (typeof (e as Record<string, unknown>)?.message === 'string') return (e as Record<string, unknown>).message as string
   return fallback
 }
 
 // ------------------------------------------------------------------
 // Types
 // ------------------------------------------------------------------
-
-export interface TokenResponse {
-  access_token: string
-  refresh_token: string
-  token_type: string
-}
-
-export interface User {
-  id: string
-  email: string
-  full_name: string
-  is_admin: boolean
-  is_active: boolean
-  created_at: string
-  updated_at: string
-}
 
 export interface TmProject {
   id: string
@@ -152,22 +136,6 @@ export interface Iteration {
 // ------------------------------------------------------------------
 // API calls
 // ------------------------------------------------------------------
-
-export const authApi = {
-  login: (email: string, password: string) =>
-    api.post<TokenResponse>('/auth/login', { email, password }),
-  refresh: (refresh_token: string) =>
-    api.post<TokenResponse>('/auth/refresh', { refresh_token }),
-}
-
-export const usersApi = {
-  list: (offset = 0, limit = 50) =>
-    api.get<{ items: User[]; total: number }>('/users', { params: { offset, limit } }),
-  create: (data: { email: string; password: string; full_name: string; is_admin: boolean }) =>
-    api.post<User>('/users', data),
-  update: (id: string, data: Partial<{ email: string; password: string; full_name: string; is_admin: boolean; is_active: boolean }>) =>
-    api.patch<User>(`/users/${id}`, data),
-}
 
 export const tmApi = {
   listProjects: () => api.get<TmProject[]>('/ticket-manager/projects'),

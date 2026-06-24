@@ -5,8 +5,8 @@ import time
 import httpx
 
 from src.config import Settings, get_settings
+from src.core.keycloak_client import get_kc_client
 from src.schemas import AdrSummary, FetchAdrsResult, FetchProjectMemoryResult, ToolEnvelope
-from src.utils.auth import make_service_jwt
 from src.utils.envelope import build_error, build_success
 
 _TOOL_MEMORY = "fetch_project_memory"
@@ -30,12 +30,12 @@ async def fetch_project_memory(
     s = settings or get_settings()
     tool = _TOOL_MEMORY
 
-    token = make_service_jwt(s)
+    auth_headers = await get_kc_client().async_auth_headers()
     url = f"{s.distiller_base_url}/api/v1/memory/{project_id}"
 
     try:
         async with httpx.AsyncClient(timeout=s.distiller_timeout_seconds) as client:
-            resp = await client.get(url, headers={"Authorization": f"Bearer {token}"})
+            resp = await client.get(url, headers=auth_headers)
     except httpx.TimeoutException:
         return build_error(tool, "TIMEOUT", "Context Distiller request timed out", True, t0)
     except (httpx.ConnectError, httpx.RemoteProtocolError, httpx.TransportError) as exc:
@@ -81,7 +81,7 @@ async def fetch_adrs(
     s = settings or get_settings()
     tool = _TOOL_ADRS
 
-    token = make_service_jwt(s)
+    auth_headers = await get_kc_client().async_auth_headers()
 
     # "all" → omit status query param, otherwise pass it
     params: dict[str, str] = {}
@@ -92,9 +92,7 @@ async def fetch_adrs(
 
     try:
         async with httpx.AsyncClient(timeout=s.distiller_timeout_seconds) as client:
-            resp = await client.get(
-                url, params=params, headers={"Authorization": f"Bearer {token}"}
-            )
+            resp = await client.get(url, params=params, headers=auth_headers)
     except httpx.TimeoutException:
         return build_error(tool, "TIMEOUT", "Context Distiller request timed out", True, t0)
     except (httpx.ConnectError, httpx.RemoteProtocolError, httpx.TransportError) as exc:

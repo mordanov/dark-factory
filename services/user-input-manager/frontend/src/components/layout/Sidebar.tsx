@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../../store/auth'
 
 export function Sidebar() {
-  const user = useAuthStore((s) => s.currentUser)
+  const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
@@ -14,6 +14,9 @@ export function Sidebar() {
   const toggleLang = () => {
     i18n.changeLanguage(i18n.language === 'en' ? 'ru' : 'en')
   }
+
+  const kcBase = import.meta.env.VITE_KEYCLOAK_URL as string | undefined
+  const kcConsoleUrl = kcBase ? `${kcBase}/admin/dark-factory/console` : null
 
   return (
     <aside className="sidebar">
@@ -39,14 +42,17 @@ export function Sidebar() {
           {t('nav.queue')}
         </button>
 
-        {user?.is_admin && (
-          <button
-            className={`nav-item ${isActive('/admin') ? 'active' : ''}`}
-            onClick={() => navigate('/admin')}
+        {user?.isAdmin && kcConsoleUrl && (
+          <a
+            className="nav-item"
+            href={kcConsoleUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+            aria-label={`${t('nav.admin')} (opens in new tab)`}
           >
-            <span>◈</span>
+            <span aria-hidden="true">◈</span>
             {t('nav.admin')}
-          </button>
+          </a>
         )}
       </nav>
 
@@ -55,7 +61,7 @@ export function Sidebar() {
           {t('common.language')}: {i18n.language.toUpperCase()}
         </button>
         <div className="user-info">{user?.email}</div>
-        <button className="btn btn-ghost btn-sm" onClick={() => { logout(); navigate('/login') }}>
+        <button className="btn btn-ghost btn-sm" onClick={() => void logout()}>
           {t('nav.logout')}
         </button>
       </div>

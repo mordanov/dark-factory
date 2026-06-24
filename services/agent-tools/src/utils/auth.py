@@ -1,21 +1,6 @@
-import time
-
-from jose import jwt
-
-from src.config import Settings
-from src.core.auth_adapter import AuthAdapter
+from src.core.auth_adapter import KeycloakValidator
 
 
-def make_service_jwt(settings: Settings) -> str:
-    now = int(time.time())
-    payload = {
-        "sub": "agent-tools",
-        "iat": now,
-        "exp": now + 60,
-    }
-    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
-
-
-async def verify_token(token: str, settings: Settings) -> dict:
-    adapter = AuthAdapter(settings)
+async def verify_token(token: str) -> dict:
+    adapter = KeycloakValidator()
     return await adapter.verify(token)

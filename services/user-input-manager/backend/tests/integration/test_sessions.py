@@ -156,7 +156,6 @@ async def test_submit_feedback_approved(
     assert resp.json()["awaiting_approval"] is True
 
 
-
 @pytest.mark.asyncio
 async def test_revert(client, app, db, auth_headers, mock_tm_client, mock_llm_result):
     app.dependency_overrides[get_session_service] = lambda: SessionService(db, mock_tm_client)

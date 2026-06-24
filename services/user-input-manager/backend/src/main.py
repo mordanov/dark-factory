@@ -3,16 +3,24 @@
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api.v1 import auth, orchestrator, planning, sessions, ticket_manager, users
+from src.api.v1 import orchestrator, planning, sessions, ticket_manager
+from src.core.auth_adapter import prefetch_jwks
 from src.core.config import get_settings
 from src.core.exceptions import AppError, app_error_handler
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 settings = get_settings()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await prefetch_jwks()
+    yield
 
 
 def create_app() -> FastAPI:
@@ -21,6 +29,7 @@ def create_app() -> FastAPI:
         version="1.0.0",
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
+        lifespan=lifespan,
     )
 
     app.add_middleware(
@@ -34,12 +43,10 @@ def create_app() -> FastAPI:
     app.add_exception_handler(AppError, app_error_handler)
 
     for router in [
-        auth.router,
         orchestrator.router,
         planning.router,
         sessions.router,
         ticket_manager.router,
-        users.router,
     ]:
         app.include_router(router, prefix="/api/v1")
 

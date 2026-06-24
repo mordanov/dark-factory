@@ -5,18 +5,17 @@ export const orchestratorApi = axios.create({
   baseURL: import.meta.env.VITE_ORCHESTRATOR_BASE_URL ?? '/orchestrator-api/v1',
 })
 
-orchestratorApi.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().accessToken
-  if (token) config.headers.Authorization = `Bearer ${token}`
+orchestratorApi.interceptors.request.use(async (config) => {
+  const header = await useAuthStore.getState().getAuthHeader()
+  config.headers.Authorization = header.Authorization
   return config
 })
 
 orchestratorApi.interceptors.response.use(
   (r) => r,
-  (err) => {
+  async (err) => {
     if (err.response?.status === 401) {
-      useAuthStore.getState().logout()
-      window.location.href = '/login'
+      await useAuthStore.getState().initialize()
     }
     return Promise.reject(err)
   }

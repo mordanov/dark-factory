@@ -5,12 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.auth_adapter import UserClaims
 from src.core.database import get_db
 from src.core.security import get_current_user
 from src.models.project import Project
 from src.models.project_group import ProjectGroup
 from src.models.ticket import Ticket, TicketStatus
-from src.models.user import User
 from src.schemas.project import ProjectCreate, ProjectResponse, ProjectTicketCounts, ProjectUpdate
 from src.schemas.project_group import ProjectGroupResponse
 from src.schemas.ticket import (
@@ -78,7 +78,7 @@ async def _project_response(db: AsyncSession, project: Project) -> ProjectRespon
 async def create_project(
     body: ProjectCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ) -> ProjectResponse:
     if body.code is not None:
         existing_code = await db.execute(select(Project).where(Project.code == body.code))
@@ -109,7 +109,7 @@ async def create_project(
         slug=slug,
         code=body.code,
         group_id=group_id,
-        created_by=current_user.id,
+        created_by=current_user.sub,
     )
     db.add(project)
     await db.commit()
@@ -122,7 +122,7 @@ async def create_project(
 async def list_projects(
     group_id: UUID | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: UserClaims = Depends(get_current_user),
 ) -> dict:
     query = select(Project).order_by(Project.created_at.desc())
     if group_id is not None:
@@ -143,7 +143,7 @@ async def update_project(
     project_id: UUID,
     body: ProjectUpdate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: UserClaims = Depends(get_current_user),
 ) -> ProjectResponse:
     project = await db.get(Project, project_id)
     if project is None:
@@ -164,12 +164,12 @@ async def update_project(
 async def list_tickets(
     project_id: UUID,
     status: TicketStatus | None = Query(default=None),
-    assignee_id: UUID | None = Query(default=None),
+    assignee_id: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
     include_fsm: bool = Query(default=False),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: UserClaims = Depends(get_current_user),
 ) -> TicketListResponse | TicketFsmListResponse:
     if include_fsm:
         fsm_items, total = await ticket_service.list_tickets_with_fsm(
@@ -187,6 +187,6 @@ async def create_ticket(
     project_id: UUID,
     body: TicketCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ) -> TicketResponse:
     return await ticket_service.create_ticket(db, project_id, body, current_user)

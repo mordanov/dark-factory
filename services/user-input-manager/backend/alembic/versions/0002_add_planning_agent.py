@@ -1,4 +1,4 @@
-"""Add planning agent: extend session_status enum, add plan_status enum, create prompt_plans table."""
+"""Add planning agent: extend session_status, add plan_status enum, create prompt_plans table."""
 
 import sqlalchemy as sa
 from alembic import op
@@ -11,24 +11,23 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # ALTER TYPE ... ADD VALUE cannot run inside a transaction block on PostgreSQL 16.
-    # Execute enum additions under AUTOCOMMIT, then resume normal transactional DDL.
-    conn = op.get_bind()
-    conn.execution_options(isolation_level="AUTOCOMMIT")
-    conn.execute(sa.text("ALTER TYPE session_status ADD VALUE IF NOT EXISTS 'planning'"))
-    conn.execute(sa.text("ALTER TYPE session_status ADD VALUE IF NOT EXISTS 'plan_ready'"))
-    conn.execute(sa.text("ALTER TYPE session_status ADD VALUE IF NOT EXISTS 'plan_confirmed'"))
-    conn.execute(sa.text("ALTER TYPE session_status ADD VALUE IF NOT EXISTS 'tickets_created'"))
-    conn.execute(sa.text("""
+    op.execute(sa.text("ALTER TYPE session_status ADD VALUE IF NOT EXISTS 'planning'"))
+    op.execute(sa.text("ALTER TYPE session_status ADD VALUE IF NOT EXISTS 'plan_ready'"))
+    op.execute(sa.text("ALTER TYPE session_status ADD VALUE IF NOT EXISTS 'plan_confirmed'"))
+    op.execute(sa.text("ALTER TYPE session_status ADD VALUE IF NOT EXISTS 'tickets_created'"))
+    op.execute(
+        sa.text("""
         DO $$
         BEGIN
-            CREATE TYPE plan_status AS ENUM ('draft', 'ready', 'confirmed', 'tickets_created', 'error');
+            CREATE TYPE plan_status AS ENUM (
+                'draft', 'ready', 'confirmed', 'tickets_created', 'error'
+            );
         EXCEPTION
             WHEN duplicate_object THEN NULL;
         END
         $$;
-    """))
-    conn.execution_options(isolation_level="READ COMMITTED")
+    """)
+    )
 
     op.create_table(
         "prompt_plans",
@@ -37,7 +36,11 @@ def upgrade() -> None:
         sa.Column(
             "status",
             postgresql.ENUM(
-                "draft", "ready", "confirmed", "tickets_created", "error",
+                "draft",
+                "ready",
+                "confirmed",
+                "tickets_created",
+                "error",
                 name="plan_status",
                 create_type=False,
             ),

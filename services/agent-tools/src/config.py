@@ -8,9 +8,13 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     git_repo_path: str = ""
-    jwt_secret_key: str = ""
-    jwt_algorithm: str = "HS256"
-    auth_mode: str = "local"
+    # --- Keycloak / Auth ---
+    keycloak_base_url: str = "http://keycloak:8080"
+    keycloak_realm: str = "dark-factory"
+    keycloak_client_id: str = ""
+    keycloak_client_secret: str = ""
+    auth_mode: str = "keycloak"
+    test_jwt_secret: str = "test-secret-do-not-use-in-production"
     distiller_base_url: str = "http://context-distiller:8001"
     distiller_timeout_seconds: int = 10
     git_read_timeout_seconds: int = 15

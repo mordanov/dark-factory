@@ -10,7 +10,7 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import get_settings
-from src.core.security import create_service_token
+from src.core.keycloak_client import get_kc_client
 from src.repositories.run_repo import AgentRunRepository
 
 logger = structlog.get_logger(__name__)
@@ -30,12 +30,12 @@ class TmTicket:
 async def poll_once(db: AsyncSession) -> list[TmTicket]:
     """Poll Orchestrator for assigned tickets; filter out already-running ones."""
     settings = get_settings()
-    token = create_service_token()
+    auth_headers = await get_kc_client().async_auth_headers()
     url = f"{settings.orchestrator_base_url}/api/v1/jobs/pending-tickets"
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(url, headers={"Authorization": f"Bearer {token}"})
+            resp = await client.get(url, headers=auth_headers)
             resp.raise_for_status()
             data = resp.json()
     except Exception as exc:
