@@ -23,13 +23,46 @@ server {
         root /var/www/certbot;
     }
 
-    # API proxy → backend (internal port is 8000 in all services)
+    # oauth2-proxy: internal Bearer token validation endpoint
+    location = /oauth2/auth {
+        internal;
+        proxy_pass http://oauth2-proxy:4180;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+        proxy_set_header X-Original-URI $request_uri;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    # oauth2-proxy: management endpoints (ping, sign_in, etc.)
+    location /oauth2/ {
+        proxy_pass http://oauth2-proxy:4180;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # JSON 401 response for unauthenticated API calls
+    location @error401 {
+        default_type application/json;
+        return 401 '{"detail":"Not authenticated","code":"TOKEN_EXPIRED_OR_INVALID"}';
+    }
+
+    # API proxy → backend; Bearer token validated by oauth2-proxy before forwarding
     location /api/ {
         proxy_pass http://user-input-manager:8000;
         include /etc/nginx/snippets/proxy.conf;
+
+        auth_request /oauth2/auth;
+        auth_request_set $auth_user $upstream_http_x_auth_request_user;
+        auth_request_set $auth_email $upstream_http_x_auth_request_email;
+
+        proxy_set_header X-Auth-User $auth_user;
+        proxy_set_header X-Auth-Email $auth_email;
+
+        error_page 401 = @error401;
     }
 
     # Frontend SPA — proxy to the UIM frontend nginx container
+    # No auth_request: keycloak-js handles redirect in the browser
     location / {
         proxy_pass http://uim-frontend:80;
         include /etc/nginx/snippets/proxy.conf;
@@ -59,13 +92,46 @@ server {
         root /var/www/certbot;
     }
 
-    # API proxy → backend (internal port is 8000)
+    # oauth2-proxy: internal Bearer token validation endpoint
+    location = /oauth2/auth {
+        internal;
+        proxy_pass http://oauth2-proxy:4180;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+        proxy_set_header X-Original-URI $request_uri;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    # oauth2-proxy: management endpoints
+    location /oauth2/ {
+        proxy_pass http://oauth2-proxy:4180;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # JSON 401 response for unauthenticated API calls
+    location @error401 {
+        default_type application/json;
+        return 401 '{"detail":"Not authenticated","code":"TOKEN_EXPIRED_OR_INVALID"}';
+    }
+
+    # API proxy → backend; Bearer token validated by oauth2-proxy before forwarding
     location /api/ {
         proxy_pass http://ticket-manager:8000;
         include /etc/nginx/snippets/proxy.conf;
+
+        auth_request /oauth2/auth;
+        auth_request_set $auth_user $upstream_http_x_auth_request_user;
+        auth_request_set $auth_email $upstream_http_x_auth_request_email;
+
+        proxy_set_header X-Auth-User $auth_user;
+        proxy_set_header X-Auth-Email $auth_email;
+
+        error_page 401 = @error401;
     }
 
     # Frontend SPA — proxy to the TM frontend nginx container
+    # No auth_request: keycloak-js handles redirect in the browser
     location / {
         proxy_pass http://tm-frontend:80;
         include /etc/nginx/snippets/proxy.conf;

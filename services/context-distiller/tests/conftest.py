@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from jose import jwt
 from mongomock_motor import AsyncMongoMockClient
 from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
@@ -16,17 +18,17 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from src.db.postgres import Base
 from src.models import Job
 
+_TEST_JWT_SECRET = "test-secret-do-not-use-in-production"
+
 
 # SQLite doesn't support JSONB — swap it out for tests only
 def _patch_jsonb_for_sqlite():
-    import sqlalchemy.dialects.postgresql as pg
     from sqlalchemy import event
 
     @event.listens_for(Base.metadata, "before_create")
     def before_create(target, connection, **kw):
         pass
 
-    # Replace JSONB columns in the model metadata with JSON for SQLite
     for table in Base.metadata.tables.values():
         for col in table.columns:
             if isinstance(col.type, JSONB):
@@ -81,6 +83,53 @@ async def test_client(db_session, mongo_db) -> AsyncGenerator[AsyncClient, None]
         yield client
 
     app.dependency_overrides.clear()
+
+
+# ---------------------------------------------------------------------------
+# Auth fixtures (Keycloak-shaped HS256 tokens for AUTH_MODE=local)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def set_auth_mode(monkeypatch):
+    monkeypatch.setenv("AUTH_MODE", "local")
+    monkeypatch.setenv("TEST_JWT_SECRET", _TEST_JWT_SECRET)
+    from src.core import config as cfg
+
+    cfg.get_settings.cache_clear()
+    yield
+    cfg.get_settings.cache_clear()
+
+
+def _make_token(sub: str, email: str, roles: list[str]) -> str:
+    payload = {
+        "sub": sub,
+        "email": email,
+        "preferred_username": email,
+        "realm_access": {"roles": roles},
+        "exp": datetime.now(UTC) + timedelta(hours=1),
+    }
+    return jwt.encode(payload, _TEST_JWT_SECRET, algorithm="HS256")
+
+
+@pytest.fixture
+def user_token() -> str:
+    return _make_token("user-sub-001", "user@test.local", ["user"])
+
+
+@pytest.fixture
+def admin_token() -> str:
+    return _make_token("admin-sub-001", "admin@test.local", ["user", "administrator"])
+
+
+@pytest.fixture
+def auth_headers(user_token) -> dict:
+    return {"Authorization": f"Bearer {user_token}"}
+
+
+@pytest.fixture
+def admin_headers(admin_token) -> dict:
+    return {"Authorization": f"Bearer {admin_token}"}
 
 
 # ---------------------------------------------------------------------------

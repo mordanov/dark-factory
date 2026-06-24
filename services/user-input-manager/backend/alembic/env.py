@@ -38,8 +38,7 @@ async def run_async_migrations() -> None:
                 connection=sync_conn, target_metadata=target_metadata
             )
         )
-        async with engine.begin() as conn2:
-            await conn2.run_sync(lambda c: context.run_migrations())
+        await conn.run_sync(lambda c: context.run_migrations())
     await engine.dispose()
 
 

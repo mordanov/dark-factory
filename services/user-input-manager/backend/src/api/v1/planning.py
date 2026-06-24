@@ -8,9 +8,9 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies import get_current_user
+from src.core.auth_adapter import UserClaims
 from src.core.exceptions import AppError, BadRequestError, ConflictError
 from src.db.session import get_db
-from src.models.models import User
 from src.schemas.schemas import (
     PlanConfirmResponse,
     PlanGenerateResponse,
@@ -35,11 +35,11 @@ def get_planning_service(
 @router.post("/{session_id}/plan", response_model=PlanGenerateResponse, status_code=202)
 async def trigger_plan_generation(
     session_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
     svc: PlanningService = Depends(get_planning_service),
 ):
     try:
-        return await svc.generate(session_id, current_user.id)
+        return await svc.generate(session_id, current_user.sub)
     except ConflictError as exc:
         raise HTTPException(status_code=409, detail=exc.detail)
     except AppError:
@@ -49,21 +49,21 @@ async def trigger_plan_generation(
 @router.get("/{session_id}/plan", response_model=PlanResponse)
 async def get_plan(
     session_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
     svc: PlanningService = Depends(get_planning_service),
 ):
-    return await svc.get_plan(session_id, current_user.id)
+    return await svc.get_plan(session_id, current_user.sub)
 
 
 @router.put("/{session_id}/plan", response_model=PlanResponse)
 async def update_plan(
     session_id: uuid.UUID,
     payload: PlanUpdateRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
     svc: PlanningService = Depends(get_planning_service),
 ):
     try:
-        return await svc.update(session_id, current_user.id, payload.plan_content)
+        return await svc.update(session_id, current_user.sub, payload.plan_content)
     except BadRequestError as exc:
         raise HTTPException(
             status_code=422,
@@ -82,11 +82,11 @@ async def update_plan(
 async def confirm_plan(
     session_id: uuid.UUID,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
     svc: PlanningService = Depends(get_planning_service),
 ):
     try:
-        return await svc.confirm(session_id, current_user.id, background_tasks)
+        return await svc.confirm(session_id, current_user.sub, background_tasks)
     except ConflictError as exc:
         raise HTTPException(status_code=409, detail=exc.detail)
     except AppError:
@@ -96,7 +96,7 @@ async def confirm_plan(
 @router.get("/{session_id}/plan/status", response_model=PlanStatusResponse)
 async def get_plan_status(
     session_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
     svc: PlanningService = Depends(get_planning_service),
 ):
-    return await svc.get_creation_status(session_id, current_user.id)
+    return await svc.get_creation_status(session_id, current_user.sub)

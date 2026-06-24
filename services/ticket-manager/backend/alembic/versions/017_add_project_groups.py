@@ -19,12 +19,22 @@ depends_on = None
 def upgrade() -> None:
     op.create_table(
         "project_groups",
-        sa.Column("id", PGUUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+        sa.Column(
+            "id",
+            PGUUID(as_uuid=True),
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
         sa.Column("identifier", sa.String(8), nullable=False),
         sa.Column("name", sa.String(255), nullable=False),
         sa.Column("description", sa.Text, nullable=True),
         sa.Column("is_system", sa.Boolean, nullable=False, server_default="false"),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.UniqueConstraint("identifier", name="uq_project_groups_identifier"),
     )
     op.create_index("idx_project_groups_identifier", "project_groups", ["identifier"])
@@ -44,9 +54,7 @@ def upgrade() -> None:
     op.add_column("projects", sa.Column("group_id", PGUUID(as_uuid=True), nullable=True))
 
     # Backfill all existing projects to the DEFAULT group
-    conn.execute(
-        sa.text("UPDATE projects SET group_id = :gid").bindparams(gid=default_id)
-    )
+    conn.execute(sa.text("UPDATE projects SET group_id = :gid").bindparams(gid=default_id))
 
     # Now enforce NOT NULL
     op.alter_column("projects", "group_id", nullable=False)

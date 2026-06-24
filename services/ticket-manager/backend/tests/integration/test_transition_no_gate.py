@@ -21,9 +21,7 @@ async def _make_assigned_ticket(session: AsyncSession) -> tuple[User, Ticket]:
     session.add(project)
     await session.flush()
 
-    ticket = Ticket(
-        project_id=project.id, title="T", created_by=user.id, status=TicketStatus.OPEN
-    )
+    ticket = Ticket(project_id=project.id, title="T", created_by=user.id, status=TicketStatus.OPEN)
     session.add(ticket)
     await session.flush()
 
@@ -71,16 +69,16 @@ async def test_any_assignee_can_transition(db_session: AsyncSession):
     session.add(project)
     await session.flush()
 
-    ticket = Ticket(
-        project_id=project.id, title="T", created_by=user1.id, status=TicketStatus.OPEN
-    )
+    ticket = Ticket(project_id=project.id, title="T", created_by=user1.id, status=TicketStatus.OPEN)
     session.add(ticket)
     await session.flush()
 
-    session.add_all([
-        TicketAssignment(ticket_id=ticket.id, user_id=user1.id, assigned_by=user1.id),
-        TicketAssignment(ticket_id=ticket.id, user_id=user2.id, assigned_by=user1.id),
-    ])
+    session.add_all(
+        [
+            TicketAssignment(ticket_id=ticket.id, user_id=user1.id, assigned_by=user1.id),
+            TicketAssignment(ticket_id=ticket.id, user_id=user2.id, assigned_by=user1.id),
+        ]
+    )
     await session.commit()
 
     result = await transition_service.transition_ticket(

@@ -82,6 +82,7 @@ async def approved_session(db, svc_user):
     db.add(session)
 
     from src.models.models import PromptIteration
+
     iter1 = PromptIteration(
         session_id=None,
         iteration_number=1,
@@ -321,7 +322,9 @@ async def test_create_tickets_full_success(db, svc_user):
     tm.create_story = AsyncMock(side_effect=mock_create_story)
     tm.create_task = AsyncMock(side_effect=mock_create_task)
 
-    with patch("src.services.planning_service.PlanningService._store_agent_config", new_callable=AsyncMock):
+    with patch(
+        "src.services.planning_service.PlanningService._store_agent_config", new_callable=AsyncMock
+    ):
         svc = PlanningService(db, tm)
         await svc._create_tickets(session.id)
 
@@ -378,7 +381,9 @@ async def test_create_tickets_partial_failure_retry_no_duplicates(db, svc_user):
     tm.create_story = AsyncMock(return_value="tm-story-1")
     tm.create_task = AsyncMock(side_effect=mock_create_task_fail_second)
 
-    with patch("src.services.planning_service.PlanningService._store_agent_config", new_callable=AsyncMock):
+    with patch(
+        "src.services.planning_service.PlanningService._store_agent_config", new_callable=AsyncMock
+    ):
         svc = PlanningService(db, tm)
         await svc._create_tickets(session.id)
 
@@ -394,7 +399,9 @@ async def test_create_tickets_partial_failure_retry_no_duplicates(db, svc_user):
         side_effect=lambda project_id, task, story_tm_id, dep_tm_ids: f"tm-{task.local_id}"
     )
 
-    with patch("src.services.planning_service.PlanningService._store_agent_config", new_callable=AsyncMock):
+    with patch(
+        "src.services.planning_service.PlanningService._store_agent_config", new_callable=AsyncMock
+    ):
         svc2 = PlanningService(db, tm)
         await svc2._create_tickets(session.id)
 

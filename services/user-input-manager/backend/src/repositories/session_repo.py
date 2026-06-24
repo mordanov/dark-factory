@@ -23,9 +23,7 @@ class SessionRepository:
         )
         return result.scalar_one_or_none()
 
-    async def get_by_id_and_user(
-        self, session_id: uuid.UUID, user_id: uuid.UUID
-    ) -> PromptSession | None:
+    async def get_by_id_and_user(self, session_id: uuid.UUID, user_id: str) -> PromptSession | None:
         result = await self._db.execute(
             select(PromptSession)
             .where(
@@ -37,7 +35,7 @@ class SessionRepository:
         return result.scalar_one_or_none()
 
     async def list_for_user(
-        self, user_id: uuid.UUID, offset: int = 0, limit: int = 50
+        self, user_id: str, offset: int = 0, limit: int = 50
     ) -> tuple[list[PromptSession], int]:
         count_q = (
             select(func.count()).select_from(PromptSession).where(PromptSession.user_id == user_id)

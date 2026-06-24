@@ -4,10 +4,10 @@ from fastapi import HTTPException, status
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.auth_adapter import UserClaims
 from src.models.ticket import Ticket
 from src.models.ticket_assignment import TicketAssignment
 from src.models.ticket_event import TicketEvent
-from src.models.user import User
 from src.schemas.ticket import TokensSpentIncrementResponse
 from src.services.event_service import emit_event
 
@@ -16,7 +16,7 @@ async def increment_tokens_spent(
     session: AsyncSession,
     ticket_id: UUID,
     amount: int,
-    actor: User,
+    actor: UserClaims,
 ) -> TokensSpentIncrementResponse:
     ticket_result = await session.execute(
         select(Ticket).where(Ticket.id == ticket_id, Ticket.deleted_at.is_(None)).with_for_update()
@@ -29,7 +29,7 @@ async def increment_tokens_spent(
         select(TicketAssignment).where(TicketAssignment.ticket_id == ticket_id)
     )
     assignee_ids = {a.user_id for a in assignments_result.scalars().all()}
-    if actor.id not in assignee_ids:
+    if actor.sub not in assignee_ids:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only current assignees may increment tokens_spent",

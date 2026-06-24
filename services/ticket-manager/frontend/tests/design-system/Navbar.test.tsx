@@ -17,14 +17,17 @@ vi.mock("../../src/hooks/useTheme", () => ({
   useTheme: () => ({ theme: "light", setTheme: mockSetTheme }),
 }));
 
-// Auth store mock — overridden per-describe via `mockImplementation` where needed
+// Auth store mock — overridden per-describe via direct mutation where needed
 const mockAuthState = {
-  currentUser: { id: "u1", email: "dev@example.com", role: "developer" },
+  user: { sub: "u1", email: "dev@example.com", username: "dev", isAdmin: false },
   logout: vi.fn(),
 };
 vi.mock("../../src/store/auth", () => ({
   useAuthStore: (selector: (s: typeof mockAuthState) => unknown) => selector(mockAuthState),
 }));
+
+// Keycloak admin console URL
+vi.stubEnv("VITE_KEYCLOAK_URL", "http://keycloak:8080");
 
 function renderNavbar() {
   return render(<MemoryRouter><Navbar /></MemoryRouter>);
@@ -33,8 +36,8 @@ function renderNavbar() {
 describe("Navbar (T014)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Reset to developer role
-    mockAuthState.currentUser = { id: "u1", email: "dev@example.com", role: "developer" };
+    // Reset to non-admin user
+    mockAuthState.user = { sub: "u1", email: "dev@example.com", username: "dev", isAdmin: false };
   });
 
   it("renders dark mode toggle button with aria-label 'Toggle dark mode'", () => {
@@ -64,14 +67,14 @@ describe("Navbar (T014)", () => {
 
   it("hides admin link for non-administrator role", () => {
     renderNavbar();
-    expect(screen.queryByRole("link", { name: "Admin" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /admin/i })).not.toBeInTheDocument();
   });
 
   it("shows admin link for administrator role", () => {
-    mockAuthState.currentUser = { id: "u1", email: "admin@example.com", role: "administrator" };
+    mockAuthState.user = { sub: "u1", email: "admin@example.com", username: "admin", isAdmin: true };
     renderNavbar();
-    const adminLink = screen.getByRole("link", { name: "Admin" });
-    expect(adminLink).toHaveAttribute("href", "/admin/users");
+    const adminLink = screen.getByRole("link", { name: /admin/i });
+    expect(adminLink).toHaveAttribute("href", expect.stringContaining("/admin/dark-factory/console"));
   });
 
   it("dark mode toggle is keyboard-operable (Enter key)", async () => {

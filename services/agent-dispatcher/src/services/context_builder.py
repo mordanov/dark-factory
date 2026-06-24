@@ -9,7 +9,7 @@ import httpx
 import structlog
 
 from src.core.config import get_settings
-from src.core.security import create_service_token
+from src.core.keycloak_client import get_kc_client
 from src.models.models import BrainstormSession
 from src.schemas.schemas import AgentContext
 
@@ -93,7 +93,7 @@ async def build_context(
     before persisting raw_output. Never store the returned JWT.
     """
     settings = get_settings()
-    token = create_service_token()
+    token = await get_kc_client().get_token()
     distiller_url = settings.context_distiller_base_url
     tm_url = settings.ticket_manager_base_url
     project_id = ticket.project_id
@@ -148,9 +148,11 @@ async def build_context(
         parts.append(previous_responses_section)
 
     parts.append(
-        f"## Task Manager Access\n"
-        f"TM API: {tm_url}\n"
-        f"Your service token: {token}\n"
+        f"## Service Token\n"
+        f"Use this Bearer token for ALL API calls to Dark Factory services.\n"
+        f"Token is valid for 1 hour from agent spawn time.\n\n"
+        f"Authorization: Bearer {token}\n\n"
+        f"TM API base: {tm_url}\n"
         f"Ticket: {ticket_id} in project {project_id}\n"
     )
     parts.append(metrics_section)

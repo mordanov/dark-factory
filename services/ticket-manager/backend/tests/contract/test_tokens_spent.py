@@ -123,9 +123,7 @@ async def test_increment_tokens_spent_non_assignee_403(
 
 
 @pytest.mark.asyncio
-async def test_increment_tokens_spent_not_found_404(
-    client: AsyncClient, db_session: AsyncSession
-):
+async def test_increment_tokens_spent_not_found_404(client: AsyncClient, db_session: AsyncSession):
     user = User(email=f"{uuid4()}@t.com", hashed_password=hash_password("pw"), role=UserRole.user)
     db_session.add(user)
     await db_session.commit()

@@ -97,9 +97,9 @@ async def test_blocked_user_cannot_login_then_unblock_restores_access(
         "/api/v1/auth/login",
         json={"email": user_email, "password": password},
     )
-    assert (
-        post_unblock_resp.status_code == 200
-    ), "user should be able to login after being unblocked"
+    assert post_unblock_resp.status_code == 200, (
+        "user should be able to login after being unblocked"
+    )
     assert "access_token" in post_unblock_resp.json()
 
 

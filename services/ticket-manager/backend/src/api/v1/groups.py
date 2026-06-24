@@ -3,9 +3,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.auth_adapter import UserClaims
 from src.core.database import get_db
 from src.core.security import get_current_user
-from src.models.user import User
 from src.schemas.project_group import (
     ProjectGroupCreate,
     ProjectGroupListResponse,
@@ -21,7 +21,7 @@ router = APIRouter(tags=["Groups"])
 async def create_group(
     body: ProjectGroupCreate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: UserClaims = Depends(get_current_user),
 ) -> ProjectGroupResponse:
     return await project_group_service.create_group(db, body)
 
@@ -29,7 +29,7 @@ async def create_group(
 @router.get("/groups", response_model=ProjectGroupListResponse, status_code=200)
 async def list_groups(
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: UserClaims = Depends(get_current_user),
 ) -> ProjectGroupListResponse:
     return await project_group_service.list_groups(db)
 
@@ -38,7 +38,7 @@ async def list_groups(
 async def get_group(
     group_id: UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: UserClaims = Depends(get_current_user),
 ) -> ProjectGroupResponse:
     return await project_group_service.get_group(db, group_id)
 
@@ -48,7 +48,7 @@ async def update_group(
     group_id: UUID,
     body: ProjectGroupUpdate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: UserClaims = Depends(get_current_user),
 ) -> ProjectGroupResponse:
     return await project_group_service.update_group(db, group_id, body)
 
@@ -57,6 +57,6 @@ async def update_group(
 async def delete_group(
     group_id: UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: UserClaims = Depends(get_current_user),
 ) -> None:
     await project_group_service.delete_group(db, group_id)

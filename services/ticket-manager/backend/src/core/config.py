@@ -1,35 +1,28 @@
-from pydantic import field_validator
+from functools import lru_cache
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    database_url: str
-    secret_key: str
-    refresh_token_secret: str
+    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/df_ticket_manager"
     environment: str = "development"
     log_level: str = "INFO"
-    access_token_expire_minutes: int = 30
-    auth_mode: str = "local"
     frontend_url: str = "http://localhost:5173"
 
-    default_admin_email: str = ""
-    default_admin_password: str = ""
-    default_user_email: str = ""
-    default_user_password: str = ""
-
-    ticket_manager_service_email: str = ""
-
-    @field_validator("secret_key", "refresh_token_secret")
-    @classmethod
-    def require_minimum_entropy(cls, v: str, info) -> str:
-        if len(v) < 32:
-            raise ValueError(
-                f"{info.field_name} must be at least 32 characters; "
-                'generate with: python -c "import secrets; print(secrets.token_hex(32))"'
-            )
-        return v
+    # --- Keycloak / Auth ---
+    keycloak_base_url: str = "http://keycloak:8080"
+    keycloak_realm: str = "dark-factory"
+    keycloak_client_id: str = ""
+    keycloak_client_secret: str = ""
+    auth_mode: str = "keycloak"
+    test_jwt_secret: str = "test-secret-do-not-use-in-production"
 
 
-settings = Settings()  # type: ignore[call-arg]
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
+
+
+settings = get_settings()

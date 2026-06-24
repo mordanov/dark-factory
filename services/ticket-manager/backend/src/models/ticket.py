@@ -109,7 +109,7 @@ class Ticket(Base):
     urgent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     blocker: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     bugfix: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_by: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         nullable=False, server_default=func.now(), onupdate=func.now()
@@ -133,7 +133,6 @@ class Ticket(Base):
     orchestrator_errors: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
 
     project = relationship("Project", back_populates="tickets")
-    creator = relationship("User", back_populates="tickets_created", foreign_keys=[created_by])
     parent = relationship("Ticket", remote_side="Ticket.id", foreign_keys=[parent_ticket_id])
     follow_ups = relationship("Ticket", foreign_keys=[parent_ticket_id], back_populates="parent")
     assignments = relationship(

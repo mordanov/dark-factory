@@ -1,15 +1,21 @@
 """Minimal FastAPI sidecar for agent-tools health endpoint and auth adapter."""
+
 from __future__ import annotations
+
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from src.core.auth_adapter import AuthAdapter
-from src.config import get_settings
+from src.core.auth_adapter import prefetch_jwks
 
-app = FastAPI(title="agent-tools-sidecar", docs_url=None, redoc_url=None)
 
-_settings = get_settings()
-_adapter = AuthAdapter(_settings)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await prefetch_jwks()
+    yield
+
+
+app = FastAPI(title="agent-tools-sidecar", docs_url=None, redoc_url=None, lifespan=lifespan)
 
 
 @app.get("/health")

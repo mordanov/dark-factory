@@ -3,10 +3,10 @@
 import pytest
 from src.services.planning.validator import validate_plan
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_plan(stories=None, epic_overrides=None):
     epic = {
@@ -54,6 +54,7 @@ def _make_task(task_idx=1, story_idx=1, depends_on=None, overrides=None):
 # Valid plan
 # ---------------------------------------------------------------------------
 
+
 def test_valid_plan_passes():
     plan, errors = validate_plan(_make_plan())
     assert errors == []
@@ -93,15 +94,16 @@ def test_valid_plan_all_complexity_values():
 # Top-level structural errors
 # ---------------------------------------------------------------------------
 
+
 def test_missing_epic():
     _, errors = validate_plan({"stories": [_make_story()]})
     assert any("epic" in e for e in errors)
 
 
 def test_missing_stories():
-    _, errors = validate_plan({"epic": {
-        "local_id": "epic-1", "title": "T", "description": "D", "ticket_type": "epic"
-    }})
+    _, errors = validate_plan(
+        {"epic": {"local_id": "epic-1", "title": "T", "description": "D", "ticket_type": "epic"}}
+    )
     assert any("stories" in e for e in errors)
 
 
@@ -118,6 +120,7 @@ def test_empty_stories_list():
 # ---------------------------------------------------------------------------
 # Epic validation
 # ---------------------------------------------------------------------------
+
 
 def test_epic_wrong_ticket_type():
     _, errors = validate_plan(_make_plan(epic_overrides={"ticket_type": "story"}))
@@ -145,6 +148,7 @@ def test_epic_missing_required_fields():
 # Story count limit
 # ---------------------------------------------------------------------------
 
+
 def test_story_count_exceeds_10():
     stories = [_make_story(i) for i in range(1, 12)]
     _, errors = validate_plan(_make_plan(stories=stories))
@@ -161,6 +165,7 @@ def test_story_count_exactly_10_passes():
 # ---------------------------------------------------------------------------
 # Story field validation
 # ---------------------------------------------------------------------------
+
 
 def test_story_wrong_ticket_type():
     story = _make_story(overrides={"ticket_type": "task"})
@@ -191,6 +196,7 @@ def test_story_missing_required_field():
 # Task count limit
 # ---------------------------------------------------------------------------
 
+
 def test_task_count_exceeds_10():
     tasks = [_make_task(i, 1) for i in range(1, 12)]
     story = _make_story(tasks=tasks)
@@ -208,6 +214,7 @@ def test_task_count_exactly_10_passes():
 # ---------------------------------------------------------------------------
 # Task field validation
 # ---------------------------------------------------------------------------
+
 
 def test_task_invalid_ticket_type():
     task = _make_task(overrides={"ticket_type": "epic"})
@@ -249,6 +256,7 @@ def test_task_missing_required_field():
 # depends_on validation
 # ---------------------------------------------------------------------------
 
+
 def test_depends_on_unknown_task():
     task = _make_task(1, 1, depends_on=["task-1-99"])
     story = _make_story(tasks=[task])
@@ -274,6 +282,7 @@ def test_depends_on_not_a_list():
 # ---------------------------------------------------------------------------
 # Circular dependency detection
 # ---------------------------------------------------------------------------
+
 
 def test_simple_cycle_detected():
     tasks = [
@@ -307,9 +316,9 @@ def test_three_task_cycle_detected():
 def test_diamond_dependency_no_cycle():
     """A→B, A→C, B→D, C→D is a valid diamond shape with no cycle."""
     tasks = [
-        _make_task(1, 1),                                 # A
-        _make_task(2, 1, depends_on=["task-1-1"]),        # B depends on A
-        _make_task(3, 1, depends_on=["task-1-1"]),        # C depends on A
+        _make_task(1, 1),  # A
+        _make_task(2, 1, depends_on=["task-1-1"]),  # B depends on A
+        _make_task(3, 1, depends_on=["task-1-1"]),  # C depends on A
         _make_task(4, 1, depends_on=["task-1-2", "task-1-3"]),  # D depends on B, C
     ]
     story = _make_story(tasks=tasks)
@@ -321,6 +330,7 @@ def test_diamond_dependency_no_cycle():
 # Return-value contract
 # ---------------------------------------------------------------------------
 
+
 def test_returns_none_plan_on_error():
     plan, errors = validate_plan({"epic": "not a dict", "stories": []})
     assert plan is None
@@ -329,6 +339,7 @@ def test_returns_none_plan_on_error():
 
 def test_returns_plan_content_object_on_success():
     from src.schemas.schemas import PlanContent
+
     plan, errors = validate_plan(_make_plan())
     assert isinstance(plan, PlanContent)
     assert errors == []

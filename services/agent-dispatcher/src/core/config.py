@@ -21,11 +21,13 @@ class Settings(BaseSettings):
     # PostgreSQL
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/df_dispatcher"
 
-    # JWT
-    jwt_secret_key: str = Field(default="CHANGE_ME")
-    jwt_algorithm: str = "HS256"
-    auth_mode: str = "local"
-    service_jwt_expire_hours: int = 1
+    # --- Keycloak / Auth ---
+    keycloak_base_url: str = "http://keycloak:8080"
+    keycloak_realm: str = "dark-factory"
+    keycloak_client_id: str = ""
+    keycloak_client_secret: str = ""
+    auth_mode: str = "keycloak"
+    test_jwt_secret: str = "test-secret-do-not-use-in-production"
 
     # Agent runner
     agent_runner_mode: str = "claude_code"  # 'claude_code' | 'api'

@@ -4,9 +4,9 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.auth_adapter import UserClaims
 from src.models.ticket import Ticket, TicketStatus
 from src.models.ticket_assignment import TicketAssignment
-from src.models.user import User
 from src.schemas.ticket import TicketResponse
 from src.services.event_service import emit_event
 from src.services.ticket_service import _load_ticket_response
@@ -17,7 +17,7 @@ async def transition_ticket(
     session: AsyncSession,
     ticket_id: UUID,
     to_status: TicketStatus,
-    actor: User,
+    actor: UserClaims,
 ) -> TicketResponse:
     ticket_result = await session.execute(
         select(Ticket).where(Ticket.id == ticket_id, Ticket.deleted_at.is_(None)).with_for_update()
@@ -33,7 +33,7 @@ async def transition_ticket(
     all_assignments = all_assignments_result.scalars().all()
 
     assignee_ids = {a.user_id for a in all_assignments}
-    if actor.id not in assignee_ids:
+    if actor.sub not in assignee_ids:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only assignees may transition this ticket",

@@ -5,8 +5,8 @@ from fastapi import HTTPException, status
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.auth_adapter import UserClaims
 from src.models.ticket import Ticket
-from src.models.user import User
 from src.schemas.resource import TicketResourceIncrementResponse
 from src.services.event_service import emit_event
 
@@ -16,7 +16,7 @@ _log = structlog.get_logger(__name__)
 async def increment_resources(
     session: AsyncSession,
     ticket_id: UUID,
-    actor: User,
+    actor: UserClaims,
     time_delta: int,
     token_delta: int,
 ) -> TicketResourceIncrementResponse:
@@ -65,7 +65,7 @@ async def increment_resources(
     _log.info(
         "ticket_resources_incremented",
         ticket_id=str(ticket_id),
-        actor_id=str(actor.id),
+        actor_id=actor.sub,
         time_spent_delta=time_delta,
         tokens_consumed_delta=token_delta,
         time_spent_total=ticket.time_spent,

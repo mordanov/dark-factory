@@ -4,10 +4,10 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.auth_adapter import UserClaims
 from src.models.progress_update import ProgressUpdate
 from src.models.ticket import Ticket
 from src.models.ticket_assignment import TicketAssignment
-from src.models.user import User
 from src.schemas.progress import ProgressListResponse, ProgressUpdateResponse
 from src.services.event_service import emit_event
 
@@ -15,7 +15,7 @@ from src.services.event_service import emit_event
 async def submit_update(
     session: AsyncSession,
     ticket_id: UUID,
-    actor: User,
+    actor: UserClaims,
     content: str,
 ) -> ProgressUpdateResponse:
     ticket = await session.get(Ticket, ticket_id)
@@ -25,7 +25,7 @@ async def submit_update(
     assignment_result = await session.execute(
         select(TicketAssignment).where(
             TicketAssignment.ticket_id == ticket_id,
-            TicketAssignment.user_id == actor.id,
+            TicketAssignment.user_id == actor.sub,
         )
     )
     if assignment_result.scalar_one_or_none() is None:
@@ -37,7 +37,7 @@ async def submit_update(
     existing_result = await session.execute(
         select(ProgressUpdate).where(
             ProgressUpdate.ticket_id == ticket_id,
-            ProgressUpdate.user_id == actor.id,
+            ProgressUpdate.user_id == actor.sub,
         )
     )
     existing = existing_result.scalar_one_or_none()
@@ -48,7 +48,7 @@ async def submit_update(
         await session.flush()
         record = existing
     else:
-        record = ProgressUpdate(ticket_id=ticket_id, user_id=actor.id, content=content)
+        record = ProgressUpdate(ticket_id=ticket_id, user_id=actor.sub, content=content)
         session.add(record)
         await session.flush()
 
@@ -68,7 +68,7 @@ async def submit_update(
 async def list_updates(
     session: AsyncSession,
     ticket_id: UUID,
-    actor: User,
+    actor: UserClaims,
 ) -> ProgressListResponse:
     ticket = await session.get(Ticket, ticket_id)
     if ticket is None or ticket.deleted_at is not None:

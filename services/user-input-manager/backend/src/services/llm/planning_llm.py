@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
-import structlog
 
+import structlog
 from openai import AsyncOpenAI
 
 from src.core.config import get_settings

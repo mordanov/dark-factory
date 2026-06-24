@@ -45,7 +45,7 @@ class SessionService:
             raise BadRequestError(f"Session is already {session.status}")
 
     async def _get_session_for_user(
-        self, session_id: uuid.UUID, user_id: uuid.UUID, *, admin_allowed: bool = False
+        self, session_id: uuid.UUID, user_id: str, *, admin_allowed: bool = False
     ) -> PromptSession:
         session = await self._session_repo.get_by_id(session_id)
         if not session:
@@ -78,7 +78,7 @@ class SessionService:
     # Create session (first user prompt → first LLM refinement)
     # ------------------------------------------------------------------
 
-    async def create_session(self, user_id: uuid.UUID, payload: SessionCreate) -> dict:
+    async def create_session(self, user_id: str, payload: SessionCreate) -> dict:
         """
         1. Persist the session.
         2. Persist iteration #1 (user role).
@@ -134,7 +134,7 @@ class SessionService:
     async def submit_feedback(
         self,
         session_id: uuid.UUID,
-        user_id: uuid.UUID,
+        user_id: str,
         feedback: UserFeedback,
     ) -> dict:
         session = await self._get_session_for_user(session_id, user_id)
@@ -201,9 +201,7 @@ class SessionService:
     # Revert to a previous iteration
     # ------------------------------------------------------------------
 
-    async def revert(
-        self, session_id: uuid.UUID, user_id: uuid.UUID, payload: RevertRequest
-    ) -> dict:
+    async def revert(self, session_id: uuid.UUID, user_id: str, payload: RevertRequest) -> dict:
         session = await self._get_session_for_user(session_id, user_id)
         self._require_in_progress(session)
 
@@ -231,7 +229,7 @@ class SessionService:
     async def approve_and_create_ticket(
         self,
         session_id: uuid.UUID,
-        user_id: uuid.UUID,
+        user_id: str,
         payload: ApproveRequest,
     ) -> dict:
         session = await self._get_session_for_user(session_id, user_id)
@@ -284,22 +282,18 @@ class SessionService:
     # Read operations
     # ------------------------------------------------------------------
 
-    async def list_sessions(
-        self, user_id: uuid.UUID, offset: int, limit: int
-    ) -> SessionListResponse:
+    async def list_sessions(self, user_id: str, offset: int, limit: int) -> SessionListResponse:
         sessions, total = await self._session_repo.list_for_user(user_id, offset, limit)
         return SessionListResponse(
             items=[SessionResponse.model_validate(s) for s in sessions],
             total=total,
         )
 
-    async def get_session(self, session_id: uuid.UUID, user_id: uuid.UUID) -> SessionResponse:
+    async def get_session(self, session_id: uuid.UUID, user_id: str) -> SessionResponse:
         session = await self._get_session_for_user(session_id, user_id)
         return SessionResponse.model_validate(session)
 
-    async def get_iterations(
-        self, session_id: uuid.UUID, user_id: uuid.UUID
-    ) -> list[IterationResponse]:
+    async def get_iterations(self, session_id: uuid.UUID, user_id: str) -> list[IterationResponse]:
         session = await self._get_session_for_user(session_id, user_id)
         iterations = await self._iter_repo.list_for_session(session.id)
         return [IterationResponse.model_validate(it) for it in iterations]

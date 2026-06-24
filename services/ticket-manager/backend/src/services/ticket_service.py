@@ -5,9 +5,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from src.core.auth_adapter import UserClaims
 from src.models.ticket import Ticket, TicketStatus
 from src.models.ticket_assignment import TicketAssignment
-from src.models.user import User
 from src.schemas.ticket import (
     AssigneeSummary,
     BatchFsmStatusEntry,
@@ -49,8 +49,7 @@ async def _load_ticket_response(session: AsyncSession, ticket: Ticket) -> Ticket
         select(Ticket)
         .where(Ticket.id == ticket.id)
         .options(
-            selectinload(Ticket.creator),
-            selectinload(Ticket.assignments).selectinload(TicketAssignment.user),
+            selectinload(Ticket.assignments),
             selectinload(Ticket.progress_updates),
             selectinload(Ticket.tags),
             selectinload(Ticket.project),
@@ -63,7 +62,6 @@ async def _load_ticket_response(session: AsyncSession, ticket: Ticket) -> Ticket
     assignees = [
         AssigneeSummary(
             user_id=a.user_id,
-            email=a.user.email,
             has_progress_update=a.user_id in progress_user_ids,
         )
         for a in t.assignments
@@ -95,7 +93,7 @@ async def _load_ticket_response(session: AsyncSession, ticket: Ticket) -> Ticket
         urgent=t.urgent,
         blocker=t.blocker,
         bugfix=t.bugfix,
-        created_by=t.creator,
+        created_by=t.created_by,
         created_at=t.created_at,
         updated_at=t.updated_at,
         assignees=assignees,
@@ -115,7 +113,7 @@ async def create_ticket(
     session: AsyncSession,
     project_id: UUID,
     data: TicketCreate,
-    actor: User,
+    actor: UserClaims,
 ) -> TicketResponse:
     from src.models.project import Project
 
@@ -129,7 +127,7 @@ async def create_ticket(
         project_id=project_id,
         title=data.title,
         description=data.description,
-        created_by=actor.id,
+        created_by=actor.sub,
         status=TicketStatus.OPEN,
         number=number,
         ticket_type=data.ticket_type,
@@ -164,7 +162,7 @@ async def create_follow_up(
     session: AsyncSession,
     parent_ticket_id: UUID,
     data: FollowUpTicketCreate,
-    actor: User,
+    actor: UserClaims,
 ) -> TicketResponse:
     parent = await session.get(Ticket, parent_ticket_id)
     if parent is None or parent.deleted_at is not None:
@@ -177,7 +175,7 @@ async def create_follow_up(
         parent_ticket_id=parent_ticket_id,
         title=data.title,
         description=data.description,
-        created_by=actor.id,
+        created_by=actor.sub,
         status=TicketStatus.OPEN,
         number=number,
         ticket_type=data.ticket_type,
@@ -212,13 +210,13 @@ async def update_ticket(
     session: AsyncSession,
     ticket_id: UUID,
     data: TicketUpdate,
-    actor: User,
+    actor: UserClaims,
 ) -> TicketResponse:
     ticket = await session.get(Ticket, ticket_id)
     if ticket is None or ticket.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found")
 
-    if ticket.created_by != actor.id and actor.role.value != "administrator":
+    if ticket.created_by != actor.sub and not actor.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not the ticket creator")
 
     prev_state = {"title": ticket.title, "description": ticket.description}
@@ -252,7 +250,7 @@ async def update_ticket(
 async def delete_ticket(
     session: AsyncSession,
     ticket_id: UUID,
-    actor: User,
+    actor: UserClaims,
 ) -> None:
     from datetime import UTC, datetime
 
@@ -260,7 +258,7 @@ async def delete_ticket(
     if ticket is None or ticket.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found")
 
-    if ticket.created_by != actor.id and actor.role.value != "administrator":
+    if ticket.created_by != actor.sub and not actor.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not the ticket creator")
 
     follow_up_count_result = await session.execute(
@@ -300,7 +298,7 @@ async def list_tickets(
     session: AsyncSession,
     project_id: UUID,
     status_filter: TicketStatus | None = None,
-    assignee_id: UUID | None = None,
+    assignee_id: str | None = None,
     page: int = 1,
     page_size: int = 50,
 ) -> tuple[list[TicketResponse], int]:
@@ -342,7 +340,7 @@ async def add_tag(
     session: AsyncSession,
     ticket_id: UUID,
     tag_name: str,
-    actor: User,
+    actor: UserClaims,
 ) -> TicketResponse:
     from src.models.tag import Tag
 
@@ -374,7 +372,7 @@ async def remove_tag(
     session: AsyncSession,
     ticket_id: UUID,
     tag_name: str,
-    actor: User,
+    actor: UserClaims,
 ) -> TicketResponse:
     from src.models.tag import Tag
 
@@ -397,11 +395,10 @@ async def apply_tag_delta(
     project_id: UUID,
     ticket_id: UUID,
     body: TagDeltaRequest,
-    actor: User,
+    actor: UserClaims,
 ) -> TagDeltaResponse:
     from src.models.project import Project
     from src.models.tag import Tag
-    from src.models.user import UserRole
 
     ticket = await session.get(Ticket, ticket_id)
     if ticket is None or ticket.deleted_at is not None:
@@ -410,9 +407,9 @@ async def apply_tag_delta(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found")
 
     # Require project ownership or admin to modify tags
-    if getattr(actor, "role", None) != UserRole.administrator:
+    if not actor.is_admin:
         project = await session.get(Project, project_id)
-        if project is None or project.created_by != getattr(actor, "id", None):
+        if project is None or project.created_by != actor.sub:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
 
     await session.refresh(ticket, ["tags"])
@@ -449,10 +446,9 @@ async def apply_tag_delta(
 async def batch_fsm_status(
     session: AsyncSession,
     ticket_ids: list[UUID],
-    caller: object,
+    caller: UserClaims,
 ) -> BatchFsmStatusResponse:
     from src.models.project import Project
-    from src.models.user import UserRole
 
     if not ticket_ids:
         return BatchFsmStatusResponse(statuses={})
@@ -463,9 +459,9 @@ async def batch_fsm_status(
     )
 
     # Non-admins can only see tickets in projects they created
-    if getattr(caller, "role", None) != UserRole.administrator:
+    if not caller.is_admin:
         caller_projects = await session.execute(
-            select(Project.id).where(Project.created_by == getattr(caller, "id", None))
+            select(Project.id).where(Project.created_by == caller.sub)
         )
         accessible_project_ids = [row[0] for row in caller_projects.all()]
         stmt = stmt.where(Ticket.project_id.in_(accessible_project_ids))
@@ -488,7 +484,7 @@ async def list_tickets_with_fsm(
     session: AsyncSession,
     project_id: UUID,
     status_filter: TicketStatus | None = None,
-    assignee_id: UUID | None = None,
+    assignee_id: str | None = None,
     page: int = 1,
     page_size: int = 50,
 ) -> tuple[list[TicketFsmResponse], int]:

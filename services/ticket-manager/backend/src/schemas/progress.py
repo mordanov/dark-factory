@@ -10,7 +10,7 @@ class ProgressUpdateRequest(BaseModel):
 
 class ProgressUpdateResponse(BaseModel):
     ticket_id: UUID
-    user_id: UUID
+    user_id: str
     content: str
     created_at: datetime
     updated_at: datetime

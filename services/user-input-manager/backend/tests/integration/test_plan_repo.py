@@ -183,9 +183,7 @@ async def test_update_status_with_extra_kwargs(repo, session_for_plan):
         session_id=session_for_plan.id,
         plan_content=VALID_PLAN_DICT,
     )
-    updated = await repo.update_status(
-        plan, "tickets_created", tm_epic_id="tm-epic-99"
-    )
+    updated = await repo.update_status(plan, "tickets_created", tm_epic_id="tm-epic-99")
     assert updated.status == "tickets_created"
     assert updated.tm_epic_id == "tm-epic-99"
 

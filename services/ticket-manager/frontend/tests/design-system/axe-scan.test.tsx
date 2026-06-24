@@ -1,12 +1,13 @@
 /**
- * SC-002: Zero axe-core accessibility violations across all 5 application pages.
+ * SC-002: Zero axe-core accessibility violations across application pages.
  *
  * Pages tested:
- *  1. LoginPage
- *  2. ProjectListPage
- *  3. ProjectPage  (with projectId route param)
- *  4. TicketDetailPage (with ticketId route param)
- *  5. AdminUsersPage
+ *  1. ProjectListPage
+ *  2. ProjectPage  (with projectId route param)
+ *  3. TicketDetailPage (with ticketId route param)
+ *
+ * LoginPage and AdminUsersPage removed: auth is Keycloak-redirect-based;
+ * admin UI is the Keycloak console (external).
  */
 import { describe, it, expect, vi } from "vitest";
 import { render } from "@testing-library/react";
@@ -27,15 +28,15 @@ vi.mock("../../src/store/auth", () => ({
     }),
 }));
 
-vi.mock("../../src/api/auth", () => ({ login: vi.fn() }));
-
 const MOCK_PROJECTS = [
   {
     id: "p1",
     name: "Test Project",
+    slug: "test-project",
     code: "ABCD-123",
     created_at: "2024-01-01T00:00:00Z",
     ticket_counts: { open: 1, active: 2, done: 3 },
+    group: { id: "g1", identifier: "DEFAULT", name: "Default", description: "", is_system: true, created_at: "2024-01-01T00:00:00Z", project_count: 1 },
   },
 ];
 
@@ -57,6 +58,7 @@ const MOCK_TICKET = {
   bugfix: false,
   tags: [],
   assignees: [],
+  tokens_spent: 0,
   created_by: { id: "u1", email: "admin@example.com" },
   created_at: "2024-01-01T00:00:00Z",
   updated_at: "2024-01-01T00:00:00Z",
@@ -78,21 +80,6 @@ vi.mock("../../src/api/tickets", () => ({
   removeTag: vi.fn(),
 }));
 
-const MOCK_ADMIN_USERS_LIST = {
-  items: [
-    { id: "u1", email: "admin@example.com", role: "administrator", is_blocked: false },
-    { id: "u2", email: "user@example.com", role: "user", is_blocked: false },
-  ],
-};
-
-vi.mock("../../src/api/admin", () => ({
-  listAdminUsers: () => Promise.resolve(MOCK_ADMIN_USERS_LIST),
-  createAdminUser: vi.fn(),
-  updateAdminUser: vi.fn(),
-  blockAdminUser: vi.fn(),
-  unblockAdminUser: vi.fn(),
-}));
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function makeQC() {
@@ -101,25 +88,13 @@ function makeQC() {
 
 // ── Page imports ──────────────────────────────────────────────────────────────
 
-import { LoginPage } from "../../src/pages/LoginPage";
 import { ProjectListPage } from "../../src/pages/ProjectListPage";
 import { ProjectPage } from "../../src/pages/ProjectPage";
 import { TicketDetailPage } from "../../src/pages/TicketDetailPage";
-import { AdminUsersPage } from "../../src/pages/AdminUsersPage";
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe("SC-002: Zero axe violations on all 5 pages", () => {
-  it("LoginPage has no axe violations", async () => {
-    const { container } = render(
-      <MemoryRouter>
-        <LoginPage />
-      </MemoryRouter>
-    );
-    const results = await axe(container);
-    expect(results).toHaveNoViolations();
-  });
-
+describe("SC-002: Zero axe violations on application pages", () => {
   it("ProjectListPage has no axe violations", async () => {
     const qc = makeQC();
     qc.setQueryData(["projects"], MOCK_PROJECTS);
@@ -162,20 +137,6 @@ describe("SC-002: Zero axe violations on all 5 pages", () => {
           <Routes>
             <Route path="/tickets/:ticketId" element={<TicketDetailPage />} />
           </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>
-    );
-    const results = await axe(container);
-    expect(results).toHaveNoViolations();
-  });
-
-  it("AdminUsersPage has no axe violations", async () => {
-    const qc = makeQC();
-    qc.setQueryData(["admin", "users"], MOCK_ADMIN_USERS_LIST);
-    const { container } = render(
-      <QueryClientProvider client={qc}>
-        <MemoryRouter>
-          <AdminUsersPage />
         </MemoryRouter>
       </QueryClientProvider>
     );

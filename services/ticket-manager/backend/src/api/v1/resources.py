@@ -3,9 +3,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.auth_adapter import UserClaims
 from src.core.database import get_db
 from src.core.security import get_current_user
-from src.models.user import User
 from src.schemas.resource import TicketResourceIncrementRequest, TicketResourceIncrementResponse
 from src.services import resource_service
 
@@ -19,7 +19,7 @@ async def increment_ticket_resources(
     ticket_id: UUID,
     body: TicketResourceIncrementRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ) -> TicketResourceIncrementResponse:
     if body.time_spent_delta == 0 and body.tokens_consumed_delta == 0:
         raise HTTPException(

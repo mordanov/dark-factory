@@ -12,43 +12,47 @@ from src.services.llm.planning_llm import generate_agent_config, generate_plan
 # Shared helpers
 # ---------------------------------------------------------------------------
 
-VALID_PLAN_JSON = json.dumps({
-    "epic": {
-        "local_id": "epic-1",
-        "title": "Build auth system",
-        "description": "Implement JWT authentication",
-        "ticket_type": "epic",
-    },
-    "stories": [
-        {
-            "local_id": "story-1",
-            "title": "Backend auth",
-            "description": "JWT service and endpoints",
-            "ticket_type": "story",
-            "tasks": [
-                {
-                    "local_id": "task-1-1",
-                    "title": "Create JWT service",
-                    "description": "Token generation and validation",
-                    "ticket_type": "task",
-                    "complexity": "M",
-                    "depends_on": [],
-                }
-            ],
-        }
-    ],
-})
+VALID_PLAN_JSON = json.dumps(
+    {
+        "epic": {
+            "local_id": "epic-1",
+            "title": "Build auth system",
+            "description": "Implement JWT authentication",
+            "ticket_type": "epic",
+        },
+        "stories": [
+            {
+                "local_id": "story-1",
+                "title": "Backend auth",
+                "description": "JWT service and endpoints",
+                "ticket_type": "story",
+                "tasks": [
+                    {
+                        "local_id": "task-1-1",
+                        "title": "Create JWT service",
+                        "description": "Token generation and validation",
+                        "ticket_type": "task",
+                        "complexity": "M",
+                        "depends_on": [],
+                    }
+                ],
+            }
+        ],
+    }
+)
 
-VALID_AGENT_CONFIG_JSON = json.dumps({
-    "project_id": "proj-abc",
-    "tech_stack": ["Python", "FastAPI"],
-    "agent_overrides": [
-        {
-            "agent_id": "backend",
-            "override_text": "Focus on async patterns and SQLAlchemy 2.0",
-        }
-    ],
-})
+VALID_AGENT_CONFIG_JSON = json.dumps(
+    {
+        "project_id": "proj-abc",
+        "tech_stack": ["Python", "FastAPI"],
+        "agent_overrides": [
+            {
+                "agent_id": "backend",
+                "override_text": "Focus on async patterns and SQLAlchemy 2.0",
+            }
+        ],
+    }
+)
 
 
 def _mock_openai_client(content: str):
@@ -117,9 +121,7 @@ async def test_generate_plan_retries_on_bad_json_then_succeeds():
     good_response.choices = [good_choice]
 
     mock_client = MagicMock()
-    mock_client.chat.completions.create = AsyncMock(
-        side_effect=[bad_response, good_response]
-    )
+    mock_client.chat.completions.create = AsyncMock(side_effect=[bad_response, good_response])
 
     with patch("src.services.llm.planning_llm.AsyncOpenAI", return_value=mock_client):
         result = await generate_plan("Retry prompt")
@@ -164,9 +166,7 @@ async def test_generate_plan_retries_on_invalid_plan_then_succeeds():
     good_response.choices = [good_choice]
 
     mock_client = MagicMock()
-    mock_client.chat.completions.create = AsyncMock(
-        side_effect=[bad_response, good_response]
-    )
+    mock_client.chat.completions.create = AsyncMock(side_effect=[bad_response, good_response])
 
     with patch("src.services.llm.planning_llm.AsyncOpenAI", return_value=mock_client):
         result = await generate_plan("Invalid first, valid second")
@@ -198,9 +198,7 @@ async def test_generate_plan_raises_upstream_error_after_two_invalid_plans():
 @pytest.mark.asyncio
 async def test_generate_plan_raises_upstream_error_after_two_api_failures():
     mock_client = MagicMock()
-    mock_client.chat.completions.create = AsyncMock(
-        side_effect=Exception("network error")
-    )
+    mock_client.chat.completions.create = AsyncMock(side_effect=Exception("network error"))
 
     with patch("src.services.llm.planning_llm.AsyncOpenAI", return_value=mock_client):
         with pytest.raises(UpstreamError, match="LLM service unavailable"):
@@ -236,9 +234,7 @@ async def test_generate_plan_retries_on_api_error_then_succeeds():
 async def test_generate_agent_config_returns_agent_config():
     mock_client = _mock_openai_client(VALID_AGENT_CONFIG_JSON)
     with patch("src.services.llm.planning_llm.AsyncOpenAI", return_value=mock_client):
-        result = await generate_agent_config(
-            "Build auth", _valid_plan_content(), "proj-abc"
-        )
+        result = await generate_agent_config("Build auth", _valid_plan_content(), "proj-abc")
 
     assert isinstance(result, AgentConfig)
     assert result.project_id == "proj-abc"
@@ -266,13 +262,9 @@ async def test_generate_agent_config_includes_project_id_in_user_message():
 @pytest.mark.asyncio
 async def test_generate_agent_config_returns_none_on_api_exception():
     mock_client = MagicMock()
-    mock_client.chat.completions.create = AsyncMock(
-        side_effect=Exception("network error")
-    )
+    mock_client.chat.completions.create = AsyncMock(side_effect=Exception("network error"))
     with patch("src.services.llm.planning_llm.AsyncOpenAI", return_value=mock_client):
-        result = await generate_agent_config(
-            "Build auth", _valid_plan_content(), "proj-fail"
-        )
+        result = await generate_agent_config("Build auth", _valid_plan_content(), "proj-fail")
 
     assert result is None
 
@@ -281,9 +273,7 @@ async def test_generate_agent_config_returns_none_on_api_exception():
 async def test_generate_agent_config_returns_none_on_bad_json():
     mock_client = _mock_openai_client("not json at all")
     with patch("src.services.llm.planning_llm.AsyncOpenAI", return_value=mock_client):
-        result = await generate_agent_config(
-            "Build auth", _valid_plan_content(), "proj-bad-json"
-        )
+        result = await generate_agent_config("Build auth", _valid_plan_content(), "proj-bad-json")
 
     assert result is None
 
@@ -292,9 +282,7 @@ async def test_generate_agent_config_returns_none_on_bad_json():
 async def test_generate_agent_config_returns_none_on_missing_keys():
     mock_client = _mock_openai_client(json.dumps({"wrong": "structure"}))
     with patch("src.services.llm.planning_llm.AsyncOpenAI", return_value=mock_client):
-        result = await generate_agent_config(
-            "Build auth", _valid_plan_content(), "proj-missing"
-        )
+        result = await generate_agent_config("Build auth", _valid_plan_content(), "proj-missing")
 
     # Should return a valid AgentConfig with empty fields, or None — either is acceptable
     # The key requirement: does NOT raise
@@ -305,14 +293,10 @@ async def test_generate_agent_config_returns_none_on_missing_keys():
 async def test_generate_agent_config_never_raises():
     """generate_agent_config must never propagate any exception."""
     mock_client = MagicMock()
-    mock_client.chat.completions.create = AsyncMock(
-        side_effect=RuntimeError("unexpected crash")
-    )
+    mock_client.chat.completions.create = AsyncMock(side_effect=RuntimeError("unexpected crash"))
     with patch("src.services.llm.planning_llm.AsyncOpenAI", return_value=mock_client):
         try:
-            result = await generate_agent_config(
-                "Build auth", _valid_plan_content(), "proj-crash"
-            )
+            result = await generate_agent_config("Build auth", _valid_plan_content(), "proj-crash")
             assert result is None
         except Exception:
             pytest.fail("generate_agent_config should never raise")

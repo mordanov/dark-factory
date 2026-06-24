@@ -145,7 +145,9 @@ async def test_delete_system_group_409(client: AsyncClient, db_session: AsyncSes
 
     # Find DEFAULT group
     from sqlalchemy import select
+
     from src.models.project_group import ProjectGroup as PG
+
     result = await db_session.execute(select(PG).where(PG.identifier == "DEFAULT"))
     default = result.scalar_one()
 

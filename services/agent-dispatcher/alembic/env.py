@@ -5,12 +5,11 @@ from __future__ import annotations
 import asyncio
 from logging.config import fileConfig
 
+import src.models.models  # noqa: F401 — ensure models are registered
 from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
-
 from src.core.config import get_settings
 from src.db.session import Base
-import src.models.models  # noqa: F401 — ensure models are registered
 
 config = context.config
 if config.config_file_name is not None:

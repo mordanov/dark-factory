@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 
 from src.api.v1.distill import router as distill_router
 from src.api.v1.memory import router as memory_router
+from src.core.auth_adapter import prefetch_jwks
 from src.core.exceptions import ConflictError, NotFoundError, UpstreamError
 from src.schemas.schemas import HealthResponse
 from src.workers.job_worker import JobWorker
@@ -23,6 +24,7 @@ _worker: JobWorker | None = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _worker
+    await prefetch_jwks()
     _worker = JobWorker()
     await _worker.start()
     yield

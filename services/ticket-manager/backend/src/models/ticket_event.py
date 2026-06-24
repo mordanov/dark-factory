@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import Enum, ForeignKey, Index, String, func
+from sqlalchemy import Enum, ForeignKey, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -20,7 +20,7 @@ class TicketEvent(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     ticket_id: Mapped[UUID] = mapped_column(ForeignKey("tickets.id"), nullable=False)
     event_type: Mapped[str] = mapped_column(String(100), nullable=False)
-    actor_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    actor_id: Mapped[str] = mapped_column(Text, nullable=False)
     actor_role: Mapped[UserRole] = mapped_column(
         Enum(UserRole, name="user_role", create_type=False), nullable=False
     )
@@ -30,4 +30,3 @@ class TicketEvent(Base):
     occurred_at: Mapped[datetime] = mapped_column(nullable=False, server_default=func.now())
 
     ticket = relationship("Ticket", back_populates="events")
-    actor = relationship("User", foreign_keys=[actor_id])

@@ -5,20 +5,16 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 
 from src.models.ticket import FsmStatus, TicketSpec, TicketStatus, TicketType
-from src.models.user import UserRole
 
 
 class UserSummary(BaseModel):
-    id: UUID
-    email: str
-    role: UserRole
+    id: str
 
     model_config = {"from_attributes": True}
 
 
 class AssigneeSummary(BaseModel):
-    user_id: UUID
-    email: str
+    user_id: str
     has_progress_update: bool
 
 
@@ -92,7 +88,7 @@ class TicketResponse(BaseModel):
     time_spent: int = 0
     tokens_consumed: int = 0
     tokens_spent: int = 0
-    created_by: UserSummary
+    created_by: str
     created_at: datetime
     updated_at: datetime
     assignees: list[AssigneeSummary] = []
