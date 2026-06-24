@@ -28,7 +28,7 @@ export function ProjectPage() {
 
   const { data: projects } = useQuery({
     queryKey: ["projects"],
-    queryFn: listProjects,
+    queryFn: () => listProjects(),
   });
 
   const project = projects?.find((p) => p.id === projectId);

@@ -26,7 +26,7 @@ interface StatusTransitionButtonProps {
 
 export function StatusTransitionButton({ ticket, onTransitioned }: StatusTransitionButtonProps) {
   const { t } = useTranslation();
-  const currentUser = useAuthStore((s) => s.currentUser);
+  const currentUser = useAuthStore((s) => s.user);
   const nextStatuses = WORKFLOW_TRANSITIONS[ticket.status] ?? [];
   const [blocked, setBlocked] = useState<TransitionBlockedError | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -48,7 +48,7 @@ export function StatusTransitionButton({ ticket, onTransitioned }: StatusTransit
       const result = await transitionTicket(ticket.id, toStatus);
       if (isTransitionBlockedError(result)) {
         const currentUserBlocking = currentUser
-          ? result.missing_updates.some((u) => u.user_id === currentUser.id)
+          ? result.missing_updates.some((u) => u.user_id === currentUser.sub)
           : false;
         if (currentUserBlocking) {
           setPendingToStatus(toStatus);

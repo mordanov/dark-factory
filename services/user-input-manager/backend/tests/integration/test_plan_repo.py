@@ -4,8 +4,7 @@ import uuid
 
 import pytest
 import pytest_asyncio
-from src.core.security import hash_password
-from src.models.models import PromptPlan, PromptSession, User
+from src.models.models import PromptPlan, PromptSession
 from src.repositories.plan_repo import PlanRepository
 
 # ---------------------------------------------------------------------------
@@ -48,27 +47,15 @@ VALID_PLAN_DICT = {
 }
 
 
-@pytest_asyncio.fixture
-async def plan_test_user(db):
-    """Isolated user for plan repo tests — unique email to avoid conftest user collisions."""
-    unique = str(uuid.uuid4())[:8]
-    user = User(
-        email=f"plan-test-{unique}@test.com",
-        password_hash=hash_password("Test1234!"),
-        full_name="Plan Test User",
-        is_admin=False,
-        is_active=True,
-    )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-    return user
+@pytest.fixture
+def plan_test_user():
+    return "plan-test-user-sub-001"
 
 
 @pytest_asyncio.fixture
 async def session_for_plan(db, plan_test_user):
     session = PromptSession(
-        user_id=plan_test_user.id,
+        user_id=plan_test_user,
         session_type="new_project",
         tm_project_name="Repo Test Project",
         tm_project_id="proj-repo-test",

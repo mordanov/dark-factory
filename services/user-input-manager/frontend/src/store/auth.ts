@@ -1,44 +1,68 @@
 import { create } from 'zustand'
-import type { User } from '../api/client'
+import keycloak from '../keycloak'
 
-const RT_KEY = 'rt'
-
-interface AuthState {
-  accessToken: string | null
-  currentUser: User | null
-  refreshToken: string | null
-  isRestoring: boolean
-  login: (accessToken: string, refreshToken: string | undefined, user: User) => void
-  setAccessToken: (token: string) => void
-  setRestored: () => void
-  logout: () => void
+interface AuthUser {
+  sub: string
+  email: string
+  username: string
+  isAdmin: boolean
 }
 
-const storedRefreshToken = sessionStorage.getItem(RT_KEY)
+interface AuthState {
+  initialized: boolean
+  initError: boolean
+  user: AuthUser | null
+  initialize: () => Promise<void>
+  logout: () => Promise<void>
+  getToken: () => Promise<string | null>
+  getAuthHeader: () => Promise<{ Authorization: string }>
+}
 
 export const useAuthStore = create<AuthState>((set) => ({
-  accessToken: null,
-  currentUser: null,
-  refreshToken: storedRefreshToken,
-  isRestoring: storedRefreshToken !== null,
+  initialized: false,
+  initError: false,
+  user: null,
 
-  login(accessToken, refreshToken, user) {
-    if (refreshToken) {
-      sessionStorage.setItem(RT_KEY, refreshToken)
+  async initialize() {
+    try {
+      await keycloak.init({ onLoad: 'login-required', pkceMethod: 'S256' })
+
+      keycloak.onTokenExpired = () => {
+        keycloak.updateToken(30).catch(() => {
+          keycloak.logout({ redirectUri: window.location.origin })
+        })
+      }
+
+      const profile = keycloak.tokenParsed
+      const roles: string[] = (profile?.realm_access as { roles?: string[] })?.roles ?? []
+
+      set({
+        initialized: true,
+        initError: false,
+        user: {
+          sub: profile?.sub ?? '',
+          email: (profile?.email as string | undefined) ?? '',
+          username: (profile?.preferred_username as string | undefined) ?? (profile?.email as string | undefined) ?? '',
+          isAdmin: roles.includes('administrator'),
+        },
+      })
+    } catch {
+      set({ initialized: false, initError: true })
     }
-    set({ accessToken, refreshToken: refreshToken ?? null, currentUser: user, isRestoring: false })
   },
 
-  setAccessToken(token) {
-    set({ accessToken: token })
+  async logout() {
+    set({ initialized: false, user: null })
+    await keycloak.logout({ redirectUri: window.location.origin })
   },
 
-  setRestored() {
-    set({ isRestoring: false })
+  async getToken() {
+    await keycloak.updateToken(30)
+    return keycloak.token ?? null
   },
 
-  logout() {
-    sessionStorage.removeItem(RT_KEY)
-    set({ accessToken: null, refreshToken: null, currentUser: null, isRestoring: false })
+  async getAuthHeader() {
+    await keycloak.updateToken(30)
+    return { Authorization: `Bearer ${keycloak.token ?? ''}` }
   },
 }))

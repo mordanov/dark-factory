@@ -45,7 +45,9 @@ class KeycloakValidator:
                 payload = jwt.decode(token, settings.test_jwt_secret, algorithms=["HS256"])
             else:
                 jwks = await self._get_jwks(settings)
-                payload = jwt.decode(token, jwks, algorithms=["RS256"], options={"verify_aud": False})
+                payload = jwt.decode(
+                    token, jwks, algorithms=["RS256"], options={"verify_aud": False}
+                )
         except JWTError as exc:
             raise UnauthorizedError(str(exc)) from exc
         return self._extract_claims(payload)

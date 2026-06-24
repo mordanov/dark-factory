@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 from src.schemas.schemas import PlanEpic, PlanStory, PlanTask
@@ -58,8 +58,8 @@ async def test_create_epic_posts_correct_payload():
     assert call_kwargs[0][0] == "POST"
     payload = call_kwargs[1]["json"]
     assert payload["title"] == "Build auth"
-    assert payload["type"] == "epic"
-    assert payload["tags"] == []
+    assert payload["ticket_type"] == "feature"
+    assert "plan-epic" in payload["tags"]
 
 
 @pytest.mark.asyncio
@@ -72,9 +72,10 @@ async def test_create_story_posts_correct_payload():
     assert result == "tm-story-xyz"
     payload = client._request.call_args[1]["json"]
     assert payload["title"] == "Backend auth"
-    assert payload["type"] == "story"
-    assert payload["tags"] == ["story"]
-    assert payload["parent_id"] == "tm-epic-abc"
+    assert payload["ticket_type"] == "feature"
+    assert "plan-story" in payload["tags"]
+    # Stories use follow-ups endpoint for hierarchy
+    assert "tm-epic-abc/follow-ups" in client._request.call_args[0][1]
 
 
 @pytest.mark.asyncio
@@ -87,17 +88,19 @@ async def test_create_task_posts_correct_payload():
     assert result == "tm-task-001"
     payload = client._request.call_args[1]["json"]
     assert payload["title"] == "Create JWT service"
-    assert payload["type"] == "task"
-    assert payload["tags"] == ["complexity-M"]
-    assert payload["parent_id"] == "tm-story-xyz"
-    assert payload["depends_on"] == ["tm-dep-1"]
+    assert payload["ticket_type"] == "other"  # "task" maps to "other"
+    assert "complexity-M" in payload["tags"]
+    assert "plan-task" in payload["tags"]
+    # Dependencies encoded as tags
+    assert any("depends-on-" in t for t in payload["tags"])
+    # Tasks use follow-ups endpoint
+    assert "tm-story-xyz/follow-ups" in client._request.call_args[0][1]
 
 
 @pytest.mark.asyncio
 async def test_create_task_complexity_tag_reflects_task_complexity():
     client = _client()
     client._request.return_value = {"id": "tm-task-xl"}
-    task = _task()
     task = PlanTask(
         local_id="task-1-2",
         title="Large task",
@@ -110,19 +113,19 @@ async def test_create_task_complexity_tag_reflects_task_complexity():
     await client.create_task("proj-1", task, "tm-story-1", [])
 
     payload = client._request.call_args[1]["json"]
-    assert payload["tags"] == ["complexity-XL"]
-    assert payload["type"] == "implementation"
+    assert "complexity-XL" in payload["tags"]
+    assert payload["ticket_type"] == "improvement"  # "implementation" maps to "improvement"
 
 
 @pytest.mark.asyncio
-async def test_create_task_no_deps_passes_empty_list():
+async def test_create_task_no_deps_passes_no_dep_tags():
     client = _client()
     client._request.return_value = {"id": "tm-task-no-dep"}
 
     await client.create_task("proj-1", _task(), "tm-story-1", [])
 
     payload = client._request.call_args[1]["json"]
-    assert payload["depends_on"] == []
+    assert not any("depends-on-" in t for t in payload["tags"])
 
 
 @pytest.mark.asyncio

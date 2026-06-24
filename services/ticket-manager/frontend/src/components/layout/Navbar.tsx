@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Sun, Moon, LogOut, Menu } from "lucide-react";
+import { Sun, Moon, LogOut, Menu, ExternalLink } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,8 +23,8 @@ import { useTheme } from "@/hooks/useTheme";
 export function Navbar() {
   const { t } = useTranslation();
   const { theme, setTheme } = useTheme();
-  const { currentUser, logout } = useAuthStore((s) => ({
-    currentUser: s.currentUser,
+  const { user, logout } = useAuthStore((s) => ({
+    user: s.user,
     logout: s.logout,
   }));
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -34,6 +34,9 @@ export function Navbar() {
   function toggleDark() {
     setTheme(isDark ? "light" : "dark");
   }
+
+  const kcBase = import.meta.env.VITE_KEYCLOAK_URL as string | undefined;
+  const kcConsoleUrl = kcBase ? `${kcBase}/admin/dark-factory/console` : null;
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -53,9 +56,12 @@ export function Navbar() {
               <Button variant="ghost" size="sm" asChild className="justify-start" onClick={() => setMobileOpen(false)}>
                 <Link to="/projects">{t("nav.projects")}</Link>
               </Button>
-              {currentUser?.role === "administrator" && (
+              {user?.isAdmin && kcConsoleUrl && (
                 <Button variant="ghost" size="sm" asChild className="justify-start" onClick={() => setMobileOpen(false)}>
-                  <Link to="/admin/users">{t("nav.admin")}</Link>
+                  <a href={kcConsoleUrl} target="_blank" rel="noreferrer noopener" aria-label={`${t("nav.admin")} (opens in new tab)`}>
+                    <ExternalLink aria-hidden="true" className="h-4 w-4 mr-1" />
+                    {t("nav.admin")}
+                  </a>
                 </Button>
               )}
             </nav>
@@ -72,9 +78,12 @@ export function Navbar() {
           <Button variant="ghost" size="sm" asChild>
             <Link to="/projects">{t("nav.projects")}</Link>
           </Button>
-          {currentUser?.role === "administrator" && (
+          {user?.isAdmin && kcConsoleUrl && (
             <Button variant="ghost" size="sm" asChild>
-              <Link to="/admin/users">{t("nav.admin")}</Link>
+              <a href={kcConsoleUrl} target="_blank" rel="noreferrer noopener" aria-label={`${t("nav.admin")} (opens in new tab)`}>
+                <ExternalLink aria-hidden="true" className="h-4 w-4 mr-1" />
+                {t("nav.admin")}
+              </a>
             </Button>
           )}
         </nav>
@@ -93,15 +102,15 @@ export function Navbar() {
             {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
 
-          {currentUser && (
+          {user && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="max-w-[180px] truncate">
-                  {currentUser.email}
+                  {user.email}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
+                <DropdownMenuItem onClick={() => void logout()} className="text-destructive focus:text-destructive">
                   <LogOut className="h-4 w-4 mr-2" />
                   {t("auth.logout")}
                 </DropdownMenuItem>

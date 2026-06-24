@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies import get_current_user
+from src.core.auth_adapter import UserClaims
 from src.db.postgres import get_db
 from src.repositories.audit_repo import AuditRepository
 from src.schemas.schemas import AuditListResponse, AuditLogResponse
@@ -14,7 +15,7 @@ async def get_audit_for_ticket(
     ticket_id: str,
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=500),
-    _: dict = Depends(get_current_user),
+    _: UserClaims = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     repo = AuditRepository(db)

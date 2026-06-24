@@ -32,7 +32,7 @@ export function TicketDetailPage() {
   const { ticketId } = useParams<{ ticketId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const currentUser = useAuthStore((s) => s.currentUser);
+  const currentUser = useAuthStore((s) => s.user);
 
   const [isEditing, setIsEditing] = useState(false);
   const [showFollowUpForm, setShowFollowUpForm] = useState(false);
@@ -126,7 +126,7 @@ export function TicketDetailPage() {
   async function handleAssignMe() {
     setAssignError(null);
     try {
-      await assignUser(ticketId!, currentUser!.id);
+      await assignUser(ticketId!, currentUser!.sub);
       await queryClient.invalidateQueries({ queryKey: ["ticket", ticketId] });
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } };
@@ -181,10 +181,10 @@ export function TicketDetailPage() {
   if (isLoading) return <p className="text-muted-foreground">{t("tickets.loading")}</p>;
   if (isError || !ticket) return <p className="text-destructive">{t("tickets.notFound")}</p>;
 
-  const isCreator = currentUser?.id === ticket.created_by.id;
-  const isAssignee = ticket.assignees.some((a) => a.user_id === currentUser?.id);
-  const isAdmin = currentUser?.role === "administrator";
-  const alreadyAssigned = ticket.assignees.some((a) => a.user_id === currentUser?.id);
+  const isCreator = currentUser?.sub === ticket.created_by.id;
+  const isAssignee = ticket.assignees.some((a) => a.user_id === currentUser?.sub);
+  const isAdmin = currentUser?.isAdmin ?? false;
+  const alreadyAssigned = ticket.assignees.some((a) => a.user_id === currentUser?.sub);
   const currentTagNames = pendingTags ?? ticket.tags.map((tg) => tg.name);
 
   const activeFlags = [
@@ -340,7 +340,7 @@ export function TicketDetailPage() {
               <AssigneeProgressList
                 assignees={ticket.assignees}
                 progressItems={progressData?.items ?? []}
-                currentUserId={currentUser?.id}
+                currentUserId={currentUser?.sub}
                 isAdmin={isAdmin}
                 onUnassign={handleUnassign}
               />

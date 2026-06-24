@@ -9,7 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.auth_adapter import KeycloakValidator, UnauthorizedError
+from src.core.auth_adapter import KeycloakValidator, UnauthorizedError, UserClaims
 from src.db.mongo import get_mongo_db
 from src.db.postgres import get_db
 
@@ -19,7 +19,7 @@ _adapter = KeycloakValidator()
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-) -> dict:
+) -> UserClaims:
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -38,4 +38,4 @@ async def get_current_user(
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 MongoDep = Annotated[AsyncIOMotorDatabase, Depends(get_mongo_db)]
-UserDep = Annotated[dict, Depends(get_current_user)]
+UserDep = Annotated[UserClaims, Depends(get_current_user)]

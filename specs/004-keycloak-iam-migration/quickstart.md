@@ -13,10 +13,12 @@ cp infra/.env.example infra/.env
 # Required fills: KC_BOOTSTRAP_ADMIN_PASSWORD, KC_DB_PASSWORD, OAUTH2_PROXY_CLIENT_SECRET,
 #   OAUTH2_PROXY_COOKIE_SECRET, all KC_*_CLIENT_SECRET values, POSTGRES_PASSWORD
 
-# 2. Build and start (first boot takes ~2min for Keycloak realm import)
+# 2. Build and start with dev override (exposes keycloak:8080, service ports for debugging)
+#    docker-compose.override.yml is auto-merged when in the same directory as docker-compose.yml
 docker compose -f infra/docker-compose.yml up --build -d
+# Keycloak is exposed on host port 8080 via infra/docker-compose.override.yml
 
-# 3. Wait for Keycloak to be ready
+# 3. Wait for Keycloak to be ready (realm import can take 60-90s on first boot)
 until curl -sf http://localhost:8080/realms/dark-factory > /dev/null; do
   echo "Waiting for Keycloak..."; sleep 5
 done
@@ -195,20 +197,40 @@ docker exec dark-factory-postgres-1 psql -U postgres -d df_ticket_manager \
 
 ## Scenario 7: Automated Tests with AUTH_MODE=local
 
-**Goal**: All existing tests pass without a real Keycloak instance.
+**Goal**: Keycloak auth unit tests pass without a real Keycloak instance.
 
 ```bash
-# ticket-manager backend tests
+# ticket-manager — auth unit tests (11 tests)
 cd services/ticket-manager/backend
 AUTH_MODE=local TEST_JWT_SECRET=test-secret-do-not-use-in-production \
-  python -m pytest tests/ -v --tb=short
-# Expected: all tests pass
+  python3 -m pytest tests/unit/ -v --tb=short
+# Expected: 11 passed
 
-# user-input-manager backend tests
+# user-input-manager — auth unit tests (17 tests: auth_adapter + keycloak_client)
 cd services/user-input-manager/backend
 AUTH_MODE=local TEST_JWT_SECRET=test-secret-do-not-use-in-production \
-  python -m pytest tests/ -v --tb=short
-# Expected: all tests pass
+  python3 -m pytest tests/unit/test_auth_adapter.py tests/unit/test_keycloak_client.py -v --tb=short
+# Expected: 17 passed
+
+# orchestrator — auth unit tests (17 tests: auth_adapter + keycloak_client)
+cd services/orchestrator
+AUTH_MODE=local python3 -m pytest tests/unit/test_auth_adapter.py tests/unit/test_keycloak_client.py -v --tb=short
+# Expected: 17 passed
+
+# agent-dispatcher — auth unit tests
+cd services/agent-dispatcher
+AUTH_MODE=local python3 -m pytest tests/unit/test_auth_adapter.py tests/unit/test_keycloak_client.py -v --tb=short
+# Expected: 17 passed
+
+# context-distiller — auth adapter tests
+cd services/context-distiller
+AUTH_MODE=local python3 -m pytest tests/unit/test_auth_adapter.py -v --tb=short
+# Expected: 11 passed
+
+# agent-tools — auth adapter tests
+cd services/agent-tools
+AUTH_MODE=local python3 -m pytest tests/unit/test_auth_adapter.py -v --tb=short
+# Expected: 11 passed
 
 # Frontend tests (no Keycloak needed — keycloak-js is mocked in Vitest)
 cd services/ticket-manager/frontend

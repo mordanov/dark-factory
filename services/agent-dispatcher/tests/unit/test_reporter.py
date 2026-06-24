@@ -9,10 +9,16 @@ import pytest
 from src.schemas.schemas import AgentResult
 
 
+def _kc_mock():
+    mock_kc = MagicMock()
+    mock_kc.async_auth_headers = AsyncMock(return_value={"Authorization": "Bearer svc-token"})
+    return patch("src.services.reporter.get_kc_client", return_value=mock_kc)
+
+
 async def test_report_result_posts_comment_and_triggers_orchestrator():
     with (
         patch("src.services.reporter.get_settings") as mock_settings,
-        patch("src.services.reporter.create_service_token", return_value="svc-token"),
+        _kc_mock(),
         patch("src.services.reporter.httpx.AsyncClient") as mock_client_cls,
     ):
         settings = MagicMock()
@@ -41,7 +47,7 @@ async def test_report_result_posts_comment_and_triggers_orchestrator():
 async def test_report_result_uses_summary_when_no_tm_comment():
     with (
         patch("src.services.reporter.get_settings") as mock_settings,
-        patch("src.services.reporter.create_service_token", return_value="svc-token"),
+        _kc_mock(),
         patch("src.services.reporter.httpx.AsyncClient") as mock_client_cls,
     ):
         settings = MagicMock()
@@ -76,7 +82,7 @@ async def test_report_result_uses_summary_when_no_tm_comment():
 async def test_tm_comment_failure_is_swallowed():
     with (
         patch("src.services.reporter.get_settings") as mock_settings,
-        patch("src.services.reporter.create_service_token", return_value="svc-token"),
+        _kc_mock(),
         patch("src.services.reporter.httpx.AsyncClient") as mock_client_cls,
     ):
         settings = MagicMock()
@@ -104,7 +110,7 @@ async def test_orchestrator_trigger_retries_once():
     """First orch trigger fails, second succeeds → exactly 3 POST calls total."""
     with (
         patch("src.services.reporter.get_settings") as mock_settings,
-        patch("src.services.reporter.create_service_token", return_value="svc-token"),
+        _kc_mock(),
         patch("src.services.reporter.httpx.AsyncClient") as mock_client_cls,
     ):
         settings = MagicMock()
@@ -121,7 +127,6 @@ async def test_orchestrator_trigger_retries_once():
             nonlocal call_count
             call_count += 1
             if "trigger" in url and call_count == 2:
-                # First orchestrator attempt fails
                 raise httpx.HTTPError("orch down")
             return mock_resp_ok
 

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.auth_adapter import KeycloakValidator, UnauthorizedError
+from src.core.auth_adapter import KeycloakValidator, UnauthorizedError, UserClaims
 from src.db.session import get_db
 from src.repositories.run_repo import AgentRunRepository
 from src.schemas.schemas import AgentRunListResponse, AgentRunResponse
@@ -22,7 +22,7 @@ _adapter = KeycloakValidator()
 
 async def _verify_token(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-) -> dict:
+) -> UserClaims:
     try:
         return await _adapter.verify(credentials.credentials)
     except UnauthorizedError as exc:
@@ -36,7 +36,7 @@ async def list_runs(
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    _: dict = Depends(_verify_token),
+    _: UserClaims = Depends(_verify_token),
 ) -> AgentRunListResponse:
     repo = AgentRunRepository(db)
     runs, total = await repo.list_all(
@@ -54,7 +54,7 @@ async def list_runs(
 async def get_run(
     run_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: dict = Depends(_verify_token),
+    _: UserClaims = Depends(_verify_token),
 ) -> AgentRunResponse:
     repo = AgentRunRepository(db)
     run = await repo.get_by_id(run_id)
