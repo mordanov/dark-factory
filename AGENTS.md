@@ -1,63 +1,63 @@
-# AGENTS.md
+# Dark Factory Architecture Overview
 
-## Read this codebase in this order
-1. `README.md` for the current monorepo map and startup flow.
-2. `specs/004-keycloak-iam-migration/plan.md` for the current auth architecture and cross-service constraints.
-3. `infra/docker-compose.yml` + `infra/docker-compose.override.yml` for the real runtime topology, ports, healthchecks, and env wiring.
+## System Architecture
 
-## Big picture
-- Dark Factory is a six-service monorepo: `user-input-manager`, `ticket-manager`, `orchestrator`, `context-distiller`, `agent-tools`, `agent-dispatcher`.
-- Runtime boundaries are HTTP over the internal Docker network, not shared Python packages. If you change a cross-service pattern, keep it copy-consistent per service rather than introducing a shared backend library.
-- Only `orchestrator` and `context-distiller` use MongoDB; all other durable state is per-service PostgreSQL.
-- `agent-dispatcher` is the automation hinge: it polls Orchestrator, runs agents in `claude_code` or `api` mode, and posts results back to Ticket Manager.
+**Dark Factory** is a distributed, service-oriented system designed as a six-service monorepo orchestrated through containerized deployment. The architecture emphasizes clear runtime boundaries, independent data persistence, and stateless service coordination via HTTP APIs.
 
-## Choose your lane
+### Core Design Principles
 
-### If you are a backend implementation agent
-- Start from the target service's `src/main.py`, `src/core/config.py`, `src/core/auth_adapter.py`, and the relevant router/service/client files.
-- Follow the FastAPI app-factory + lifespan pattern used in `services/user-input-manager/backend/src/main.py`: shared `AppError` handling, CORS middleware, router registration, and startup JWKS prefetch.
-- Keep runtime config inside `src/core/config.py` via `pydantic-settings` + cached `get_settings()`; avoid ad-hoc `os.environ` reads elsewhere.
-- Treat Keycloak as the runtime auth source of truth. The active pattern is `KeycloakValidator` as in `services/user-input-manager/backend/src/core/auth_adapter.py`; tests may still exercise `AUTH_MODE=local`.
-- Use internal Docker URLs like `http://ticket-manager:8000`, not host-mapped ports, in service clients and defaults.
+**Service Isolation & Clear Boundaries**
+- Runtime communication occurs over HTTP within containerized environments, not through shared Python packages or in-memory coupling
+- Each service maintains independent data persistence, supporting both PostgreSQL (relational state) and MongoDB (document-oriented state) where domain requirements justify multi-model storage
+- This approach trades some coupling overhead for architectural clarity, operational observability, and independent scaling/deployment
 
-### If you are a full-stack / productivity agent
-- Backend + frontend changes often come in pairs: check the service frontend store/API client alongside backend schema/router changes.
-- Frontend auth is in-memory `keycloak-js` + Zustand, e.g. `services/user-input-manager/frontend/src/store/auth.ts`; do not introduce `localStorage`/`sessionStorage` token persistence.
-- Root `package.json` is a version ledger only, not a workspace. Install and run Node dependencies inside each service frontend.
-- When auth, routing, or API behavior changes, also inspect nginx and compose wiring because browser-visible behavior depends on `infra/nginx/` plus Keycloak/oauth2-proxy.
+**Authentication & Security**
+- Identity and access control are centralized through a dedicated IAM provider (Keycloak)
+- All services perform runtime validation against centralized identity pools, not local token management
+- Frontend applications use stateless, in-memory authentication flows; token persistence to browser storage is explicitly avoided to reduce attack surface
+- Test environments support seeded identity fixtures separate from production auth flows
 
-### If you are a multi-agent orchestration contributor
-- Read `development/run-agents.sh` first; it encodes the real brainstorm workflow, role startup order, terminal-launch behavior, and dry-run validation.
-- Read the role prompts in `development/agents/*.md` before changing agent coordination semantics.
-- `agent-dispatcher` behavior is defined by code and env together: see `services/agent-dispatcher/README.md`, `infra/.env.example`, and dispatcher service env in `infra/docker-compose.yml`.
-- Brainstorm/result handling is product behavior, not incidental plumbing: agent output parsing, round limits, and downstream Ticket Manager reporting must stay compatible.
+**Configuration & Environment Management**
+- Runtime configuration is externalized through environment variables aggregated at service startup
+- No ad-hoc reads of environmental state within service logic; configuration is instantiated once and injected throughout application lifecycle
+- This centralizes configuration decisions and enables safe environment-specific overrides
 
-## Auth and docs reality
-- Compose runs every backend with `AUTH_MODE=keycloak`; `AUTH_MODE=local` is reserved for tests in `integration-tests/docker-compose.test.yml`.
-- `integration-tests/conftest.py` and the test compose still use seeded local users and HMAC-style flows intentionally.
-- Some service READMEs still describe legacy `/api/v1/auth/login` local JWT flows. For auth work, trust current source, root docs, and `specs/004-keycloak-iam-migration/plan.md` over older per-service README text.
+### Service Ecosystem
 
-## Workflows that matter
-```bash
-cp infra/.env.example infra/.env
-docker compose -f infra/docker-compose.yml -f infra/docker-compose.override.yml up --build
-```
-```bash
-docker compose -f integration-tests/docker-compose.test.yml up --build -d
-pytest integration-tests/ -v
-docker compose -f integration-tests/docker-compose.test.yml down -v
-```
-```bash
-pre-commit run --all-files
-bash development/run-agents.sh --dry-run
-```
-- Keycloak first boot is slow; `infra/KEYCLOAK.md` says to allow up to ~5 minutes for realm import and healthchecks.
-- Python style is monorepo-wide: `ruff` with line length 100 and `py312` from `pyproject.toml`; root pre-commit only targets `services/**/*.py`.
+The system coordinates six primary services, each addressing a distinct domain:
 
-## Cross-service traces to follow before editing
-- `user-input-manager` calls Ticket Manager and Context Distiller during prompt approval and planning.
-- `orchestrator` drives ticket FSM transitions and uses Context Distiller memory; inspect its clients before changing ticket lifecycle behavior.
-- `agent-dispatcher` depends on Orchestrator, Ticket Manager, and Context Distiller URLs/env vars from `infra/.env.example`; result parsing and brainstorm rounds are service behavior.
-- For any cross-service feature, read the neighboring service API/router/schema files at `../` scope before editing only one side; service-level `CLAUDE.md` files explicitly call this out.
+1. **User Input Manager** — Ingestion and validation of user-submitted problems and context
+2. **Ticket Manager** — Stateful lifecycle management of tickets through FSM-driven state transitions
+3. **Orchestrator** — Central coordination hub for multi-stage ticket processing and decision workflows
+4. **Context Distiller** — Synthesis and retrieval of contextual information supporting agent decision-making
+5. **Agent Tools** — Utility endpoints and helper services
+6. **Agent Dispatcher** — Autonomous agent invocation, result collection, and asynchronous task orchestration
+
+### Data Persistence Strategy
+
+- **Primary Relational Store (PostgreSQL)**: All services maintain transactional state except `orchestrator` and `context-distiller`
+- **Hybrid Approach**: `Orchestrator` and `context-distiller` maintain both PostgreSQL (transactional records) and MongoDB (larger, unstructured documents)
+- This hybrid model supports both ACID guarantees for critical state and flexible document storage for evolving agent outputs and context
+
+### Development Consistency
+
+All Python services follow unified patterns for reliability and maintainability:
+- FastAPI-based HTTP service architecture with async request handling
+- Structured application initialization and graceful shutdown lifecycle management
+- Shared error handling conventions and middleware configuration
+- SQLAlchemy for ORM and async database access
+- Syntax and style enforcement through `ruff` linter with consistent line-length conventions
+
+Frontend applications use React with Vite for development and build optimization, coordinated state management through Zustand, and component testing through Vitest.
+
+### Cross-Service Dependencies
+
+Many features require coordination across multiple services. Key interaction patterns:
+
+- **User Input → Ticket Coordination**: User submissions flow through validation, storage, and scheduling
+- **Orchestration → Ticket Lifecycle**: Ticket state machine transitions are driven by orchestrator decisions, with state changes persisted to Ticket Manager
+- **Agent Dispatch Cycle**: Dispatcher polls orchestrator for pending work, invokes agents, aggregates results, and triggers downstream updates through multiple services
+
+When modifying cross-service behavior, complementary API and schema changes must be coordinated across service boundaries to maintain contract consistency.
 
 

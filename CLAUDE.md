@@ -1,10 +1,8 @@
-<!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan:
-`specs/004-keycloak-iam-migration/plan.md`
-<!-- SPECKIT END -->
-
 # Dark Factory Monorepo
+
+## Overview
+
+Dark Factory is a distributed, service-oriented system deployed as a containerized monorepo. The architecture separates concerns across six autonomous HTTP services, each with independent data persistence and clear API boundaries. All services are coordinated through Docker Compose with centralized nginx routing and unified infrastructure provisioning.
 
 ## Service Map
 
@@ -28,20 +26,19 @@ shell commands, and other important information, read the current plan:
 | PostgreSQL init | `infra/postgres/init/01_create_databases.sql` |
 | Integration tests | `integration-tests/` |
 
-## Getting Started
+## Deployment & Local Development
 
-```bash
-cp infra/.env.example infra/.env
-# Fill in required credentials (POSTGRES_PASSWORD, SECRET_KEY values, OPENAI_API_KEY)
-docker compose -f infra/docker-compose.yml up --build
-```
+The complete system is provisioned through Docker Compose, which manages service lifecycle, networking, volume mounts, and health checks. All services discover each other through internal Docker DNS. Persistent state is managed through separate PostgreSQL and MongoDB instances with isolated databases per service. Local development includes nginx reverse proxy and optional authentication bypass for testing.
 
-## Sibling Project Paths
+## Project Organization
 
-- `specs/001-monorepo-unification/` — implementation plan and contracts
-- `development/` — agent definitions and scripts
-- `infra/` — unified Docker Compose and infrastructure
-- `integration-tests/` — cross-service test suite
+| Directory | Purpose |
+|-----------|---------|
+| `services/` | Six autonomous HTTP services with independent codebases and deployments |
+| `infra/` | Docker Compose orchestration, nginx routing, database initialization, and infrastructure configuration |
+| `integration-tests/` | Cross-service contract and behavioral testing with isolated test environment |
+| `development/` | Automation scripts and role definitions for agent-driven development workflows |
+| `specs/` | Feature specifications, design artifacts, and architectural documentation |
 
 ## Canonical Versions
 
