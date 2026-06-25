@@ -1,0 +1,367 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  # ─── Stage 1: Detect changed services ────────────────────────────────────────
+  detect:
+    name: Detect changed services
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.detect.outputs.services }}
+      has_changes: ${{ steps.detect.outputs.has_changes }}
+    steps:
+      - name: Checkout (depth 2 for diff)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          fetch-depth: 2
+
+      - name: Run change detection
+        id: detect
+        run: |
+          chmod +x .github/scripts/detect-changes.sh
+          SERVICES=$(.github/scripts/detect-changes.sh)
+          echo "services=${SERVICES}" >> "$GITHUB_OUTPUT"
+          if [ "$SERVICES" = "[]" ]; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Changed services: ${SERVICES}"
+
+  # ─── Stage 2: Validate (ruff + docker build) ─────────────────────────────────
+  validate:
+    name: Validate (${{ matrix.service }})
+    needs: detect
+    if: needs.detect.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.detect.outputs.services) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Validate service name against allowlist
+        run: |
+          SERVICE="${{ matrix.service }}"
+          ALLOWED="uim-backend tm-backend orchestrator context-distiller agent-dispatcher agent-tools uim-frontend tm-frontend nginx"
+          if ! echo "$ALLOWED" | grep -qw "$SERVICE"; then
+            echo "ERROR: Unknown service name '${SERVICE}' — rejecting to prevent shell injection"
+            exit 1
+          fi
+
+      - name: Resolve service paths
+        id: paths
+        run: |
+          chmod +x .github/scripts/service-to-path.sh
+          COMPOSE_SERVICE=$(.github/scripts/service-to-path.sh "${{ matrix.service }}" | head -1)
+          BUILD_PATH=$(.github/scripts/service-to-path.sh "${{ matrix.service }}" | tail -1)
+          echo "compose_service=${COMPOSE_SERVICE}" >> "$GITHUB_OUTPUT"
+          echo "build_path=${BUILD_PATH}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python 3.12
+        if: >
+          contains(fromJSON('["uim-backend","tm-backend","orchestrator","context-distiller","agent-dispatcher","agent-tools"]'), matrix.service)
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        if: >
+          contains(fromJSON('["uim-backend","tm-backend","orchestrator","context-distiller","agent-dispatcher","agent-tools"]'), matrix.service)
+        run: pip install ruff==0.8.3
+
+      - name: Run ruff check
+        if: >
+          contains(fromJSON('["uim-backend","tm-backend","orchestrator","context-distiller","agent-dispatcher","agent-tools"]'), matrix.service)
+        run: ruff check ${{ steps.paths.outputs.build_path }}
+
+      - name: Run ruff format check
+        if: >
+          contains(fromJSON('["uim-backend","tm-backend","orchestrator","context-distiller","agent-dispatcher","agent-tools"]'), matrix.service)
+        run: ruff format --check ${{ steps.paths.outputs.build_path }}
+
+      - name: Build Docker image
+        run: |
+          docker build --no-cache \
+            -f ${{ steps.paths.outputs.build_path }}/Dockerfile \
+            ${{ steps.paths.outputs.build_path }}
+
+  # ─── Stage 3: Test (pytest / vitest) ─────────────────────────────────────────
+  test:
+    name: Test (${{ matrix.service }})
+    needs: [detect, validate]
+    if: needs.detect.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.detect.outputs.services) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Validate service name against allowlist
+        run: |
+          SERVICE="${{ matrix.service }}"
+          ALLOWED="uim-backend tm-backend orchestrator context-distiller agent-dispatcher agent-tools uim-frontend tm-frontend nginx"
+          if ! echo "$ALLOWED" | grep -qw "$SERVICE"; then
+            echo "ERROR: Unknown service name '${SERVICE}' — rejecting to prevent shell injection"
+            exit 1
+          fi
+
+      - name: Resolve service paths
+        id: paths
+        run: |
+          chmod +x .github/scripts/service-to-path.sh
+          BUILD_PATH=$(.github/scripts/service-to-path.sh "${{ matrix.service }}" | tail -1)
+          echo "build_path=${BUILD_PATH}" >> "$GITHUB_OUTPUT"
+
+      # ── Python backend services ────────────────────────────────────────────
+      - name: Set up Python 3.12
+        if: >
+          contains(fromJSON('["uim-backend","tm-backend","orchestrator","context-distiller","agent-dispatcher"]'), matrix.service)
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        if: >
+          contains(fromJSON('["uim-backend","tm-backend","orchestrator","context-distiller","agent-dispatcher"]'), matrix.service)
+        run: |
+          cd ${{ steps.paths.outputs.build_path }}
+          pip install -r requirements.txt
+
+      - name: Run pytest (uim-backend / tm-backend / agent-dispatcher)
+        if: >
+          contains(fromJSON('["uim-backend","tm-backend","agent-dispatcher"]'), matrix.service)
+        working-directory: ${{ steps.paths.outputs.build_path }}
+        env:
+          AUTH_MODE: local
+          TEST_JWT_SECRET: ci-test-secret
+          DATABASE_URL: sqlite+aiosqlite:///:memory:
+          OPENAI_API_KEY: test-key
+          OPENAI_BASE_URL: http://localhost:9999
+        run: pytest --cov --cov-fail-under=80
+
+      - name: Run pytest (orchestrator / context-distiller — MongoDB-aware)
+        if: >
+          contains(fromJSON('["orchestrator","context-distiller"]'), matrix.service)
+        working-directory: ${{ steps.paths.outputs.build_path }}
+        env:
+          AUTH_MODE: local
+          TEST_JWT_SECRET: ci-test-secret
+          DATABASE_URL: sqlite+aiosqlite:///:memory:
+          MONGO_URL: mongomock://localhost
+          OPENAI_API_KEY: test-key
+          OPENAI_BASE_URL: http://localhost:9999
+        run: pytest --cov --cov-fail-under=80
+
+      # ── Frontend services ──────────────────────────────────────────────────
+      - name: Set up Node.js 20
+        if: contains(fromJSON('["uim-frontend","tm-frontend"]'), matrix.service)
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a  # v4.2.0
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: ${{ steps.paths.outputs.build_path }}/package-lock.json
+
+      - name: Install frontend dependencies
+        if: contains(fromJSON('["uim-frontend","tm-frontend"]'), matrix.service)
+        working-directory: ${{ steps.paths.outputs.build_path }}
+        run: npm ci
+
+      - name: Run frontend tests (Vitest)
+        if: contains(fromJSON('["uim-frontend","tm-frontend"]'), matrix.service)
+        working-directory: ${{ steps.paths.outputs.build_path }}
+        run: npm run test -- --run --coverage
+
+      # ── Services with no test suite (nginx, agent-tools) ──────────────────
+      - name: Skip (no test suite)
+        if: contains(fromJSON('["nginx","agent-tools"]'), matrix.service)
+        run: echo "No test suite for ${{ matrix.service }} — skipping test stage."
+
+  # ─── Stage 4: Deploy (SSH to VPS) ────────────────────────────────────────────
+  deploy:
+    name: Deploy to VPS
+    needs: [detect, test]
+    if: needs.detect.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: production
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Build service list for deployment
+        id: svclist
+        run: |
+          SERVICES='${{ needs.detect.outputs.services }}'
+          # Convert JSON array to space-separated list for shell use
+          SVC_SPACE=$(echo "$SERVICES" | python3 -c "import sys,json; print(' '.join(json.load(sys.stdin)))")
+          echo "space_list=${SVC_SPACE}" >> "$GITHUB_OUTPUT"
+          echo "json_list=${SERVICES}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17  # v1.2.0
+        env:
+          SERVICES_JSON: ${{ needs.detect.outputs.services }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: SERVICES_JSON
+          script: |
+            set -euo pipefail
+            cd /app/dark-factory
+
+            # ── 1. Pull latest code ──────────────────────────────────────────
+            git pull origin main
+
+            # ── 2. Parse service list ────────────────────────────────────────
+            SERVICES=$(echo "$SERVICES_JSON" | python3 -c "import sys,json; print(' '.join(json.load(sys.stdin)))")
+
+            # Service → compose name mapping
+            compose_name() {
+              case "$1" in
+                uim-backend)       echo "user-input-manager" ;;
+                tm-backend)        echo "ticket-manager" ;;
+                orchestrator)      echo "orchestrator" ;;
+                context-distiller) echo "context-distiller" ;;
+                agent-dispatcher)  echo "agent-dispatcher" ;;
+                agent-tools)       echo "agent-tools" ;;
+                uim-frontend)      echo "uim-frontend" ;;
+                tm-frontend)       echo "tm-frontend" ;;
+                nginx)             echo "nginx" ;;
+                *)                 echo "$1" ;;
+              esac
+            }
+
+            # Health path mapping (empty = no health check; use docker compose exec not host port)
+            health_path() {
+              case "$1" in
+                uim-backend)       echo "/health" ;;
+                tm-backend)        echo "/health" ;;
+                orchestrator)      echo "/health" ;;
+                context-distiller) echo "/health" ;;
+                agent-dispatcher)  echo "/api/health" ;;
+                agent-tools)       echo "" ;;
+                uim-frontend)      echo "" ;;
+                tm-frontend)       echo "" ;;
+                nginx)             echo "" ;;
+                *)                 echo "" ;;
+              esac
+            }
+
+            # Migration-enabled services
+            needs_migration() {
+              case "$1" in
+                uim-backend|tm-backend|orchestrator|context-distiller|agent-dispatcher) return 0 ;;
+                *) return 1 ;;
+              esac
+            }
+
+            TIMESTAMP=$(date +%Y%m%d%H%M%S)
+            COMPOSE="docker compose -f infra/docker-compose.yml"
+
+            # ── 3. Snapshot current images ───────────────────────────────────
+            echo "=== Snapshotting current images ==="
+            for SVC in $SERVICES; do
+              CSVC=$(compose_name "$SVC")
+              IMAGE="dark-factory-${CSVC}:latest"
+              if docker image inspect "$IMAGE" >/dev/null 2>&1; then
+                docker tag "$IMAGE" "dark-factory-${CSVC}:rollback-${TIMESTAMP}"
+                echo "  Snapshot: dark-factory-${CSVC}:rollback-${TIMESTAMP}"
+                # Retain only 3 most recent rollback tags
+                docker images --format '{{.Tag}}' "dark-factory-${CSVC}" \
+                  | grep '^rollback-' | sort -r | tail -n +4 \
+                  | xargs -I{} docker rmi "dark-factory-${CSVC}:{}" 2>/dev/null || true
+              else
+                echo "  No existing image for ${CSVC}, skipping snapshot"
+              fi
+            done
+
+            # ── 4. Build new images on VPS ───────────────────────────────────
+            echo "=== Building images ==="
+            COMPOSE_SERVICES=""
+            for SVC in $SERVICES; do
+              CSVC=$(compose_name "$SVC")
+              COMPOSE_SERVICES="$COMPOSE_SERVICES $CSVC"
+            done
+            $COMPOSE build $COMPOSE_SERVICES
+
+            # ── 5. Run database migrations ───────────────────────────────────
+            echo "=== Running migrations ==="
+            for SVC in $SERVICES; do
+              if needs_migration "$SVC"; then
+                CSVC=$(compose_name "$SVC")
+                echo "  Migrating ${CSVC}..."
+                if ! $COMPOSE run --rm "$CSVC" alembic upgrade head; then
+                  echo "ERROR: Migration failed for ${CSVC}. Aborting deploy — old containers remain running."
+                  exit 1
+                fi
+              fi
+            done
+
+            # ── 6. Restart containers ────────────────────────────────────────
+            echo "=== Restarting containers ==="
+            for SVC in $SERVICES; do
+              CSVC=$(compose_name "$SVC")
+              $COMPOSE up -d "$CSVC"
+            done
+
+            # ── 7. Health check poll (90s window) ────────────────────────────
+            # Uses docker compose exec to reach the internal container port (no host port mapping needed)
+            echo "=== Health checking ==="
+            UNHEALTHY=""
+            for SVC in $SERVICES; do
+              HPATH=$(health_path "$SVC")
+              CSVC=$(compose_name "$SVC")
+              if [ -z "$HPATH" ]; then
+                echo "  ${SVC}: no health endpoint, skipping"
+                continue
+              fi
+              echo "  Waiting for ${SVC} at ${HPATH}..."
+              DEADLINE=$((SECONDS + 90))
+              OK=false
+              while [ $SECONDS -lt $DEADLINE ]; do
+                if $COMPOSE exec -T "$CSVC" python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000${HPATH}')" >/dev/null 2>&1; then
+                  echo "  ${SVC}: healthy"
+                  OK=true
+                  break
+                fi
+                sleep 5
+              done
+              if [ "$OK" = false ]; then
+                echo "  ${SVC}: UNHEALTHY after 90s"
+                UNHEALTHY="$UNHEALTHY $SVC"
+              fi
+            done
+
+            # ── 8. Auto-rollback on health check failure ─────────────────────
+            if [ -n "$UNHEALTHY" ]; then
+              echo "=== ROLLBACK: restoring previous images for:${UNHEALTHY} ==="
+              for SVC in $UNHEALTHY; do
+                CSVC=$(compose_name "$SVC")
+                ROLLBACK_TAG=$(docker images --format '{{.Tag}}' "dark-factory-${CSVC}" \
+                  | grep '^rollback-' | sort -r | head -1 || true)
+                if [ -n "$ROLLBACK_TAG" ]; then
+                  docker tag "dark-factory-${CSVC}:${ROLLBACK_TAG}" "dark-factory-${CSVC}:latest"
+                  $COMPOSE up -d "$CSVC"
+                  echo "  Restored ${CSVC} from ${ROLLBACK_TAG}"
+                else
+                  echo "  WARNING: No rollback tag found for ${CSVC}"
+                fi
+              done
+              echo "=== Rollback complete. Pipeline exiting as failed. ==="
+              exit 1
+            fi
+
+            echo "=== Deployment successful ==="

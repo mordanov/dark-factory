@@ -283,7 +283,7 @@ Security architecture work is done only when:
 
 All API work must use endpoints from `documentation/api-endpoints-agent-playbook.md` only.
 
-Use Ticket Manager connection details provisioned by `project-administrator` in `credentials.json`.
+Use Ticket Manager connection details from `development/<agent_name>/credentials.json`. This file is either provisioned by `project-administrator` or placed directly by the operator before the agent runs.
 
 ### Credential format
 

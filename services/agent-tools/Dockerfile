@@ -9,5 +9,4 @@ COPY src/ ./src/
 
 ENV PYTHONUNBUFFERED=1
 
-# Sidecar exposes health + auth adapter on port 8000 (matches unified compose convention)
-CMD ["uvicorn", "src.sidecar:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "src.server"]

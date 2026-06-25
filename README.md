@@ -95,6 +95,10 @@ Extends Prompt Studio with a plan generation flow. After a prompt is approved, t
 
 Replaces all local password-based authentication with Keycloak 25 as the sole identity provider. Every backend's `auth_adapter.py` becomes a `KeycloakValidator` that validates RS256 tokens from Keycloak's JWKS endpoint (cached ≥300s). Service-to-service calls use Client Credentials grants via `KeycloakServiceClient`. Both frontends replace hand-rolled login forms with `keycloak-js` PKCE flows. The `users` table is dropped from every service that held one (destructive Alembic migrations — no rollback). All `user_id` columns become `TEXT NOT NULL` storing the Keycloak `sub` UUID. `AUTH_MODE=local` (HS256 test tokens) is reserved for automated tests only and must never appear in `infra/docker-compose.yml`.
 
+### 005 — GitHub Actions CI/CD Pipeline
+
+Adds a fully automated CI/CD pipeline via GitHub Actions. Every push to `main` runs `ruff` lint + Docker build for changed services only (detected by `.github/scripts/detect-changes.sh`). After validation, `pytest` and `vitest` run with ≥80% coverage gates. On success, changed services are deployed to the VPS over SSH: each deploy snapshots the current image, runs Alembic migrations as a separate step (never inside the container CMD), restarts the container, and polls the health endpoint for up to 90 seconds — rolling back automatically on failure. A `workflow_dispatch` workflow (`manual-rollback.yml`) allows operators to trigger an emergency rollback for any service from the GitHub Actions UI with a full audit trail. All GitHub Actions action references are pinned to immutable commit SHAs. The deploy job is scoped to a `production` environment so VPS secrets are never exposed to other jobs. `agent-tools` is converted to a pure MCP stdio process (no sidecar uvicorn). SSL certificate renewal via Certbot is available as an opt-in Docker Compose profile. See `infra/DEPLOYMENT.md` for operator setup and `infra/scripts/setup-vps.sh` for idempotent VPS provisioning.
+
 ## Repository Layout
 
 ```

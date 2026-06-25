@@ -1,0 +1,183 @@
+# Implementation Plan: GitHub Actions CI/CD Pipeline
+
+**Branch**: `005-github-actions-cicd` | **Date**: 2026-06-25 | **Spec**: [spec.md](spec.md)
+**Input**: Feature specification from `specs/005-github-actions-cicd/spec.md`
+
+## Summary
+
+Implement a GitHub Actions CI/CD pipeline for the Dark Factory monorepo that automatically
+validates, tests, and deploys changed services to a Hetzner VPS on every push to `main`.
+The pipeline uses path-based change detection, runs all builds on the VPS (no container
+registry), applies Alembic migrations before container restart, and auto-rolls back on
+healthcheck failure. As a prerequisite, all backend Dockerfiles that currently run
+`alembic upgrade head` at startup must have that removed, and `agent-tools` must get its
+correct MCP-only CMD.
+
+## Technical Context
+
+**Language/Version**: Bash (shell scripts), YAML (GitHub Actions), Python 3.12 (per-service tests)
+**Primary Dependencies**: GitHub Actions (ubuntu-latest runners), `appleboy/ssh-action@v1`, Docker Compose v2, ruff 0.8.3, pytest 8.3.x, Vitest 2.1.8
+**Storage**: N/A — pipeline state is ephemeral; VPS image tags as rollback state
+**Testing**: pytest (Python backends), Vitest (frontends); CI-mode with SQLite + mongomock + AUTH_MODE=local
+**Target Platform**: GitHub Actions CI runner + Hetzner VPS (Ubuntu 24.04 LTS)
+**Project Type**: Infrastructure / devops pipeline
+**Performance Goals**: Full pipeline (validate + test + deploy) for a single changed service ≤ 10 minutes
+**Constraints**: Exactly 3 GitHub Secrets; no container registry; no sudo on VPS; CMD must not contain alembic
+**Scale/Scope**: 6 backend services + 2 frontends + nginx; single VPS; no staging environment
+
+## Constitution Check
+
+*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+
+| # | Principle | Status | Notes |
+|---|-----------|--------|-------|
+| I | Services Remain Independently Deployable | ✅ Pass | Pipeline deploys per-service, not monolithic |
+| II | Keycloak IAM Migration | ✅ N/A | Pipeline does not touch auth logic |
+| III | Python 3.12 Everywhere | ✅ Pass | All backend Dockerfiles already use python:3.12-slim |
+| IV | Shared Python Library Versions | ✅ Pass | No new Python deps added to services |
+| V | Shared Frontend Library Versions | ✅ Pass | No new frontend deps added to services |
+| VI | Zustand for All Frontend State | ✅ N/A | Pipeline does not touch frontend state |
+| VII | Vitest for All Frontend Tests | ✅ Pass | CI uses `npm run test -- --run` (Vitest) |
+| VIII | ruff for All Python Linting | ✅ Pass | validate stage runs ruff check + ruff format --check |
+| IX | Nginx is DNS-Name Aware | ✅ Pass | nginx.conf.template already correct; certbot volumes added |
+| X | No Cross-Service Database Access | ✅ N/A | Pipeline doesn't add cross-DB access |
+| XI | Agent Dispatcher — FSM Sovereignty | ✅ N/A | Pipeline doesn't modify FSM logic |
+| XII | Agent Dispatcher — Operational Safety | ✅ N/A | Pipeline doesn't modify dispatcher logic |
+| XIII | Planning Agent — Plan Persistence | ✅ N/A | Out of scope |
+| XIV | Planning Agent — User Confirmation Gate | ✅ N/A | Out of scope |
+| XV | Planning Agent — Ticket Creation All-or-None | ✅ N/A | Out of scope |
+| XVI | Planning Agent — Agent Config Best-Effort | ✅ N/A | Out of scope |
+| XVII | Keycloak Single Source of Truth | ✅ Pass | Pipeline runs Keycloak in production; CI uses AUTH_MODE=local only |
+| XVIII | JWKS Validation Must Be Cached | ✅ N/A | No change to auth_adapter.py |
+| XIX | Service-to-Service via Client Credentials | ✅ N/A | No change to service clients |
+| XX | Frontend Auth via keycloak-js | ✅ N/A | No change to frontend auth |
+| XXI | Users Table Permanently Removed | ✅ N/A | No schema changes |
+| XXII | Build on VPS, Not in CI | ✅ Pass | ci-cd.yml deploys via SSH to VPS; no docker push |
+| XXIII | Path-Based Change Detection | ✅ Pass | detect-changes.sh + matrix jobs in ci-cd.yml |
+| XXIV | Migrations Before Container Restart | ✅ Pass | Alembic removed from CMDs; pipeline runs migration step |
+| XXV | Automatic Rollback on Healthcheck Failure | ✅ Pass | 90s healthcheck polling + docker tag rollback |
+| XXVI | VPS-Only Secrets | ✅ Pass | Exactly VPS_HOST, VPS_USER, VPS_SSH_KEY |
+| XXVII | Validation Gates | ✅ Pass | ruff + docker build in validate stage before VPS SSH |
+| XXVIII | CI Tests Use SQLite + mongomock + AUTH_MODE=local | ✅ Pass | test job sets AUTH_MODE=local, SQLite DSN, mongomock |
+
+No violations. No Complexity Tracking table needed.
+
+## Project Structure
+
+### Documentation (this feature)
+
+```text
+specs/005-github-actions-cicd/
+├── plan.md              ← this file
+├── research.md          ← D001–D011, alembic violation inventory
+├── data-model.md        ← ServiceMap, ServiceBuildPath, VPS state model
+├── quickstart.md        ← 6 acceptance test scenarios
+├── contracts/
+│   ├── detect-changes.md
+│   ├── ci-cd-workflow.md
+│   └── manual-rollback-workflow.md
+└── tasks.md             ← generated by /speckit-tasks
+```
+
+### Source Code (repository root)
+
+```text
+.github/
+├── workflows/
+│   ├── ci-cd.yml                     ← NEW: main pipeline
+│   ├── manual-rollback.yml           ← NEW: workflow_dispatch rollback
+│   └── infra-checks.yml              ← EXISTING: no changes
+└── scripts/
+    ├── detect-changes.sh             ← NEW: path→service mapping
+    └── service-to-path.sh            ← NEW: service→VPS path mapping
+
+infra/
+├── docker-compose.yml                ← MODIFY: add certbot service
+├── scripts/
+│   └── setup-vps.sh                  ← NEW: one-time VPS init script
+└── DEPLOYMENT.md                     ← NEW: operator guide
+
+services/orchestrator/Dockerfile      ← MODIFY: remove alembic from CMD
+services/agent-dispatcher/Dockerfile  ← MODIFY: remove alembic from CMD
+services/user-input-manager/backend/Dockerfile  ← MODIFY: remove alembic from CMD
+services/ticket-manager/backend/
+├── Dockerfile                        ← MODIFY: use direct uvicorn CMD
+└── entrypoint.sh                     ← MODIFY: remove alembic call
+services/agent-tools/Dockerfile       ← MODIFY: change CMD to python -m src.server
+```
+
+## Implementation Phases
+
+### Phase 1: Prerequisite Dockerfile Fixes (constitution compliance)
+
+These are blockers — the pipeline cannot work correctly with alembic in CMDs.
+
+**Deliverables**:
+- Remove `alembic upgrade head` from `services/orchestrator/Dockerfile` CMD
+- Remove `alembic upgrade head` from `services/agent-dispatcher/Dockerfile` CMD
+- Remove `alembic upgrade head` from `services/user-input-manager/backend/Dockerfile` CMD
+- Remove `alembic upgrade head` from `services/ticket-manager/backend/entrypoint.sh`
+  (and simplify entrypoint.sh or switch to direct uvicorn CMD)
+- Change `services/agent-tools/Dockerfile` CMD to `["python", "-m", "src.server"]`
+  (constitution item 49, principle XXII scope)
+
+Each change is one-line; no logic changes.
+
+### Phase 2: Change Detection Scripts
+
+**Deliverables**:
+- `.github/scripts/detect-changes.sh` — ServiceMap with JSON output
+- `.github/scripts/service-to-path.sh` — service name → compose service name + build path
+
+These are pure shell; no external dependencies. Testable locally:
+```bash
+# smoke test
+.github/scripts/detect-changes.sh
+# must emit valid JSON
+```
+
+### Phase 3: CI/CD Workflow
+
+**Deliverables**:
+- `.github/workflows/ci-cd.yml` — detect → validate → test → deploy pipeline
+
+Key design constraints from research:
+- `actions/checkout@v4` with `fetch-depth: 2` (for `git diff HEAD^ HEAD`)
+- validate and test use matrix strategy over `fromJSON(needs.detect.outputs.services)`
+- deploy runs `appleboy/ssh-action@v1` for all VPS commands
+- concurrency group `production`, `cancel-in-progress: false`
+- 90-second healthcheck poll loop on VPS
+
+### Phase 4: Manual Rollback Workflow
+
+**Deliverables**:
+- `.github/workflows/manual-rollback.yml` — `workflow_dispatch` with service + reason inputs
+
+### Phase 5: Certbot in Docker Compose
+
+**Deliverables**:
+- Add certbot service to `infra/docker-compose.yml` with `profiles: [certbot]`
+- Add shared volumes: `letsencrypt`, `certbot_www`
+- Mount volumes read-only into nginx service
+
+nginx.conf.template already has all necessary certbot/SSL blocks — no nginx changes needed.
+
+### Phase 6: VPS Setup Script + DEPLOYMENT.md
+
+**Deliverables**:
+- `infra/scripts/setup-vps.sh` — idempotent one-time setup:
+  - Docker install (via `apt-get` or official Docker repo)
+  - Add deployment user to `docker` group
+  - Clone repo to `/app/dark-factory/`
+  - Verify docker compose v2 available
+  - Print `.env` placement instructions
+- `infra/DEPLOYMENT.md` — operator guide covering:
+  - GitHub Actions secrets configuration
+  - First-time VPS setup procedure
+  - Certbot SSL setup procedure
+  - Manual rollback procedure
+  - Monitoring checklist
+
+## Complexity Tracking
+
+> No constitution violations. No entries needed.
