@@ -1,0 +1,158 @@
+# Deployment Guide — Dark Factory
+
+## GitHub Actions Secrets
+
+Configure exactly three secrets in **Repository → Settings → Secrets → Actions**:
+
+| Secret | Value |
+|--------|-------|
+| `VPS_HOST` | IP address of the Hetzner VPS |
+| `VPS_USER` | SSH username (e.g. `ubuntu`) |
+| `VPS_SSH_KEY` | Private SSH key (PEM format, e.g. `~/.ssh/id_ed25519`) |
+
+**Nothing else.** No database passwords, API keys, Keycloak secrets, or application credentials belong here. All application configuration is sourced from `.env` on the VPS at runtime.
+
+---
+
+## First-Time VPS Setup
+
+Run the idempotent setup script from the VPS as `root` or with `sudo`, passing the repository URL:
+
+```bash
+sudo bash /app/dark-factory/infra/scripts/setup-vps.sh https://github.com/your-org/dark-factory.git
+```
+
+If the repo is not yet present, clone it first:
+
+```bash
+git clone https://github.com/your-org/dark-factory.git /app/dark-factory
+sudo bash /app/dark-factory/infra/scripts/setup-vps.sh https://github.com/your-org/dark-factory.git
+```
+
+> **Initial deployment note:** The pipeline uses `git diff HEAD^ HEAD` to detect changes. On the very first push to `main` (no parent commit), no changed services are detected and the pipeline does nothing. The **first deployment must be performed manually** via SSH before the pipeline takes over subsequent pushes:
+> ```bash
+> cd /app/dark-factory
+> docker compose -f infra/docker-compose.yml build
+> docker compose -f infra/docker-compose.yml run --rm <service> alembic upgrade head  # for each backend
+> docker compose -f infra/docker-compose.yml up -d
+> ```
+
+The script:
+- Installs Docker (official Docker apt repo) if not already installed
+- Adds the deploy user to the `docker` group
+- Verifies Docker Compose v2 is available
+- Clones the repo to `/app/dark-factory/` if not present
+- Prints a reminder to place the `.env` file
+
+---
+
+## Placing the Production `.env` File
+
+The production environment file must be placed at `/app/dark-factory/infra/.env` before the first pipeline run. It is never committed to git or stored in GitHub.
+
+```bash
+# Copy your production .env to the VPS:
+scp your-production.env ubuntu@<VPS_HOST>:/app/dark-factory/infra/.env
+```
+
+Use `infra/.env.example` as the reference for required variables.
+
+---
+
+## How the CI/CD Pipeline Works
+
+Every push to `main` triggers `.github/workflows/ci-cd.yml`:
+
+1. **detect** — identifies which services changed using path-based diff
+2. **validate** — runs `ruff check` + `ruff format --check` for Python services; attempts `docker build` for all changed services (no VPS contact)
+3. **test** — runs `pytest --cov --cov-fail-under=80` (backends) or `vitest` (frontends) with in-memory SQLite + AUTH_MODE=local
+4. **deploy** — SSHs to the VPS and:
+   - `git pull origin main`
+   - Snapshots current images (`:rollback-TIMESTAMP`)
+   - Builds new images on the VPS
+   - Runs `alembic upgrade head` for each migration-enabled service
+   - Restarts containers
+   - Polls `/health` for up to 90 seconds per service
+   - Auto-restores previous images if health check times out
+
+Deployments are serialised: a second `git push` during an active deploy queues and waits (GitHub Actions concurrency group `production`).
+
+---
+
+## Optional: SSL/HTTPS Setup with Certbot
+
+SSL is set up manually after HTTP is confirmed working. The certbot service is included in Docker Compose under the `certbot` profile and does **not** start with a normal `docker compose up`.
+
+```bash
+# On the VPS, after HTTP traffic is working:
+docker compose -f infra/docker-compose.yml --profile certbot run --rm certbot \
+  certonly --webroot --webroot-path=/var/www/certbot \
+  -d studio.dark-factory.com -d tickets.dark-factory.com \
+  --email admin@dark-factory.com --agree-tos
+```
+
+After the certificate is issued:
+1. Uncomment the SSL server blocks in `infra/nginx/nginx.conf.template`
+2. Restart nginx: `docker compose -f infra/docker-compose.yml restart nginx`
+
+### Certbot Auto-Renewal (cron)
+
+Add to root crontab on the VPS (`sudo crontab -e`):
+
+```cron
+0 3 * * * docker compose -f /app/dark-factory/infra/docker-compose.yml --profile certbot run --rm certbot renew --quiet && docker compose -f /app/dark-factory/infra/docker-compose.yml restart nginx
+```
+
+---
+
+## Manual Rollback Procedure
+
+Use when a defect is discovered after the automated health check window has passed.
+
+1. Navigate to **Actions → Manual Rollback** in GitHub
+2. Click **Run workflow**
+3. Select the affected service (or `all`)
+4. Enter a reason (required — appears in the audit log)
+5. Click **Run workflow**
+
+The workflow restores the most recent `:rollback-*` snapshot for the selected service(s) and restarts the container(s). Completion time: under 2 minutes for a single service.
+
+### Rollback Snapshot Retention
+
+The pipeline retains the **3 most recent rollback tags** per service. Older tags are deleted automatically during each deployment. If a snapshot has been garbage-collected, the manual rollback logs a warning for that service and continues with any remaining services in an `all` rollback.
+
+### Audit Trail
+
+Every manual rollback run records:
+- **Actor**: GitHub username who triggered the workflow
+- **Timestamp**: `github.run_started_at` (UTC)
+- **Service**: selected service name
+- **Reason**: operator-provided text
+- **Run URL**: permanent link to the workflow run
+
+The job log is the authoritative audit record. GitHub retains workflow logs for 90 days by default.
+
+---
+
+## Troubleshooting
+
+### VPS unreachable during deploy
+
+The `deploy` job fails with an SSH connection error. Validate and test results are preserved in the run log. No partial deployment occurs — old containers remain running.
+
+### Migration succeeded but new container crashes
+
+The pipeline auto-rolls back the container image. However, the migration is already applied to the database schema. To recover:
+1. Trigger a manual rollback via the GitHub Actions UI to restore the container image
+2. Assess whether the schema migration needs a manual down migration (`alembic downgrade -1`)
+
+### Health check endpoint not available
+
+Services without a `/health` endpoint (agent-tools, uim-frontend, tm-frontend, nginx) are treated as healthy immediately after container start. They are not monitored during the 90-second window.
+
+### Check pipeline status from CLI
+
+```bash
+gh run list --limit 5
+gh run watch
+```
