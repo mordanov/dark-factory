@@ -1,6 +1,6 @@
 # Dark Factory Architecture
 
-_Last updated: 2026-06-24_
+_Last updated: 2026-06-25_
 
 ## 1. Scope and source of truth
 
@@ -14,6 +14,61 @@ This document describes the **Dark Factory** platform as it exists in the monore
 - Representative service entrypoints and module trees under `services/**/src`
 
 > Note: some older per-service READMEs still describe legacy local-JWT flows. The architecture below follows the current runtime defined by compose + spec + current source: **Keycloak is the active identity provider in runtime**, while `AUTH_MODE=local` remains for automated tests.
+
+---
+
+## Original vision vs. implementation status
+
+This section maps the original high-level architecture and workflow described in the early Dark Factory prompt to the current monorepo implementation.
+
+### Status legend
+
+| Symbol | Meaning |
+|--------|---------|
+| ✅ | Implemented and operational |
+| ⚠️ | Partially implemented — core present, gaps remain |
+| ❌ | Not implemented |
+| 🆕 | Implemented, but not part of the original vision |
+
+### Workflow steps
+
+| # | Step | Status | Current implementation |
+|---|------|--------|------------------------|
+| 1 | **Prompt Processing** — receive, analyze, clarify, and enhance a user prompt | ✅ | `user-input-manager` (Prompt Studio) performs iterative session-based refinement with LLM support before plan generation. |
+| 2 | **Planning** — pass enhanced spec to Speckit; generate implementation plan with requirements, architecture, and milestones | ✅ | Planning is implemented in `user-input-manager` via `PlanningService`, which generates Epic → Stories → Tasks and stores agent configuration. |
+| 3 | **Task Decomposition** — decompose plan into discrete tasks; register in Ticket Manager | ✅ | Confirmed plans are converted into `ticket-manager` entities over HTTP. |
+| 4 | **Development Execution** — human operator initiates the cycle; Orchestrator monitors backlog | ✅ | Operators trigger orchestration jobs in `orchestrator`; `JobWorker` processes them asynchronously. |
+| 5 | **Task Assignment** — Orchestrator analyzes scope, requirements, dependencies, and complexity, then assigns the most appropriate agent | ✅ | `OrchestratorService` uses FSM transitions, project memory, dependency state, and LLM-guided decisions to assign work back to Ticket Manager. |
+| 6 | **Agent Collaboration** — agents collaborate through the Brainstorm MCP communication layer | ⚠️ | `agent-dispatcher` has `BrainstormCoordinator` for structured multi-round collaboration, but direct peer-to-peer messaging and shared working memory are not yet implemented. |
+| 7 | **Iterative Development** — agents implement, test, validate, debug, document, and review | ✅ | `agent-dispatcher` launches agents in `claude_code` or `api` mode, parses results, and reports progress/outcomes. |
+| 8 | **Completion Criteria** — the cycle continues until every ticket reaches Done | ✅ | `ticket-manager` FSM and event history track completion; `Done` is a terminal state. |
+
+### Core components
+
+| Original component | Status | Current implementation |
+|-------------------|--------|------------------------|
+| **Prompt Enhancement Layer** | ✅ | Delivered by `user-input-manager` as Prompt Studio with iterative prompt refinement. |
+| **Speckit** | ✅ | Planning capabilities are embedded in `user-input-manager` instead of a standalone runtime service. |
+| **Ticket Manager** | ✅ | `ticket-manager` is the system of record for projects, tickets, assignments, progress, and event history. |
+| **Orchestrator** | ✅ | `orchestrator` coordinates workflow decisions, FSM transitions, audit trail, and distillation triggers. |
+| **Specialized Agents** | ⚠️ | Agent execution is implemented, but agents are transient CLI/API-invoked processes rather than persistent deployable services. |
+| **Brainstorm MCP** | ⚠️ | `agent-tools` provides MCP-style read tooling and `agent-dispatcher` coordinates brainstorm loops, but open inter-agent messaging is missing. |
+
+### Components added during implementation
+
+| Component | Status | Role |
+|-----------|--------|------|
+| 🆕 **Context Distiller** | Implemented | Compresses project history and ADRs into durable memory used by orchestration and agent runs. |
+| 🆕 **Identity & Access Management** | Implemented | Keycloak + `oauth2-proxy` provide centralized runtime authentication and authorization. |
+| 🆕 **Frontend applications** | Implemented | `uim-frontend` and `tm-frontend` provide browser UIs for prompt refinement and ticket management. |
+| 🆕 **Edge proxy & routing** | Implemented | `nginx` handles browser ingress and routes traffic through the auth layer. |
+| 🆕 **Agent Tools** | Implemented | MCP-compatible helper service for read-only git and memory access. |
+
+### Remaining gaps from the original vision
+
+- **Brainstorm MCP**: collaboration is still coordinator-driven; agents do not yet exchange messages peer-to-peer or share a live working memory.
+- **Specialized Agents**: agents are not yet long-running services with a registry and capability discovery API.
+- **Dynamic specialization**: agent selection is still mostly driven by static role definitions and LLM reasoning rather than a formal capability index.
 
 ---
 
