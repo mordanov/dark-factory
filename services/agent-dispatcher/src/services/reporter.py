@@ -19,6 +19,7 @@ class Reporter:
         ticket_id: str,
         project_id: str,
         result: AgentResult,
+        registry: object | None = None,
     ) -> None:
         settings = get_settings()
         headers = {**await get_kc_client().async_auth_headers(), "Content-Type": "application/json"}
@@ -36,6 +37,7 @@ class Reporter:
             ticket_id,
             project_id,
             headers,
+            registry=registry,
         )
 
     async def _post_tm_comment(
@@ -60,9 +62,12 @@ class Reporter:
         ticket_id: str,
         project_id: str,
         headers: dict,
+        registry: object | None = None,
     ) -> None:
         url = f"{orch_url}/api/v1/jobs/trigger"
-        payload = {"ticket_id": ticket_id, "project_id": project_id}
+        payload: dict = {"ticket_id": ticket_id, "project_id": project_id}
+        if registry is not None:
+            payload["registry_yaml"] = registry.to_yaml_string()  # type: ignore[union-attr]
 
         for attempt in range(2):
             try:

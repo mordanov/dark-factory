@@ -13,7 +13,7 @@ def make_ticket(ticket_id="TKT-BS-TEST", project_id="proj-1"):
     return MagicMock(
         id=ticket_id,
         project_id=project_id,
-        assigned_agent="software_architect",
+        assigned_agent="software-architect",
         fsm_status="architecture_review",
         ticket_type="feature",
         title="Review design",
@@ -36,8 +36,8 @@ def make_result_stdout(status="completed", consensus=None, tm_comment="comment")
 async def test_two_agents_run_sequentially(db_session, tmp_path):
     prompts_dir = tmp_path / "prompts"
     prompts_dir.mkdir()
-    (prompts_dir / "software_architect.md").write_text("SA role")
-    (prompts_dir / "security_architect.md").write_text("SEC role")
+    (prompts_dir / "software-architect.md").write_text("SA role")
+    (prompts_dir / "security-architect.md").write_text("SEC role")
 
     ticket = make_ticket()
     run_order: list[str] = []
@@ -60,7 +60,7 @@ async def test_two_agents_run_sequentially(db_session, tmp_path):
         settings = MagicMock()
         settings.agent_prompts_dir = str(prompts_dir)
         settings.agent_runner_mode = "claude_code"
-        settings.brainstorm_agents_list = ["software_architect", "security_architect"]
+        settings.brainstorm_agents_list = ["software-architect", "security-architect"]
         settings.brainstorm_max_rounds = 2
         settings.agent_timeout_for = MagicMock(return_value=300)
         mock_settings.return_value = settings
@@ -70,15 +70,57 @@ async def test_two_agents_run_sequentially(db_session, tmp_path):
         coordinator = BrainstormCoordinator(mock_runner)
         result = await coordinator.run_brainstorm(ticket, db_session)
 
-    assert run_order[0] == "software_architect"
-    assert run_order[1] == "security_architect"
+    assert run_order[0] == "software-architect"
+    assert run_order[1] == "security-architect"
+
+
+async def test_two_agents_run_sequentially_with_explicit_participants(db_session, tmp_path):
+    prompts_dir = tmp_path / "prompts"
+    prompts_dir.mkdir()
+    (prompts_dir / "software-architect.md").write_text("SA role")
+    (prompts_dir / "security-architect.md").write_text("SEC role")
+
+    ticket = make_ticket()
+    run_order: list[str] = []
+
+    async def mock_run(agent_id, system_prompt, context, timeout):
+        run_order.append(agent_id)
+        return (0, make_result_stdout())
+
+    mock_runner = AsyncMock()
+    mock_runner.run.side_effect = mock_run
+
+    with (
+        patch("src.services.brainstorm_coordinator.get_settings") as mock_settings,
+        patch(
+            "src.services.brainstorm_coordinator.build_context",
+            return_value=("context", "jwt-token"),
+        ),
+        patch("src.services.brainstorm_coordinator.build_context_snapshot", return_value={}),
+    ):
+        settings = MagicMock()
+        settings.agent_prompts_dir = str(prompts_dir)
+        settings.agent_runner_mode = "claude_code"
+        settings.brainstorm_max_rounds = 2
+        settings.agent_timeout_for = MagicMock(return_value=300)
+        mock_settings.return_value = settings
+
+        from src.services.brainstorm_coordinator import BrainstormCoordinator
+
+        coordinator = BrainstormCoordinator(mock_runner)
+        result = await coordinator.run_brainstorm(
+            ticket, db_session, participants=["software-architect", "security-architect"]
+        )
+
+    assert run_order[0] == "software-architect"
+    assert run_order[1] == "security-architect"
 
 
 async def test_early_exit_on_first_agent_agreed(db_session, tmp_path):
     prompts_dir = tmp_path / "prompts"
     prompts_dir.mkdir()
-    (prompts_dir / "software_architect.md").write_text("SA role")
-    (prompts_dir / "security_architect.md").write_text("SEC role")
+    (prompts_dir / "software-architect.md").write_text("SA role")
+    (prompts_dir / "security-architect.md").write_text("SEC role")
 
     ticket = make_ticket()
     call_count = 0
@@ -101,7 +143,7 @@ async def test_early_exit_on_first_agent_agreed(db_session, tmp_path):
         settings = MagicMock()
         settings.agent_prompts_dir = str(prompts_dir)
         settings.agent_runner_mode = "claude_code"
-        settings.brainstorm_agents_list = ["software_architect", "security_architect"]
+        settings.brainstorm_agents_list = ["software-architect", "security-architect"]
         settings.brainstorm_max_rounds = 3
         settings.agent_timeout_for = MagicMock(return_value=300)
         mock_settings.return_value = settings
@@ -119,8 +161,8 @@ async def test_early_exit_on_first_agent_agreed(db_session, tmp_path):
 async def test_max_rounds_enforced(db_session, tmp_path):
     prompts_dir = tmp_path / "prompts"
     prompts_dir.mkdir()
-    (prompts_dir / "software_architect.md").write_text("SA role")
-    (prompts_dir / "security_architect.md").write_text("SEC role")
+    (prompts_dir / "software-architect.md").write_text("SA role")
+    (prompts_dir / "security-architect.md").write_text("SEC role")
 
     ticket = make_ticket()
     call_count = 0
@@ -143,7 +185,7 @@ async def test_max_rounds_enforced(db_session, tmp_path):
         settings = MagicMock()
         settings.agent_prompts_dir = str(prompts_dir)
         settings.agent_runner_mode = "claude_code"
-        settings.brainstorm_agents_list = ["software_architect", "security_architect"]
+        settings.brainstorm_agents_list = ["software-architect", "security-architect"]
         settings.brainstorm_max_rounds = 2
         settings.agent_timeout_for = MagicMock(return_value=300)
         mock_settings.return_value = settings
@@ -161,8 +203,8 @@ async def test_max_rounds_enforced(db_session, tmp_path):
 async def test_api_mode_injects_previous_responses(db_session, tmp_path):
     prompts_dir = tmp_path / "prompts"
     prompts_dir.mkdir()
-    (prompts_dir / "software_architect.md").write_text("SA role")
-    (prompts_dir / "security_architect.md").write_text("SEC role")
+    (prompts_dir / "software-architect.md").write_text("SA role")
+    (prompts_dir / "security-architect.md").write_text("SEC role")
 
     ticket = make_ticket()
     captured_prev_responses: list = []
@@ -185,7 +227,7 @@ async def test_api_mode_injects_previous_responses(db_session, tmp_path):
         settings = MagicMock()
         settings.agent_prompts_dir = str(prompts_dir)
         settings.agent_runner_mode = "api"
-        settings.brainstorm_agents_list = ["software_architect", "security_architect"]
+        settings.brainstorm_agents_list = ["software-architect", "security-architect"]
         settings.brainstorm_max_rounds = 1
         settings.agent_timeout_for = MagicMock(return_value=300)
         mock_settings.return_value = settings
@@ -195,8 +237,8 @@ async def test_api_mode_injects_previous_responses(db_session, tmp_path):
         coordinator = BrainstormCoordinator(mock_runner)
         await coordinator.run_brainstorm(ticket, db_session)
 
-    sa_call = next(c for c in captured_prev_responses if c[0] == "software_architect")
-    sec_call = next(c for c in captured_prev_responses if c[0] == "security_architect")
+    sa_call = next(c for c in captured_prev_responses if c[0] == "software-architect")
+    sec_call = next(c for c in captured_prev_responses if c[0] == "security-architect")
     assert sa_call[1] is None
     assert sec_call[1] is not None
-    assert "software_architect" in sec_call[1]
+    assert "software-architect" in sec_call[1]

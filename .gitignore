@@ -38,6 +38,7 @@ dist/
 
 # Secrets
 credentials.json
+development/**/credentials.json
 *.sqlite3
 
 # Monorepo infra

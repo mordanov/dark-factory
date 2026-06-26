@@ -24,7 +24,12 @@ class BrainstormCoordinator:
     def __init__(self, runner: AgentRunner) -> None:
         self._runner = runner
 
-    async def run_brainstorm(self, ticket: Any, db: AsyncSession) -> dict:
+    async def run_brainstorm(
+        self,
+        ticket: Any,
+        db: AsyncSession,
+        participants: list[str] | None = None,
+    ) -> dict:
         settings = get_settings()
         bs_repo = BrainstormSessionRepository(db)
         run_repo = AgentRunRepository(db)
@@ -32,7 +37,7 @@ class BrainstormCoordinator:
         session = await bs_repo.get_or_create(ticket.id, max_rounds=settings.brainstorm_max_rounds)
         await db.flush()
 
-        agents = settings.brainstorm_agents_list
+        agents = participants if participants is not None else settings.brainstorm_agents_list
         max_rounds = settings.brainstorm_max_rounds
         agent_results: list[AgentResult] = []
         concluded = False

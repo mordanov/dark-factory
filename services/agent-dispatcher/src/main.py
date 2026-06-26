@@ -22,6 +22,12 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await prefetch_jwks()
+
+    from src.services.capability_registry import load_registry
+
+    registry = load_registry(settings.resolved_registry_path)
+    logger.info("Capability registry loaded", agent_count=len(registry.all_role_ids()))
+
     from src.repositories.run_repo import AgentRunRepository
     from src.schemas.schemas import AgentResult
     from src.services.reporter import Reporter

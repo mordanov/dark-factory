@@ -99,6 +99,10 @@ Replaces all local password-based authentication with Keycloak 25 as the sole id
 
 Adds a fully automated CI/CD pipeline via GitHub Actions. Every push to `main` runs `ruff` lint + Docker build for changed services only (detected by `.github/scripts/detect-changes.sh`). After validation, `pytest` and `vitest` run with ≥80% coverage gates. On success, changed services are deployed to the VPS over SSH: each deploy snapshots the current image, runs Alembic migrations as a separate step (never inside the container CMD), restarts the container, and polls the health endpoint for up to 90 seconds — rolling back automatically on failure. A `workflow_dispatch` workflow (`manual-rollback.yml`) allows operators to trigger an emergency rollback for any service from the GitHub Actions UI with a full audit trail. All GitHub Actions action references are pinned to immutable commit SHAs. The deploy job is scoped to a `production` environment so VPS secrets are never exposed to other jobs. `agent-tools` is converted to a pure MCP stdio process (no sidecar uvicorn). SSL certificate renewal via Certbot is available as an opt-in Docker Compose profile. See `infra/DEPLOYMENT.md` for operator setup and `infra/scripts/setup-vps.sh` for idempotent VPS provisioning.
 
+### 006 — Capability Registry
+
+Replaces the hardcoded `AGENT_FOR_STATE` dictionary in the Orchestrator with a YAML-driven Capability Registry and LLM-assisted dynamic agent selection. A `registry.yaml` file in `development/agents/` defines each agent's role ID, description, and the FSM states it can handle. The `CapabilityRegistry` class in Agent Dispatcher loads this file once at startup (logged with a SHA-256 hash for tamper detection) and injects the registry YAML into every Orchestrator job payload via `reporter.py`. The Orchestrator's `agent_selector.py` resolves candidates from the registry at job-processing time and calls the LLM to pick the best-fit agent (10-second timeout, non-raising fallback to first listed candidate). The `_write_credentials()` helper validates role IDs against `VALID_AGENT_IDS` and enforces `0600` file permissions before writing. `credentials.json` files under `development/` are gitignored; a CI job in `infra-checks.yml` fails the pipeline if any are accidentally tracked. See `specs/006-capability-registry/quickstart.md` for the registry reload procedure and startup smoke test.
+
 ## Repository Layout
 
 ```
@@ -124,7 +128,9 @@ dark-factory/
 │   ├── 001-monorepo-unification/
 │   ├── 002-agent-dispatcher/
 │   ├── 003-planning-agent/
-│   └── 004-keycloak-iam-migration/
+│   ├── 004-keycloak-iam-migration/
+│   ├── 005-github-actions-cicd/
+│   └── 006-capability-registry/
 ├── development/               # Agent definitions and scripts
 ├── pyproject.toml             # Canonical Python versions + ruff config
 ├── package.json               # Canonical frontend versions (reference)
@@ -173,3 +179,4 @@ See `infra/.env.example` for all required variables with inline documentation. K
 - `OAUTH2_PROXY_CLIENT_SECRET`, `OAUTH2_PROXY_COOKIE_SECRET` — nginx auth proxy
 - `OPENAI_API_KEY` — required for agent runs in API mode
 - `VITE_KEYCLOAK_URL`, `VITE_*_CLIENT_ID` — frontend Keycloak configuration
+- `AGENT_REGISTRY_PATH` — path to `registry.yaml` inside the agent-dispatcher container (default: `/app/registry.yaml`; mounted from `development/agents/registry.yaml`)

@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import uuid
 
+import yaml
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.repositories.audit_repo import AuditRepository
@@ -21,6 +22,14 @@ from src.services.llm.orchestrator_llm import call_orchestrator_llm
 from src.services.tm_client.client import TicketManagerClient
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_registry_roles(registry_yaml: str) -> set[str]:
+    try:
+        data = yaml.safe_load(registry_yaml)
+        return {a["role_id"] for a in data.get("agents", []) if "role_id" in a}
+    except Exception:
+        return set()
 
 
 class OrchestratorService:
@@ -100,10 +109,34 @@ class OrchestratorService:
         memory = await self._doc_store.get_memory(project_id)
         adrs = await self._doc_store.list_adrs(project_id, status_filter="accepted")
 
-        # 6. Call LLM orchestrator
-        decision = await call_orchestrator_llm(ticket, fsm_eval, memory, adrs, dep_statuses)
+        job_payload = job.payload or {}
 
-        # 7. Apply decision
+        # 6. Call LLM orchestrator
+        decision = await call_orchestrator_llm(
+            ticket, fsm_eval, memory, adrs, dep_statuses, job_payload=job_payload
+        )
+
+        # 7. Validate assigned_agent against registry; fall back to selector if invalid
+        assigned = decision.decision.assigned_agent
+        registry_yaml = job_payload.get("registry_yaml", "")
+        if assigned and registry_yaml:
+            valid_roles = _parse_registry_roles(registry_yaml)
+            if assigned not in valid_roles:
+                logger.warning(
+                    "LLM returned unknown role, invoking selector fallback",
+                    returned_role=assigned,
+                )
+                from src.services.fsm.agent_selector import select_agent
+
+                fallback = await select_agent(
+                    ticket=ticket,
+                    to_state=decision.decision.to_state or "",
+                    candidate_role_ids=list(valid_roles) if valid_roles else [assigned],
+                    registry_yaml=registry_yaml,
+                )
+                decision.decision.assigned_agent = fallback
+
+        # 8. Apply decision
         await self._apply_decision(ticket, project_id, decision, job_id)
 
         return {
@@ -120,7 +153,7 @@ class OrchestratorService:
             ticket.id,
             fsm_status=fsm_eval.from_state,
             blocked_reason=fsm_eval.blocked_reason,
-            assigned_agent=fsm_eval.assigned_agent,
+            assigned_agent=None,
         )
         await self._audit_repo.append(
             ticket_id=ticket.id,
@@ -128,7 +161,7 @@ class OrchestratorService:
             action="WAIT",
             from_state=fsm_eval.from_state,
             blocked_reason=fsm_eval.blocked_reason,
-            assigned_agent=fsm_eval.assigned_agent,
+            assigned_agent=None,
             details=fsm_eval.blocked_reason or "Waiting",
             job_id=job_id,
         )

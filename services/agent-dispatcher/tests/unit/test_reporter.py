@@ -144,3 +144,83 @@ async def test_orchestrator_trigger_retries_once():
 
     # 1 TM comment + 2 orchestrator trigger attempts = 3 total
     assert call_count == 3
+
+
+async def test_report_result_includes_registry_yaml_in_trigger():
+    """When a registry is passed, registry_yaml appears in the orchestrator trigger payload."""
+    with (
+        patch("src.services.reporter.get_settings") as mock_settings,
+        _kc_mock(),
+        patch("src.services.reporter.httpx.AsyncClient") as mock_client_cls,
+    ):
+        settings = MagicMock()
+        settings.ticket_manager_base_url = "http://tm"
+        settings.orchestrator_base_url = "http://orch"
+        mock_settings.return_value = settings
+
+        trigger_payloads: list = []
+
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status = MagicMock()
+
+        async def post_side_effect(url, **kwargs):
+            if "trigger" in url:
+                trigger_payloads.append(kwargs.get("json", {}))
+            return mock_resp
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        mock_client.post.side_effect = post_side_effect
+        mock_client_cls.return_value = mock_client
+
+        mock_registry = MagicMock()
+        mock_registry.to_yaml_string.return_value = "version: '1.0'\nagents: []"
+
+        from src.services.reporter import Reporter
+
+        reporter = Reporter()
+        result = AgentResult(status="completed", summary="done", tm_comment="ok")
+        await reporter.report_result("TKT-5", "proj-1", result, registry=mock_registry)
+
+    assert len(trigger_payloads) == 1
+    assert "registry_yaml" in trigger_payloads[0]
+    assert "version" in trigger_payloads[0]["registry_yaml"]
+
+
+async def test_report_result_no_registry_yaml_when_registry_none():
+    """When registry is None, registry_yaml should not appear in the trigger payload."""
+    with (
+        patch("src.services.reporter.get_settings") as mock_settings,
+        _kc_mock(),
+        patch("src.services.reporter.httpx.AsyncClient") as mock_client_cls,
+    ):
+        settings = MagicMock()
+        settings.ticket_manager_base_url = "http://tm"
+        settings.orchestrator_base_url = "http://orch"
+        mock_settings.return_value = settings
+
+        trigger_payloads: list = []
+
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status = MagicMock()
+
+        async def post_side_effect(url, **kwargs):
+            if "trigger" in url:
+                trigger_payloads.append(kwargs.get("json", {}))
+            return mock_resp
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        mock_client.post.side_effect = post_side_effect
+        mock_client_cls.return_value = mock_client
+
+        from src.services.reporter import Reporter
+
+        reporter = Reporter()
+        result = AgentResult(status="completed", summary="done", tm_comment="ok")
+        await reporter.report_result("TKT-6", "proj-1", result, registry=None)
+
+    assert len(trigger_payloads) == 1
+    assert "registry_yaml" not in trigger_payloads[0]

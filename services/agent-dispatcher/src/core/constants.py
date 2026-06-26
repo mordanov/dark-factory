@@ -9,13 +9,13 @@ VALID_AGENT_IDS: frozenset[str] = frozenset(
     {
         "backend",
         "frontend",
-        "software_architect",
-        "security_architect",
-        "project_manager",
+        "software-architect",
+        "security-architect",
+        "product-manager",
         "designer",
-        "code_reviewer",
+        "code-reviewer",
         "autotester",
         "devops",
-        "project_administrator",
+        "project-administrator",
     }
 )
