@@ -1,34 +1,33 @@
 <!--
   Sync Impact Report
-  Version change: 1.2.0 → 2.0.0
-  Modified principles:
-    - Principle II: "Auth Adapter Pattern — Keycloak Preparation" → "Keycloak IAM Migration"
-      (MAJOR: previous principle was explicitly scoped to a preparation-only phase and deferred
-      the full migration; this amendment enacts that migration — the seam becomes the system)
+  Version change: 2.0.0 → 2.1.0
+  Modified principles: None (all additions)
   Added sections:
-    - Principle XVII: Keycloak is the Single Source of Truth for Identity
-    - Principle XVIII: JWKS Validation MUST Be Cached — Never Per-Request
-    - Principle XIX: Service-to-Service Authentication via Client Credentials
-    - Principle XX: Frontend Auth via keycloak-js — Tokens In-Memory Only
-    - Principle XXI: Users Table Permanently Removed — Identity via Keycloak Sub
-    - Keycloak Deployment entry in Monorepo Structure (new infra/keycloak/, infra/oauth2-proxy/)
-    - Definition of Done items 22–35 (Keycloak migration acceptance criteria)
-    - Eleven new Non-Negotiable Constraints (Keycloak phase)
-  Removed sections:
-    - Non-Negotiable Constraint: "Auth MUST NOT be removed in this phase. Auth adapter only —
-      no Keycloak flows." — superseded by Keycloak migration principles XVII–XXI
+    - Principle XXII:  Build on VPS, Not in CI
+    - Principle XXIII: Path-Based Change Detection
+    - Principle XXIV:  Migrations Before Container Restart
+    - Principle XXV:   Automatic Rollback on Healthcheck Failure
+    - Principle XXVI:  VPS-Only Secrets — Minimal CI Credentials
+    - Principle XXVII: Validation Gates — Fail Fast Before VPS Deployment
+    - Principle XXVIII: CI Tests Use SQLite, mongomock, and AUTH_MODE=local
+    - CI/CD Pipeline section in Infrastructure, Integration Tests & Definition of Done
+    - .github/ added to Monorepo root layout
+    - Definition of Done items 36–49 (deployment pipeline acceptance criteria)
+    - Seven new Non-Negotiable Constraints (deployment phase)
+  Removed sections: None
   Templates requiring updates:
-    ✅ .specify/memory/constitution.md — fully updated for v2.0.0
-    ⚠  .specify/templates/plan-template.md — Constitution Check section references
-       Principles I–XII; should be updated to reference I–XXI for new features
+    ✅ .specify/memory/constitution.md — fully updated for v2.1.0
+    ✅ .specify/templates/plan-template.md — Constitution Check section uses generic
+       placeholder "[Gates determined based on constitution file]"; no literal
+       principle numbers to update
     ✅ .specify/templates/spec-template.md — no constitution-specific changes required
     ✅ .specify/templates/tasks-template.md — no constitution-specific changes required
     ✅ .specify/templates/commands/ — directory not present, no action required
   Deferred TODOs: None
-  Version bump rationale: MAJOR — Principle II is fundamentally redefined (preparation seam
-    → completed Keycloak migration); backward-incompatible governance change because code that
-    previously complied with the "no Keycloak flows" constraint in Principle II now violates
-    the new mandate. Five new principles added (XVII–XXI).
+  Version bump rationale: MINOR — Seven new principles added (XXII–XXVIII) covering
+    VPS-side build strategy, path-based change detection, migration sequencing,
+    automatic rollback, CI secret minimisation, validation gates, and CI test
+    isolation. No existing principles removed or redefined.
 -->
 
 # Dark Factory Monorepo Constitution
@@ -326,6 +325,111 @@ After migration:
   user identity information comes from JWT claims (already validated by the time the
   handler executes).
 
+### XXII. Build on VPS, Not in CI
+
+Docker images MUST be built on the Hetzner VPS, not in GitHub Actions runners. The CI
+runner validates and tests code only, then SSHs to the VPS to build and deploy. There
+is no container registry; build artifacts exist only on the VPS.
+
+This means:
+- No `docker login` step in CI and no registry credentials in GitHub Actions
+- The VPS MUST have sufficient CPU/RAM to build all services
+- All `docker build` and `docker compose build` commands run over SSH on the VPS
+
+The pipeline has three mandatory stages that run in sequence: `validate → test → deploy`.
+A failure at any stage aborts the pipeline. Deployment is triggered on every push to `main`.
+There is no staging environment: local development → `main` → production.
+
+### XXIII. Path-Based Change Detection
+
+Not every push rebuilds everything. The pipeline detects which services changed and
+operates only on those. This reduces build time and minimises downtime surface.
+
+The change-to-service mapping is fixed. `infra/docker-compose.yml` changes trigger a
+full rebuild of ALL services. `infra/.env.example` and `infra/postgres/**` changes
+trigger NO deployment (documentation and manual migration only, respectively).
+
+The mapping is maintained in `.github/scripts/detect-changes.sh` and MUST NOT grow
+exception cases. If a path is ambiguous, err toward rebuilding more services rather
+than fewer.
+
+### XXIV. Migrations Before Container Restart
+
+`alembic upgrade head` MUST NOT appear in any backend service Dockerfile CMD. Alembic
+migrations MUST run as a separate `docker compose run --rm` step in the deployment
+pipeline AFTER building the new image but BEFORE `docker compose up -d`.
+
+If a migration fails: the pipeline MUST abort and old containers MUST keep running.
+No partial state. No data corruption. The pipeline achieves this by:
+1. Building the new image
+2. Running `docker compose run --rm {service} alembic upgrade head`
+3. Only calling `docker compose up -d` if step 2 exits 0
+
+Backend Dockerfiles MUST use the CMD form:
+`CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "XXXX", "--workers", "1"]`
+
+### XXV. Automatic Rollback on Healthcheck Failure
+
+Before deploying, the pipeline MUST snapshot the current running image IDs. After
+`docker compose up -d`, it MUST wait up to 90 seconds for all deployed services to
+pass their healthchecks.
+
+If any healthcheck fails: the pipeline MUST automatically restore the snapshot images
+via `docker tag` and run `docker compose up -d` again with the old images. A GitHub
+Actions failure notification marks the pipeline as failed. No human intervention is
+required to restore a running system.
+
+An emergency `manual-rollback.yml` workflow (workflow_dispatch) MUST also exist for
+cases where the automatic rollback itself fails. It accepts `service` and `reason`
+inputs and restores the most recent `rollback-*` tagged image for the specified service.
+
+### XXVI. VPS-Only Secrets — Minimal CI Credentials
+
+The production `.env` file MUST be manually placed at `/app/dark-factory/infra/.env`
+on the VPS. It MUST NEVER be committed to git and MUST NEVER be passed through GitHub
+Actions.
+
+GitHub Actions Secrets MUST contain ONLY:
+- `VPS_HOST` — IP address of the Hetzner VPS
+- `VPS_USER` — SSH username
+- `VPS_SSH_KEY` — private SSH key for the deployment user
+
+Nothing else. No database passwords, no API keys, no Keycloak client secrets in CI.
+Any pull of secrets from GitHub Actions beyond these three values is a constitution
+violation and MUST be rejected in code review.
+
+### XXVII. Validation Gates — Fail Fast Before VPS Deployment
+
+The `validate` stage runs entirely in the CI runner (no VPS access needed) and MUST
+catch configuration and code quality errors before any VPS SSH connection is made:
+
+- `ruff check` and `ruff format --check` for every changed Python service
+- `docker build --no-cache` for every changed service (catches Dockerfile syntax errors
+  and missing dependency pins)
+
+TypeScript type checking is NOT in the validate stage — it runs as part of `npm run build`
+inside the Docker build step on the VPS. It is NOT separately run in CI to keep the
+validate stage fast.
+
+The validate stage MUST fail the pipeline before `test` or `deploy` if any of these
+checks error. A clean `validate` is a prerequisite for running tests.
+
+### XXVIII. CI Tests Use SQLite, mongomock, and AUTH_MODE=local
+
+All automated tests run in GitHub Actions runners, not on the VPS. No real PostgreSQL,
+MongoDB, or Keycloak instances are required in CI:
+
+- Python backends: SQLite in-memory via `aiosqlite` (swap `asyncpg` DSN for test sessions)
+- MongoDB-backed services: `mongomock-motor` for async MongoDB emulation
+- Auth: `AUTH_MODE=local` with a fixed `TEST_JWT_SECRET`; all tokens are HS256
+- All external HTTP calls (OpenAI, inter-service): mocked via `respx` or `AsyncMock`
+
+Tests MUST complete within 10 minutes total; individual service test timeout is 3 minutes.
+Coverage MUST NOT drop below 80% for any changed service — the `test` stage fails if it does.
+
+`AUTH_MODE=local` is the ONLY acceptable way to run tests without a Keycloak instance.
+It MUST NEVER be used in any docker-compose file that could reach production infrastructure.
+
 ## Monorepo Structure & Service Registry
 
 The monorepo layout is fixed and MUST NOT deviate. Services retain their own internal
@@ -336,6 +440,12 @@ This is a mono**repo**, not a mono**lith**.
 
 ```
 dark-factory/
+├── .github/
+│   ├── workflows/
+│   │   ├── ci-cd.yml               ← main pipeline (push to main)
+│   │   └── manual-rollback.yml     ← workflow_dispatch for emergency rollback
+│   └── scripts/
+│       └── detect-changes.sh       ← outputs JSON array of changed services
 ├── services/
 │   ├── user-input-manager/   ← port 8001 | frontend yes | PG: df_user_input      | DNS: UIM_HOST
 │   │                            Note: Planning Agent is an EXTENSION of this service,
@@ -359,8 +469,10 @@ dark-factory/
 │   ├── keycloak/
 │   │   ├── realm-export.json       ← full realm definition with ${VAR} placeholders
 │   │   └── substitute-env.sh       ← envsubst → /opt/keycloak/data/import/
-│   └── oauth2-proxy/
-│       └── config.cfg              ← Bearer token validator for nginx auth_request
+│   ├── oauth2-proxy/
+│   │   └── config.cfg              ← Bearer token validator for nginx auth_request
+│   └── scripts/
+│       └── setup-vps.sh            ← one-time VPS initialisation (run manually)
 ├── integration-tests/
 ├── .pre-commit-config.yaml
 ├── pyproject.toml
@@ -399,6 +511,22 @@ oauth2-proxy. Frontend routes have no `auth_request` (keycloak-js handles redire
 **oauth2-proxy** — Bearer token validator sidecar. Provider: `keycloak-oidc`. Validates
 Bearer tokens against Keycloak JWKS; passes `X-Auth-Request-User`, `X-Auth-Request-Email`,
 `X-Auth-Request-Groups` headers upstream. Does NOT handle login redirects.
+
+**Certbot** — exists in `docker-compose.yml` with `profiles: [certbot]` so it NEVER starts
+automatically with `docker compose up`. Certificate acquisition and renewal are manual VPS
+operations. nginx starts in HTTP-only mode; HTTPS is enabled by the operator after certbot
+runs. Certbot volumes are mounted read-only into nginx for certificate access.
+
+**CI/CD Pipeline** — GitHub Actions (`.github/workflows/ci-cd.yml`). Three stages in order:
+`validate → test → deploy`. Path-based change detection (`detect-changes.sh`) determines
+which services are in scope. All Docker builds happen on VPS via SSH; no container registry.
+Migrations run on VPS as `docker compose run --rm` before container restart. Automatic
+rollback on healthcheck failure. Only three GitHub Actions secrets are permitted: `VPS_HOST`,
+`VPS_USER`, `VPS_SSH_KEY`.
+
+**VPS** — single Hetzner VPS running Ubuntu 24.04 LTS. Directory: `/app/dark-factory/`.
+Deployment user (`ubuntu`) MUST be in the `docker` group — no `sudo` required. The production
+`.env` is manually placed at `/app/dark-factory/infra/.env` and is never in git or CI.
 
 **Integration test rules:**
 - Tests run against real services started by `docker-compose.test.yml`. No mocking of
@@ -458,6 +586,24 @@ Bearer tokens against Keycloak JWKS; passes `X-Auth-Request-User`, `X-Auth-Reque
 34. Keycloak: no `JWT_SECRET_KEY` remains in any service configuration for user token signing.
 35. Keycloak: `users` table removal migrations are applied; all `user_id` columns hold Keycloak
     `sub` strings; no FK constraints to a local users table remain.
+36. CI/CD: push to `main` triggers the pipeline automatically via `ci-cd.yml`.
+37. CI/CD: `validate` stage catches ruff errors and Dockerfile syntax errors for changed services.
+38. CI/CD: `test` stage runs pytest and vitest for changed services; coverage ≥ 80% enforced.
+39. CI/CD: `deploy` stage SSHs to VPS, builds only changed services, runs Alembic migrations
+    before `docker compose up -d`.
+40. CI/CD: `deploy` stage waits up to 90 seconds for healthchecks before marking success.
+41. CI/CD: on healthcheck failure, the pipeline automatically restores previous images and exits 1.
+42. CI/CD: no `alembic upgrade head` in any service Dockerfile CMD.
+43. CI/CD: Certbot container exists in `docker-compose.yml` with `profiles: [certbot]`; it NEVER
+    starts as part of normal `docker compose up`.
+44. CI/CD: nginx starts in HTTP-only mode; HTTPS requires a separate manual certbot run on VPS.
+45. CI/CD: `infra/scripts/setup-vps.sh` exists and produces a running system when followed on a
+    fresh Ubuntu 24.04 VPS.
+46. CI/CD: `infra/DEPLOYMENT.md` documents all GitHub Actions secrets, VPS setup steps, and
+    the certbot renewal cron job.
+47. CI/CD: `manual-rollback.yml` workflow exists and is testable via `workflow_dispatch`.
+48. CI/CD: GitHub Actions contains exactly three secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`.
+49. CI/CD: `agent-tools` Dockerfile CMD is `python -m src.server` (stdio MCP only; no HTTP server).
 
 ## Governance
 
@@ -475,7 +621,7 @@ below. Amendments must be committed to `development/documentation/` and propagat
 - MINOR: Adding a new principle, section, or materially expanding guidance.
 - PATCH: Clarifications, wording fixes, non-semantic refinements.
 
-**Compliance:** All PRs and code reviews MUST verify adherence to Core Principles I–XXI.
+**Compliance:** All PRs and code reviews MUST verify adherence to Core Principles I–XXVIII.
 Complexity introductions MUST be justified. The monorepo `CLAUDE.md` serves as the runtime
 development guide and MUST remain in sync with this constitution.
 
@@ -505,5 +651,12 @@ development guide and MUST remain in sync with this constitution.
 - The `users` table removal is irreversible. `downgrade()` in these migrations MUST raise
   `NotImplementedError`. No rollback path for destructive user-data migrations.
 - The Keycloak realm name `dark-factory` is fixed and MUST NEVER be renamed.
+- No secrets in GitHub Actions beyond VPS SSH credentials. Production `.env` lives on VPS only.
+- Migrations run before container restart, never at startup. CMD MUST NEVER contain alembic.
+- Docker images MUST be built on VPS. No registry push from CI runner.
+- Rollback is automatic, not manual. The pipeline handles it without human intervention.
+- Certbot MUST NEVER be in the main `docker compose up` flow. `profiles: [certbot]` is mandatory.
+- `agent-tools` has no HTTP server. Its Dockerfile CMD is `python -m src.server` (stdio MCP only).
+- The pipeline MUST NOT require sudo on VPS. The deployment user MUST be in the docker group.
 
-**Version**: 2.0.0 | **Ratified**: 2026-06-22 | **Last Amended**: 2026-06-24
+**Version**: 2.1.0 | **Ratified**: 2026-06-22 | **Last Amended**: 2026-06-25

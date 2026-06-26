@@ -287,13 +287,11 @@ services:
       keycloak:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      test: ["CMD-SHELL", "pgrep -f 'src.server' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 6
       start_period: 20s
-    expose:
-      - "8000"
     networks:
       - internal
 
@@ -387,6 +385,9 @@ services:
       TM_HOST: ${TM_HOST:-tickets.dark-factory.local}
     ports:
       - "${HTTP_PORT:-80}:80"
+    volumes:
+      - letsencrypt:/etc/letsencrypt:ro
+      - certbot_www:/var/www/certbot:ro
     depends_on:
       user-input-manager:
         condition: service_healthy
@@ -407,9 +408,21 @@ services:
       - internal
       - external
 
+  # ─── SSL Certificate Renewal (profile: certbot) ────────────────────────────
+  # Not started by default. Use: docker compose --profile certbot run --rm certbot
+  certbot:
+    image: certbot/certbot
+    profiles:
+      - certbot
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+
 volumes:
   postgres_data:
   mongo_data:
+  letsencrypt:
+  certbot_www:
 
 networks:
   internal:

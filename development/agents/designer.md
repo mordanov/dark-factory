@@ -129,7 +129,7 @@ Scale artifact depth to task size; do not over-document small UI changes.
 
 Use only Ticket Manager API endpoints documented in `documentation/api-endpoints-agent-playbook.md`.
 
-Use Ticket Manager connection details provisioned by `project-administrator` in `credentials.json`.
+Use Ticket Manager connection details from `development/<agent_name>/credentials.json`. This file is either provisioned by `project-administrator` or placed directly by the operator before the agent runs.
 
 ### Credential format
 

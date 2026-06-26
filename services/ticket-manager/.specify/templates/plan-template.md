@@ -31,7 +31,7 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-Verify compliance with each principle from `.specify/memory/constitution.md` (v2.0.0):
+Verify compliance with each principle from `.specify/memory/constitution.md` (v2.1.0):
 
 | # | Principle | Status | Notes |
 |---|-----------|--------|-------|
@@ -56,6 +56,13 @@ Verify compliance with each principle from `.specify/memory/constitution.md` (v2
 | XIX | Service-to-Service Authentication via Client Credentials — KeycloakServiceClient, 1h token TTL | ☐ Pass / ☐ N/A | |
 | XX | Frontend Auth via keycloak-js — tokens in-memory only, no login route, PKCE S256 | ☐ Pass / ☐ N/A | |
 | XXI | Users Table Permanently Removed — user_id is Keycloak sub; destructive migrations non-reversible | ☐ Pass / ☐ N/A | |
+| XXII | Build on VPS, Not in CI — no container registry; CI validates only, VPS builds and deploys | ☐ Pass / ☐ N/A | |
+| XXIII | Path-Based Change Detection — only changed services are rebuilt; full rebuild on docker-compose.yml change | ☐ Pass / ☐ N/A | |
+| XXIV | Migrations Before Container Restart — alembic upgrade head runs as docker compose run before docker compose up | ☐ Pass / ☐ N/A | |
+| XXV | Automatic Rollback on Healthcheck Failure — pipeline snapshots images and restores on failure; no manual step | ☐ Pass / ☐ N/A | |
+| XXVI | VPS-Only Secrets — only VPS_HOST, VPS_USER, VPS_SSH_KEY in GitHub Actions; .env lives on VPS only | ☐ Pass / ☐ N/A | |
+| XXVII | Validation Gates — ruff + docker build --no-cache run in CI before any VPS SSH connection | ☐ Pass / ☐ N/A | |
+| XXVIII | CI Tests Use SQLite + mongomock + AUTH_MODE=local — no real PG/Mongo/Keycloak in CI | ☐ Pass / ☐ N/A | |
 
 > Any row marked as a violation MUST be documented in the Complexity Tracking table below
 > with justification, or resolved before merge.

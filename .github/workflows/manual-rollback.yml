@@ -1,0 +1,121 @@
+name: Manual Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Service to roll back (choose 'all' to restore every service simultaneously)"
+        required: true
+        type: choice
+        options:
+          - uim-backend
+          - tm-backend
+          - orchestrator
+          - context-distiller
+          - agent-dispatcher
+          - agent-tools
+          - uim-frontend
+          - tm-frontend
+          - nginx
+          - all
+      reason:
+        description: "Reason for rollback — appears permanently in the audit log (e.g. 'regression in ticket search reported by user')"
+        required: true
+        type: string
+
+jobs:
+  rollback:
+    name: Rollback ${{ inputs.service }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Audit log
+        env:
+          ROLLBACK_SERVICE: ${{ inputs.service }}
+          ROLLBACK_REASON: ${{ inputs.reason }}
+        run: |
+          echo "========================================================"
+          echo "MANUAL ROLLBACK AUDIT RECORD"
+          echo "  Actor:     ${{ github.actor }}"
+          echo "  Timestamp: ${{ github.run_started_at }}"
+          echo "  Run URL:   ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "  Service:   $ROLLBACK_SERVICE"
+          echo "  Reason:    $ROLLBACK_REASON"
+          echo "========================================================"
+
+      - name: Execute rollback via SSH
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17  # v1.2.0
+        env:
+          TARGET_SERVICE: ${{ inputs.service }}
+          ROLLBACK_REASON: ${{ inputs.reason }}
+          TRIGGERED_BY: ${{ github.actor }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: TARGET_SERVICE,ROLLBACK_REASON,TRIGGERED_BY
+          script: |
+            set -euo pipefail
+            cd /app/dark-factory
+
+            COMPOSE="docker compose -f infra/docker-compose.yml"
+            FAILED=0
+
+            compose_name() {
+              case "$1" in
+                uim-backend)       echo "user-input-manager" ;;
+                tm-backend)        echo "ticket-manager" ;;
+                orchestrator)      echo "orchestrator" ;;
+                context-distiller) echo "context-distiller" ;;
+                agent-dispatcher)  echo "agent-dispatcher" ;;
+                agent-tools)       echo "agent-tools" ;;
+                uim-frontend)      echo "uim-frontend" ;;
+                tm-frontend)       echo "tm-frontend" ;;
+                nginx)             echo "nginx" ;;
+                *)                 echo "$1" ;;
+              esac
+            }
+
+            rollback_service() {
+              local SVC="$1"
+              local CSVC
+              CSVC=$(compose_name "$SVC")
+
+              echo "--- Rolling back ${SVC} (compose: ${CSVC}) ---"
+              echo "    Triggered by: ${TRIGGERED_BY}"
+              echo "    Reason:       ${ROLLBACK_REASON}"
+
+              ROLLBACK_TAG=$(docker images --format '{{.Tag}}' "dark-factory-${CSVC}" \
+                | grep '^rollback-' | sort -r | head -1 || true)
+
+              if [ -z "$ROLLBACK_TAG" ]; then
+                echo "    WARNING: No rollback snapshot found for ${CSVC} — skipping."
+                return 1
+              fi
+
+              echo "    Restoring from tag: ${ROLLBACK_TAG}"
+              docker tag "dark-factory-${CSVC}:${ROLLBACK_TAG}" "dark-factory-${CSVC}:latest"
+              $COMPOSE up -d "$CSVC"
+              echo "    ${SVC}: restored successfully"
+              return 0
+            }
+
+            if [ "$TARGET_SERVICE" = "all" ]; then
+              ALL_SVCS="uim-backend tm-backend orchestrator context-distiller agent-dispatcher agent-tools uim-frontend tm-frontend nginx"
+              for SVC in $ALL_SVCS; do
+                if ! rollback_service "$SVC"; then
+                  FAILED=1
+                fi
+              done
+            else
+              if ! rollback_service "$TARGET_SERVICE"; then
+                FAILED=1
+              fi
+            fi
+
+            if [ "$FAILED" -ne 0 ]; then
+              echo "=== Rollback completed with warnings (one or more services had no snapshot) ==="
+              exit 1
+            fi
+
+            echo "=== Rollback completed successfully ==="

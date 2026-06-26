@@ -138,7 +138,7 @@ For this project, treat `specs/001-monorepo-unification/spec.md` as the feature 
 
 Use only endpoints defined in `documentation/api-endpoints-agent-playbook.md`.
 
-Use Ticket Manager connection details provisioned by `project-administrator` in `credentials.json`.
+Use Ticket Manager connection details from `development/<agent_name>/credentials.json`. This file is either provisioned by `project-administrator` or placed directly by the operator before the agent runs.
 
 ### Credential format
 
