@@ -12,6 +12,12 @@ from src.services.fsm.engine import (
 )
 
 
+def test_agent_for_state_does_not_exist() -> None:
+    import src.services.fsm.engine as engine_module
+
+    assert not hasattr(engine_module, "AGENT_FOR_STATE"), "AGENT_FOR_STATE must be removed"
+
+
 def make_ticket(**kwargs) -> TmTicket:
     defaults = dict(
         id="t-1",
@@ -37,7 +43,7 @@ def test_needs_estimation_blocks_backlog():
     ticket = make_ticket(tags=["needs-estimation"], fsm_status="backlog")
     result = evaluate(ticket, {})
     assert result.action == "WAIT"
-    assert result.assigned_agent == "project_manager"
+    assert isinstance(result.candidate_agents, list)
     assert "needs-estimation" in result.blocked_reason
 
 
@@ -58,7 +64,7 @@ def test_other_type_blocks():
     ticket = make_ticket(ticket_type="other", fsm_status="triage")
     result = evaluate(ticket, {})
     assert result.action == "BLOCK"
-    assert result.assigned_agent == "project_manager"
+    assert isinstance(result.candidate_agents, list)
 
 
 def test_missing_type_blocks():
@@ -142,6 +148,34 @@ def test_invalid_skip_raises():
 def test_unknown_state_raises():
     with pytest.raises(FSMError):
         validate_transition("unknown_state", "specification", "feature")
+
+
+# ---------------------------------------------------------------------------
+# candidate_agents is always a list
+# ---------------------------------------------------------------------------
+
+
+def test_candidate_agents_is_list_on_advance():
+    ticket = make_ticket(ticket_type="feature", fsm_status="triage")
+    result = evaluate(ticket, {})
+    assert result.action == "ADVANCE"
+    assert isinstance(result.candidate_agents, list)
+
+
+def test_candidate_agents_empty_on_implementation_advance():
+    ticket = make_ticket(ticket_type="feature", fsm_status="architecture_review")
+    result = evaluate(ticket, {})
+    assert result.action == "ADVANCE"
+    assert result.to_state == "implementation"
+    assert isinstance(result.candidate_agents, list)
+
+
+def test_candidate_agents_empty_on_architecture_review():
+    ticket = make_ticket(ticket_type="feature", fsm_status="specification")
+    result = evaluate(ticket, {})
+    assert result.action == "ADVANCE"
+    assert result.to_state == "architecture_review"
+    assert isinstance(result.candidate_agents, list)
 
 
 # ---------------------------------------------------------------------------

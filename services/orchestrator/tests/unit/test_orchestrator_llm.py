@@ -67,6 +67,43 @@ def test_build_user_message_null_memory_note():
     assert "null" in msg.lower() or "no project memory" in msg.lower()
 
 
+def test_build_user_message_includes_registry_section():
+    ticket = sample_ticket()
+    ev = sample_eval(ticket)
+    registry_yaml = (
+        "version: '1.0'\nbrainstorm_project_template: 'df-{ticket_id}'\nagents:\n"
+        "  - role_id: backend\n    display_name: Backend\n    skill_file: b.md\n"
+        "    capabilities: [python_backend]\n    fsm_ownership: [implementation]\n"
+        "    preferred_for: []\n    brainstorm_also_for: []\n    brainstorm_role: contributor\n"
+    )
+    msg = _build_user_message(ticket, ev, None, [], {}, job_payload={"registry_yaml": registry_yaml})
+    assert "[AGENT REGISTRY]" in msg
+    assert "backend" in msg
+
+
+def test_build_user_message_no_registry_section_when_empty():
+    ticket = sample_ticket()
+    ev = sample_eval(ticket)
+    msg = _build_user_message(ticket, ev, None, [], {}, job_payload={})
+    assert "[AGENT REGISTRY]" not in msg
+
+
+# ---------------------------------------------------------------------------
+# SEC-T10: system prompt contains injection-hardening instructions
+# ---------------------------------------------------------------------------
+
+
+def test_system_prompt_contains_injection_hardening():
+    from src.services.llm.orchestrator_llm import _SYSTEM_PROMPT
+
+    assert "user-supplied" in _SYSTEM_PROMPT.lower(), (
+        "System prompt must note that [TICKET] section is user-supplied content"
+    )
+    assert "reference data" in _SYSTEM_PROMPT.lower(), (
+        "System prompt must note that [AGENT REGISTRY] section is reference data"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Response parsing
 # ---------------------------------------------------------------------------
@@ -148,7 +185,7 @@ async def test_call_orchestrator_llm_api_error():
 
     with patch("src.services.llm.orchestrator_llm.AsyncOpenAI", return_value=mock_client):
         with pytest.raises(UpstreamError, match="LLM unavailable"):
-            await call_orchestrator_llm(ticket, ev, None, [], {})
+            await call_orchestrator_llm(ticket, ev, None, [], {}, job_payload={})
 
 
 @pytest.mark.asyncio
@@ -164,4 +201,4 @@ async def test_call_orchestrator_llm_bad_json():
 
     with patch("src.services.llm.orchestrator_llm.AsyncOpenAI", return_value=mock_client):
         with pytest.raises(UpstreamError, match="non-JSON"):
-            await call_orchestrator_llm(ticket, ev, None, [], {})
+            await call_orchestrator_llm(ticket, ev, None, [], {}, job_payload={})

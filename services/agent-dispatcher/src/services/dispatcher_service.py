@@ -37,14 +37,18 @@ def _resolve_prompt_path(agent_prompts_dir: str, agent_id: str) -> Path:
     return prompt_path
 
 
-def _strip_service_jwt(text: str, jwt_value: str) -> str:
-    """Remove the service JWT from captured agent output before storage."""
-    if not jwt_value:
-        return text
-    return text.replace(jwt_value, "[SERVICE_JWT_REDACTED]")
+def _strip_service_jwt(text: str, jwt_value: str, extra_secret: str = "") -> str:
+    """Remove the service JWT and any extra secret from captured agent output before storage."""
+    if jwt_value:
+        text = text.replace(jwt_value, "[SERVICE_JWT_REDACTED]")
+    if extra_secret:
+        text = text.replace(extra_secret, "[CREDENTIAL_REDACTED]")
+    return text
 
 
 async def process_ticket(ticket: Any, db: AsyncSession) -> None:
+    from src.services.capability_registry import get_registry
+
     settings = get_settings()
     agent_id = ticket.assigned_agent
     ticket_id = ticket.id
@@ -52,17 +56,24 @@ async def process_ticket(ticket: Any, db: AsyncSession) -> None:
 
     repo = AgentRunRepository(db)
     reporter = Reporter()
+    registry = get_registry()
 
     if await repo.has_running(ticket_id):
         logger.info("Skipping ticket with active run", ticket_id=ticket_id)
         return
 
-    needs_brainstorm = getattr(ticket, "fsm_status", "") == "architecture_review" and getattr(
-        ticket, "ticket_type", ""
-    ) in ("feature", "improvement")
+    fsm_status = getattr(ticket, "fsm_status", "")
+    ticket_type = getattr(ticket, "ticket_type", "")
+    needs_brainstorm = fsm_status == "architecture_review" and ticket_type in (
+        "feature",
+        "improvement",
+    )
 
     if needs_brainstorm:
-        await _run_brainstorm(ticket, db, repo, reporter, settings)
+        participants = [p.role_id for p in registry.get_brainstorm_participants(fsm_status)]
+        await _run_brainstorm(
+            ticket, db, repo, reporter, settings, participants=participants, registry=registry
+        )
         return
 
     try:
@@ -86,6 +97,7 @@ async def process_ticket(ticket: Any, db: AsyncSession) -> None:
                 status="needs_review",
                 tm_comment=f"Invalid or unknown agent '{agent_id}'",
             ),
+            registry=registry,
         )
         return
 
@@ -108,6 +120,7 @@ async def process_ticket(ticket: Any, db: AsyncSession) -> None:
                 status="needs_review",
                 tm_comment=f"No prompt file found for agent '{agent_id}'",
             ),
+            registry=registry,
         )
         return
 
@@ -129,6 +142,8 @@ async def process_ticket(ticket: Any, db: AsyncSession) -> None:
     runner = get_runner()
     system_prompt = prompt_path.read_text(encoding="utf-8")
 
+    agent_password = await _write_credentials(agent_id, settings, registry)
+
     try:
         exit_code, stdout = await asyncio.wait_for(
             runner.run(agent_id, system_prompt, context_str, timeout),
@@ -145,10 +160,11 @@ async def process_ticket(ticket: Any, db: AsyncSession) -> None:
                 status="needs_review",
                 tm_comment="Agent run timed out",
             ),
+            registry=registry,
         )
         return
 
-    safe_stdout = _strip_service_jwt(stdout, service_jwt)
+    safe_stdout = _strip_service_jwt(stdout, service_jwt, agent_password)
 
     if exit_code != 0:
         result = parse_result(safe_stdout)
@@ -164,6 +180,7 @@ async def process_ticket(ticket: Any, db: AsyncSession) -> None:
             ticket_id=ticket_id,
             project_id=project_id,
             result=result,
+            registry=registry,
         )
         return
 
@@ -179,7 +196,58 @@ async def process_ticket(ticket: Any, db: AsyncSession) -> None:
         ticket_id=ticket_id,
         project_id=project_id,
         result=result,
+        registry=registry,
     )
+
+
+async def _write_credentials(role_id: str, settings: Any, registry: Any) -> str:
+    """Write credentials.json to development/{role_id}/ before agent spawn.
+
+    Returns the per-agent password (empty string on failure) so the caller
+    can redact it from captured agent stdout before storage.
+    """
+    import json
+    import os
+
+    from src.core.keycloak_client import get_kc_client
+
+    # 1. Whitelist guard — same pattern as _resolve_prompt_path
+    if role_id not in _VALID_AGENT_IDS:
+        logger.warning("Credentials write rejected: unknown role_id %r", role_id)
+        return ""
+
+    try:
+        # 2. Build and verify path stays inside development/
+        dev_dir = Path(settings.agent_prompts_dir).resolve().parent
+        creds_path = (dev_dir / role_id / "credentials.json").resolve()
+        if not str(creds_path).startswith(str(dev_dir)):
+            logger.warning("Path traversal detected for credentials, role_id=%r", role_id)
+            return ""
+
+        token = await get_kc_client().get_token()
+
+        # 3. Per-agent password from env (backward-compat with skill files using email+password)
+        env_key = f"AGENT_PASSWORD_{role_id.upper().replace('-', '_')}"
+        password = os.environ.get(env_key, "")
+
+        creds = {
+            "host": settings.ticket_manager_base_url,
+            "username": f"{role_id}@agents.miveralta.ru",
+            "password": password,
+            "token": token,
+        }
+
+        # 4. Write with restricted permissions (0600 file, 0700 dir)
+        creds_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        fd = os.open(str(creds_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
+            json.dump(creds, f, indent=2)
+
+        logger.info("Credentials written for role_id=%s", role_id)
+        return password
+    except Exception as exc:
+        logger.warning("Failed to write credentials for role_id=%r: %s", role_id, exc)
+        return ""
 
 
 async def _run_brainstorm(
@@ -188,17 +256,20 @@ async def _run_brainstorm(
     repo: AgentRunRepository,
     reporter: Reporter,
     settings: Any,
+    participants: list[str] | None = None,
+    registry: Any = None,
 ) -> None:
     from src.services.brainstorm_coordinator import BrainstormCoordinator
 
     runner = get_runner()
     coordinator = BrainstormCoordinator(runner)
-    data = await coordinator.run_brainstorm(ticket, db)
+    data = await coordinator.run_brainstorm(ticket, db, participants=participants)
     result = aggregate_brainstorm(data)
     await reporter.report_result(
         ticket_id=ticket.id,
         project_id=ticket.project_id,
         result=result,
+        registry=registry,
     )
 
 

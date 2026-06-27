@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
-from typing import Optional
+from pathlib import Path
 
-from pydantic import AnyHttpUrl, Field
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -43,8 +43,11 @@ class Settings(BaseSettings):
     poll_interval_seconds: int = 10
 
     # Brainstorm
-    brainstorm_agents: str = "software_architect,security_architect"
+    brainstorm_agents: str = "software-architect,security-architect"
     brainstorm_max_rounds: int = 3
+
+    # Agent registry
+    agent_registry_path: str = ""  # override path; empty = use resolved_registry_path
 
     # Context
     context_max_tokens: int = 4000
@@ -72,6 +75,12 @@ class Settings(BaseSettings):
             except ValueError:
                 pass
         return self.agent_timeout_default
+
+    @property
+    def resolved_registry_path(self) -> str:
+        if self.agent_registry_path:
+            return self.agent_registry_path
+        return str(Path(self.agent_prompts_dir).parent / "registry.yaml")
 
     @property
     def brainstorm_agents_list(self) -> list[str]:

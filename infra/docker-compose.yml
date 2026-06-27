@@ -312,17 +312,20 @@ services:
       CONTEXT_DISTILLER_BASE_URL: ${DISPATCHER_DISTILLER_URL:-http://context-distiller:8000}
       AGENT_RUNNER_MODE: ${AGENT_RUNNER_MODE:-claude_code}
       AGENT_PROMPTS_DIR: ${AGENT_PROMPTS_DIR:-/app/prompts}
+      AGENT_REGISTRY_PATH: ${AGENT_REGISTRY_PATH:-/app/registry.yaml}
       POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-10}
       WORKER_MAX_CONCURRENT_RUNS: ${WORKER_MAX_CONCURRENT_RUNS:-3}
       AGENT_TIMEOUT_DEFAULT: ${AGENT_TIMEOUT_DEFAULT:-300}
       BRAINSTORM_MAX_ROUNDS: ${BRAINSTORM_MAX_ROUNDS:-3}
-      BRAINSTORM_AGENTS: ${BRAINSTORM_AGENTS:-software_architect,security_architect}
+      BRAINSTORM_AGENTS: ${BRAINSTORM_AGENTS:-software-architect,security-architect}
       CONTEXT_MAX_TOKENS: ${CONTEXT_MAX_TOKENS:-6000}
       OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       CORS_ALLOW_ORIGINS: '["http://localhost"]'
       ENVIRONMENT: production
+    volumes:
+      - ../development/agents/registry.yaml:/app/registry.yaml:ro
     depends_on:
       postgres:
         condition: service_healthy

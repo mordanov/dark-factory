@@ -57,20 +57,6 @@ GATES_REQUIRED: dict[str, list[str]] = {
     "done": [],  # devops confirms
 }
 
-# Which agent is responsible for each state transition
-AGENT_FOR_STATE: dict[str, str] = {
-    "triage": "project_manager",
-    "specification": "project_manager",
-    "architecture_review": "software_architect",
-    "implementation": "backend",  # may also involve frontend/designer (parallel)
-    "code_review": "code_reviewer",
-    "security_review": "security_architect",
-    "testing": "autotester",
-    "release": "devops",
-    "done": "devops",
-}
-
-
 # ---------------------------------------------------------------------------
 # Dataclass for FSM evaluation result
 # ---------------------------------------------------------------------------
@@ -83,7 +69,7 @@ class FSMEvaluation:
     action: str  # ADVANCE | BLOCK | WAIT | GENERATE_ADR
     from_state: str | None
     to_state: str | None
-    assigned_agent: str | None
+    candidate_agents: list[str]  # role IDs that own to_state (registry lookup in dispatcher)
     blocked_reason: str | None
     gates_to_evaluate: list[str]  # Gates the orchestrator LLM must evaluate
     generate_adr: bool  # True if architecture_review just passed
@@ -111,7 +97,7 @@ def evaluate(ticket: TmTicket, dependency_statuses: dict[str, str]) -> FSMEvalua
             action="WAIT",
             from_state=current,
             to_state=None,
-            assigned_agent="project_manager",
+            candidate_agents=[],
             blocked_reason="Awaiting team estimation — needs-estimation tag present",
             gates_to_evaluate=[],
             generate_adr=False,
@@ -126,7 +112,7 @@ def evaluate(ticket: TmTicket, dependency_statuses: dict[str, str]) -> FSMEvalua
             action="BLOCK",
             from_state=current,
             to_state=None,
-            assigned_agent="project_manager",
+            candidate_agents=[],
             blocked_reason=f"ticket_type is '{ticket_type or 'missing'}' — triage incomplete",
             gates_to_evaluate=[],
             generate_adr=False,
@@ -144,7 +130,7 @@ def evaluate(ticket: TmTicket, dependency_statuses: dict[str, str]) -> FSMEvalua
             action="WAIT",
             from_state=current,
             to_state=None,
-            assigned_agent=None,
+            candidate_agents=[],
             blocked_reason=reason,
             gates_to_evaluate=[],
             generate_adr=False,
@@ -158,7 +144,7 @@ def evaluate(ticket: TmTicket, dependency_statuses: dict[str, str]) -> FSMEvalua
             action="WAIT",
             from_state=current,
             to_state=None,
-            assigned_agent=None,
+            candidate_agents=[],
             blocked_reason=None,
             gates_to_evaluate=[],
             generate_adr=False,
@@ -178,7 +164,7 @@ def evaluate(ticket: TmTicket, dependency_statuses: dict[str, str]) -> FSMEvalua
             action="WAIT",
             from_state=current,
             to_state=None,
-            assigned_agent=None,
+            candidate_agents=[],
             blocked_reason=None,
             gates_to_evaluate=[],
             generate_adr=False,
@@ -193,7 +179,6 @@ def evaluate(ticket: TmTicket, dependency_statuses: dict[str, str]) -> FSMEvalua
     if ticket_type == "bugfix" and "architecture_consistency" in gates:
         gates.remove("architecture_consistency")
 
-    agent = AGENT_FOR_STATE.get(to_state, "project_manager")
     generate_adr = current == "architecture_review" and ticket_type != "bugfix"
     distill_trigger = to_state == TERMINAL_STATE
 
@@ -201,7 +186,7 @@ def evaluate(ticket: TmTicket, dependency_statuses: dict[str, str]) -> FSMEvalua
         action="ADVANCE",
         from_state=current,
         to_state=to_state,
-        assigned_agent=agent,
+        candidate_agents=[],  # registry lookup happens in agent-dispatcher, not here
         blocked_reason=None,
         gates_to_evaluate=gates,
         generate_adr=generate_adr,

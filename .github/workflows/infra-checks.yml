@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - 'infra/**'
+      - 'development/**'
       - '.github/workflows/infra-checks.yml'
   pull_request:
     paths:
       - 'infra/**'
+      - 'development/**'
       - '.github/workflows/infra-checks.yml'
 
 jobs:
@@ -31,3 +33,18 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check compose YAML parses
         run: python3 -c "import yaml,sys; yaml.safe_load(open('infra/docker-compose.yml')); print('YAML valid')"
+
+  no-credentials-tracked:
+    name: credentials.json must not be tracked in git (T-08 / NFR-06)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail if any credentials.json is tracked
+        run: |
+          TRACKED=$(git ls-files 'development/**/credentials.json' 'development/*/credentials.json')
+          if [ -n "$TRACKED" ]; then
+            echo "ERROR: credentials.json file(s) found in git index — these must never be committed (NFR-06)"
+            echo "$TRACKED"
+            exit 1
+          fi
+          echo "OK: no credentials.json files tracked in git"

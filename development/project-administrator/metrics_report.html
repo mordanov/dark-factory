@@ -17,28 +17,28 @@
 </head>
 <body>
 <h1>Agent Metrics Report — auth-app</h1>
-<p class="generated">Generated: 2026-06-25 12:32 UTC</p>
+<p class="generated">Generated: 2026-06-26 23:11 UTC</p>
 
 <div class="summary-box">
-  <strong>Total events:</strong> 226 &nbsp;|&nbsp;
-  <strong>Total time:</strong> 179,437s &nbsp;|&nbsp;
-  <strong>Total tokens:</strong> 3,098,800
+  <strong>Total events:</strong> 252 &nbsp;|&nbsp;
+  <strong>Total time:</strong> 31,756,100s &nbsp;|&nbsp;
+  <strong>Total tokens:</strong> 3,910,800
 </div>
 
 <h2>By Agent</h2>
 <table>
 <tr><th>Agent</th><th>Tasks</th><th>Time (s)</th><th>Tokens</th></tr>
-<tr><td>autotester</td><td>31</td><td>26580</td><td>573,000</td></tr>
-<tr><td>backend</td><td>56</td><td>30540</td><td>470,400</td></tr>
-<tr><td>code-reviewer</td><td>22</td><td>16431</td><td>313,500</td></tr>
-<tr><td>designer</td><td>14</td><td>4192</td><td>89,900</td></tr>
+<tr><td>autotester</td><td>33</td><td>37380</td><td>743,000</td></tr>
+<tr><td>backend</td><td>59</td><td>50700</td><td>760,400</td></tr>
+<tr><td>code-reviewer</td><td>24</td><td>20031</td><td>403,500</td></tr>
+<tr><td>designer</td><td>16</td><td>5032</td><td>113,900</td></tr>
 <tr><td>development</td><td>2</td><td>11220</td><td>93,500</td></tr>
-<tr><td>devops</td><td>33</td><td>32700</td><td>608,400</td></tr>
-<tr><td>frontend</td><td>13</td><td>18840</td><td>330,000</td></tr>
-<tr><td>product-manager</td><td>10</td><td>15060</td><td>220,500</td></tr>
-<tr><td>project-administrator</td><td>7</td><td>750</td><td>22,100</td></tr>
-<tr><td>security-architect</td><td>25</td><td>13224</td><td>163,300</td></tr>
-<tr><td>software-architect</td><td>13</td><td>9900</td><td>214,200</td></tr>
+<tr><td>devops</td><td>37</td><td>35100</td><td>714,400</td></tr>
+<tr><td>frontend</td><td>15</td><td>23640</td><td>354,000</td></tr>
+<tr><td>product-manager</td><td>12</td><td>15900</td><td>237,500</td></tr>
+<tr><td>project-administrator</td><td>10</td><td>1290</td><td>49,100</td></tr>
+<tr><td>security-architect</td><td>29</td><td>15024</td><td>203,300</td></tr>
+<tr><td>software-architect</td><td>15</td><td>31540783</td><td>238,200</td></tr>
 </table>
 
 <h2>By Feature</h2>
@@ -48,7 +48,8 @@
 <tr><td>002-agent-dispatcher</td><td>24</td><td>43693</td><td>695,700</td></tr>
 <tr><td>003-planning-agent</td><td>51</td><td>15210</td><td>290,000</td></tr>
 <tr><td>004-keycloak-iam-migration</td><td>66</td><td>69300</td><td>1,131,900</td></tr>
-<tr><td>005-github-actions-cicd</td><td>45</td><td>16194</td><td>400,000</td></tr>
+<tr><td>005-github-actions-cicd</td><td>46</td><td>16434</td><td>406,500</td></tr>
+<tr><td>006-capability-registry</td><td>25</td><td>31576423</td><td>805,500</td></tr>
 <tr><td>FR-008-zustand-auth-migration</td><td>1</td><td>7200</td><td>85,000</td></tr>
 <tr><td>FR-009-frontend-test-standardisation</td><td>2</td><td>2100</td><td>25,000</td></tr>
 </table>
@@ -286,6 +287,32 @@
 <tr><td>2026-06-25T12:31:16</td><td>code-reviewer</td><td>005-github-actions-cicd</td><td>T001-T015-review-final</td><td>Re-review after all blocker fixes confirmed. Final decision: APPROVED WITH COMMENTS. GITH-005-0003 DONE.</td><td>300</td><td>5000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>self-reported</td><td>completed</td><td></td></tr>
 <tr><td>2026-06-25T12:31:16</td><td>autotester</td><td>005-github-actions-cicd</td><td>T-QA-004</td><td>Final verification and quality report correction v4: B1+B2 confirmed resolved, GO WITH TRACKED RISKS restored.</td><td>900</td><td>12000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>self-reported</td><td>completed</td><td></td></tr>
 <tr><td>2026-06-25T12:31:16</td><td>autotester</td><td>005-github-actions-cicd</td><td>T-QA-005</td><td>Closed TM tickets GITH-005-0007 and GITH-005-0008 per close-ticket-request. Final GO WITH TRACKED RISKS.</td><td>120</td><td>1500</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>self-reported</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-25T12:32:24</td><td>project-administrator</td><td>005-github-actions-cicd</td><td>PA-CLOSE</td><td>Reconcile 22 task-metrics from inbox, record all in DB, add README.md feature 005 entry, generate HTML report</td><td>240</td><td>6500</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>self-reported</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-26T22:10:15</td><td>project-administrator</td><td>006-capability-registry</td><td>PA-INIT</td><td>Project Administrator startup: DB init, brainstorm join, TM bootstrap, agent credential validation</td><td>120</td><td>8500</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>self-reported</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-26T22:11:50</td><td>product-manager</td><td>006-capability-registry</td><td>T-PM-01</td><td>Define scope, priorities, acceptance criteria, milestone order; create spec.md; broadcast task breakdown to all 10 agents; assign tasks to software-architect, security-architect, backend, devops, code-reviewer, autotester; store spec/constitution/specify-prompt resources in brainstorm</td><td>420</td><td>8500</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-26T22:13:54</td><td>designer</td><td>006-capability-registry</td><td>CAPA-006-0001</td><td>UX guidance: operator-facing error messages and log format standards for capability registry</td><td>420</td><td>12000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-26T22:15:34</td><td>devops</td><td>006-capability-registry</td><td>DEVOPS-001</td><td>Update .gitignore verification, docker-compose volume mount for registry.yaml, AGENT_REGISTRY_PATH env var, fix BRAINSTORM_AGENTS to hyphenated IDs, create quickstart.md</td><td>900</td><td>45000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-26T22:16:27</td><td>security-architect</td><td>006-capability-registry</td><td>SEC-GUARDRAILS-001</td><td>Security guardrails for 006: threat model (10 threats), 12 required security tests, implementation guidance for credentials.json, prompt injection, path traversal, token lifecycle</td><td>600</td><td>15000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-26T22:17:49</td><td>devops</td><td>006-capability-registry</td><td>DEVOPS-002</td><td>Add CI security check per T-08: no-credentials-tracked job in infra-checks.yml; expand workflow trigger paths to include development/**</td><td>300</td><td>8000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-26T22:18:08</td><td>software-architect</td><td>006-capability-registry</td><td>ARCH-001</td><td>Architecture notes: OQ-01/OQ-02 resolved, system boundaries, API contracts, ADRs, delivery sequence, security guardrails</td><td>31530288</td><td>12000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>self-reported</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-26T22:20:27</td><td>security-architect</td><td>006-capability-registry</td><td>SEC-ARCH-SIGNOFF-001</td><td>Architecture §8 sign-off: reviewed 5 security items, reconciled credentials format, updated security-guardrails.md addendum</td><td>300</td><td>5000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-26T22:26:26</td><td>backend</td><td>006-capability-registry</td><td>T001-T031</td><td>Implemented Agent Capability Registry (US1-US4): registry.yaml, CapabilityRegistry class, FSM engine migration (candidate_agents), agent_selector, registry delivery to orchestrator, brainstorm participant discovery, credentials writing</td><td>14400</td><td>180000</td><td>claude-sonnet-4-6</td><td>self-reported</td><td>completed</td><td>BUG-001 fixed; 142 tests passing (70 orchestrator + 72 dispatcher); 100% coverage on capability_registry.py and agent_selector.py; all lint clean</td></tr>
+<tr><td>2026-06-26T22:27:58</td><td>autotester</td><td>006-capability-registry</td><td>T-AT-01</td><td>Build and run unit tests for capability-registry feature: test_capability_registry.py (18 tests, 100% cov), test_agent_selector.py (13 tests, 100% cov), test_fsm_engine.py additions. Total 142 tests passing.</td><td>5400</td><td>85000</td><td>claude-sonnet-4-6</td><td>self-reported</td><td>completed</td><td>BUG-001 found (structlog kwargs in agent_selector.py) and resolved by backend. All coverage gates met: capability_registry.py=100%, agent_selector.py=100%.</td></tr>
+<tr><td>2026-06-26T22:47:48</td><td>frontend</td><td>006-capability-registry</td><td>T-FRONTEND-STANDBY</td><td>Frontend standby: monitored project channel, confirmed no frontend changes needed for 006-capability-registry feature</td><td>2400</td><td>12000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-26T23:02:23</td><td>backend</td><td>006-capability-registry</td><td>SEC-T01-SEC-T12</td><td>Security fixes: path traversal guard + 0600 file perms + additive credentials format + stdout token scrubbing + brainstorm_project_template validation + prompt injection hardening in orchestrator_llm and agent_selector system prompts</td><td>3600</td><td>45000</td><td>claude-sonnet-4-6</td><td>self-reported</td><td>completed</td><td>150 tests passing; all SEC-T01 through SEC-T12 blockers addressed; security-guardrails checklist satisfied</td></tr>
+<tr><td>2026-06-26T23:03:47</td><td>code-reviewer</td><td>006-capability-registry</td><td>T-CR-01</td><td>Code review for 006-capability-registry: reviewed all M1-M5 deliverables, published findings as resource:code-review-findings, APPROVED WITH COMMENTS</td><td>1800</td><td>45000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>self-reported</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-26T23:08:42</td><td>backend</td><td>006-capability-registry</td><td>BACKEND-IMPL-002</td><td>Backend security hardening: path traversal fix, stdout token redaction, prompt injection hardening, SHA-256 registry hash, 150 tests passing</td><td>2160</td><td>65000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-26T23:08:45</td><td>code-reviewer</td><td>006-capability-registry</td><td>T-CR-01</td><td>Code review M1-M5: 0 blockers, 1 major (fallback candidate scope), 2 minor findings, all 15 ACs pass, APPROVED WITH COMMENTS</td><td>1800</td><td>45000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-26T23:09:25</td><td>product-manager</td><td>006-capability-registry</td><td>T-PM-01</td><td>Define scope, priorities, ACs, milestone order; create spec.md; broadcast task breakdown; store resources</td><td>420</td><td>8500</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-26T23:09:25</td><td>designer</td><td>006-capability-registry</td><td>CAPA-006-0001</td><td>UX guidance: operator-facing error messages and log format standards (10 UX ACs)</td><td>420</td><td>12000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-26T23:09:25</td><td>devops</td><td>006-capability-registry</td><td>DEVOPS-001</td><td>gitignore verify, docker-compose volume mount, AGENT_REGISTRY_PATH env, fix BRAINSTORM_AGENTS hyphenated, quickstart.md</td><td>900</td><td>45000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-26T23:09:25</td><td>security-architect</td><td>006-capability-registry</td><td>SEC-GUARDRAILS-001</td><td>Security guardrails: threat model (10 threats), 12 required security tests, credentials/prompt injection/path traversal guidance</td><td>600</td><td>15000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-26T23:09:25</td><td>devops</td><td>006-capability-registry</td><td>DEVOPS-002</td><td>CI security check: no-credentials-tracked job in infra-checks.yml; expand workflow trigger paths</td><td>300</td><td>8000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-26T23:09:25</td><td>software-architect</td><td>006-capability-registry</td><td>ARCH-001</td><td>Architecture notes: OQ-01/OQ-02 resolved, system boundaries, API contracts, ADRs, delivery sequence</td><td>595</td><td>12000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-26T23:09:25</td><td>security-architect</td><td>006-capability-registry</td><td>SEC-ARCH-SIGNOFF-001</td><td>Architecture §8 sign-off: 5 security items reviewed and reconciled, credentials format confirmed</td><td>300</td><td>5000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-26T23:09:25</td><td>autotester</td><td>006-capability-registry</td><td>T-AT-01</td><td>Built and ran all unit tests: 142 tests (72 dispatcher + 70 orchestrator), 100% coverage, BUG-001 found and fixed</td><td>5400</td><td>85000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-26T23:09:25</td><td>frontend</td><td>006-capability-registry</td><td>T-FRONTEND-STANDBY</td><td>Frontend standby: monitored channel, confirmed no frontend changes needed</td><td>2400</td><td>12000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>estimated</td><td>completed</td><td></td></tr>
+<tr><td>2026-06-26T23:10:02</td><td>project-administrator</td><td>006-capability-registry</td><td>PA-RECONCILE-001</td><td>Inbox reconciliation: recorded 11 agent task-metrics, transitioned 4 TM tickets to DONE, accepted backend handoff, generated HTML report</td><td>180</td><td>12000</td><td>bedrock/anthropic.claude-sonnet-4-6</td><td>self-reported</td><td>completed</td><td></td></tr>
 </table>
 </body>
 </html>

@@ -1,0 +1,215 @@
+version: "1.0"
+brainstorm_project_template: "df-{ticket_id}"
+
+agents:
+  - role_id: product-manager
+    display_name: Product Manager
+    skill_file: product-manager.md
+    coordinator: false
+    capabilities:
+      - product_planning
+      - requirements_gathering
+      - ticket_triage
+      - stakeholder_communication
+      - acceptance_criteria
+    fsm_ownership:
+      - triage
+      - specification
+    preferred_for:
+      - requirements
+      - spec
+      - user_story
+      - product
+      - triage
+    brainstorm_also_for: []
+    brainstorm_role: contributor
+
+  - role_id: software-architect
+    display_name: Software Architect
+    skill_file: software-architect.md
+    coordinator: true
+    capabilities:
+      - system_design
+      - architecture_review
+      - adr_authoring
+      - technology_selection
+      - api_design
+    fsm_ownership:
+      - architecture_review
+    preferred_for:
+      - architecture
+      - design
+      - system
+      - scalability
+      - api_design
+    brainstorm_also_for: []
+    brainstorm_role: coordinator
+
+  - role_id: security-architect
+    display_name: Security Architect
+    skill_file: security-architect.md
+    coordinator: false
+    capabilities:
+      - threat_modeling
+      - security_review
+      - vulnerability_assessment
+      - auth_design
+      - compliance
+    fsm_ownership:
+      - security_review
+    preferred_for:
+      - security
+      - auth
+      - vulnerability
+      - threat
+      - compliance
+    brainstorm_also_for:
+      - architecture_review
+    brainstorm_role: contributor
+
+  - role_id: code-reviewer
+    display_name: Code Reviewer
+    skill_file: code-reviewer.md
+    coordinator: false
+    capabilities:
+      - code_review
+      - static_analysis
+      - best_practices
+      - performance_review
+      - test_coverage
+    fsm_ownership:
+      - code_review
+    preferred_for:
+      - review
+      - quality
+      - coverage
+      - refactor
+    brainstorm_also_for: []
+    brainstorm_role: contributor
+
+  - role_id: project-administrator
+    display_name: Project Administrator
+    skill_file: project-administrator.md
+    coordinator: false
+    capabilities:
+      - project_management
+      - metrics_tracking
+      - team_coordination
+      - process_improvement
+    fsm_ownership: []
+    preferred_for:
+      - admin
+      - metrics
+      - coordination
+    brainstorm_also_for: []
+    brainstorm_role: contributor
+
+  - role_id: backend
+    display_name: Backend Developer Python
+    skill_file: backend-developer-python.md
+    coordinator: false
+    capabilities:
+      - python_backend
+      - fastapi
+      - database_migrations
+      - api_implementation
+      - postgresql
+    fsm_ownership:
+      - implementation
+    preferred_for:
+      - python
+      - api
+      - database
+      - migration
+      - backend
+      - postgresql
+      - fastapi
+    brainstorm_also_for: []
+    brainstorm_role: contributor
+
+  - role_id: frontend
+    display_name: Frontend Developer React
+    skill_file: frontend-developer-react.md
+    coordinator: false
+    capabilities:
+      - react
+      - typescript
+      - ui_components
+      - state_management
+      - vite
+    fsm_ownership:
+      - implementation
+    preferred_for:
+      - react
+      - frontend
+      - ui
+      - component
+      - typescript
+      - css
+    brainstorm_also_for: []
+    brainstorm_role: contributor
+
+  - role_id: designer
+    display_name: UI/UX Designer
+    skill_file: designer.md
+    coordinator: false
+    capabilities:
+      - ui_design
+      - ux_design
+      - wireframing
+      - design_systems
+      - accessibility
+    fsm_ownership:
+      - implementation
+    preferred_for:
+      - design
+      - ux
+      - wireframe
+      - accessibility
+      - figma
+    brainstorm_also_for: []
+    brainstorm_role: contributor
+
+  - role_id: autotester
+    display_name: Autotester
+    skill_file: autotester.md
+    coordinator: false
+    capabilities:
+      - test_automation
+      - integration_testing
+      - e2e_testing
+      - test_planning
+      - coverage_analysis
+    fsm_ownership:
+      - testing
+    preferred_for:
+      - test
+      - qa
+      - coverage
+      - e2e
+      - integration_test
+    brainstorm_also_for: []
+    brainstorm_role: contributor
+
+  - role_id: devops
+    display_name: DevOps Engineer
+    skill_file: devops.md
+    coordinator: false
+    capabilities:
+      - ci_cd
+      - docker
+      - kubernetes
+      - infrastructure
+      - monitoring
+    fsm_ownership:
+      - release
+      - done
+    preferred_for:
+      - deploy
+      - docker
+      - ci
+      - infrastructure
+      - release
+      - kubernetes
+    brainstorm_also_for: []
+    brainstorm_role: contributor
