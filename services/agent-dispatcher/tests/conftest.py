@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os as _os
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
 
@@ -12,8 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from src.core.config import Settings
 from src.db.session import Base
 from src.main import create_app
-
-import os as _os
 
 TEST_DATABASE_URL = _os.environ.get(
     "DATABASE_URL",
