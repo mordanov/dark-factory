@@ -47,7 +47,10 @@ async def test_returns_only_assigned_tickets(db_session):
             settings.orchestrator_base_url = "http://mock-orchestrator"
             mock_settings.return_value = settings
 
-            with patch("src.services.poller.create_service_token", return_value="jwt"):
+            with patch("src.services.poller.get_kc_client") as mock_kc:
+                mock_kc.return_value.async_auth_headers = AsyncMock(
+                    return_value={"Authorization": "Bearer jwt"}
+                )
                 from src.services.poller import poll_once
 
                 tickets = await poll_once(db_session)
@@ -99,7 +102,10 @@ async def test_filters_out_tickets_with_running_run(db_session):
             settings.orchestrator_base_url = "http://mock-orchestrator"
             mock_settings.return_value = settings
 
-            with patch("src.services.poller.create_service_token", return_value="jwt"):
+            with patch("src.services.poller.get_kc_client") as mock_kc:
+                mock_kc.return_value.async_auth_headers = AsyncMock(
+                    return_value={"Authorization": "Bearer jwt"}
+                )
                 from src.services.poller import poll_once
 
                 tickets = await poll_once(db_session)
@@ -124,7 +130,10 @@ async def test_handles_orchestrator_503_gracefully(db_session):
             settings.orchestrator_base_url = "http://mock-orchestrator"
             mock_settings.return_value = settings
 
-            with patch("src.services.poller.create_service_token", return_value="jwt"):
+            with patch("src.services.poller.get_kc_client") as mock_kc:
+                mock_kc.return_value.async_auth_headers = AsyncMock(
+                    return_value={"Authorization": "Bearer jwt"}
+                )
                 from src.services.poller import poll_once
 
                 tickets = await poll_once(db_session)
