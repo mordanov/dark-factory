@@ -1,0 +1,26 @@
+# kubernetes-dashboard Helm values for Dark Factory
+# Install with:
+#   helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/
+#   helm install kubernetes-dashboard kubernetes-dashboard/kubernetes-dashboard \
+#     -n kubernetes-dashboard --create-namespace \
+#     -f k8s/monitoring/kubernetes-dashboard-values.yaml
+
+app:
+  ingress:
+    enabled: false  # Managed by k8s/monitoring/kubernetes-dashboard-ingress.yaml
+
+nginx:
+  enabled: false  # NGINX Ingress Controller is cluster-wide (not per-chart)
+
+cert-manager:
+  enabled: false  # cert-manager installed cluster-wide via setup-k3s.sh
+
+# Expose the kong-proxy as ClusterIP only — access via Ingress
+kong:
+  proxy:
+    type: ClusterIP
+    http:
+      enabled: true
+      servicePort: 80
+    tls:
+      enabled: false  # TLS terminated at Ingress layer

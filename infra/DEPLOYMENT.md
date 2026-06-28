@@ -36,9 +36,9 @@ After the k3s migration, replace the three VPS SSH secrets with two k8s secrets:
 ### First-Time k3s Cluster Setup
 
 ```bash
-# 1. Copy and run setup script on VPS
-scp infra/scripts/setup-k3s.sh <user>@<vps-ip>:~/
-ssh <user>@<vps-ip> "bash setup-k3s.sh"
+# 1. Copy repo (or just the needed files) and run setup script on VPS
+scp -r infra/ k8s/ <user>@<vps-ip>:~/dark-factory/
+ssh <user>@<vps-ip> "bash ~/dark-factory/infra/scripts/setup-k3s.sh --dashboard-password <your-password>"
 
 # 2. Copy kubeconfig to local machine
 scp <user>@<vps-ip>:/etc/rancher/k3s/k3s.yaml ~/.kube/dark-factory-k3s.yaml
@@ -120,6 +120,7 @@ Before applying the Ingress, create DNS A records pointing to the VPS public IP:
 | `studio.dark-factory.local` | VPS public IP |
 | `tickets.dark-factory.local` | VPS public IP |
 | `grafana.dark-factory.local` | VPS public IP |
+| `k8s.dark-factory.local` | VPS public IP |
 
 ### Verify Health
 
@@ -183,6 +184,27 @@ kubectl create secret generic grafana-basic-auth \
   --from-literal=auth="$(htpasswd -nb admin <your-password>)" \
   -n monitoring
 ```
+
+---
+
+## Kubernetes Dashboard
+
+Installed and fully configured by `setup-k3s.sh --dashboard-password <password>` — no extra
+steps required. The script installs the Helm chart, applies RBAC and Ingress, and creates the
+basic-auth secret in one pass.
+
+After setup, retrieve the login token:
+
+```bash
+kubectl get secret dashboard-admin-token -n kubernetes-dashboard \
+  -o jsonpath='{.data.token}' | base64 -d
+```
+
+Open `https://k8s.dark-factory.local`, authenticate with basic-auth (user: `admin`, password
+as supplied to the script), then paste the token into the Dashboard login screen.
+
+> **Security note:** The basic-auth layer protects the Ingress path. The Dashboard itself
+> requires token login — two independent auth gates before any cluster state is visible.
 
 ---
 
