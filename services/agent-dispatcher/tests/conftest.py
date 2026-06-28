@@ -79,7 +79,7 @@ def _create_all_compat(conn):
                     col.type = JSON()
                 elif isinstance(col.type, UUID):
                     col.type = String(36)
-                elif isinstance(col.type, (PG_ARRAY, SA_ARRAY)):
+                elif isinstance(col.type, PG_ARRAY | SA_ARRAY):
                     col.type = JSON()
 
     event.listen(Base.metadata, "before_create", _before_create)
