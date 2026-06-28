@@ -36,18 +36,26 @@ After the k3s migration, replace the three VPS SSH secrets with two k8s secrets:
 ### First-Time k3s Cluster Setup
 
 ```bash
+# 0. Initialise the server — run once as root on a fresh VPS
+#    Creates a deploy user, installs your SSH key, disables root SSH login
+scp infra/scripts/init-server.sh root@<vps-ip>:~/
+ssh root@<vps-ip> "bash init-server.sh --user deploy --pubkey \"$(cat ~/.ssh/id_ed25519.pub)\""
+
+# Verify the new user works before closing the root session
+ssh deploy@<vps-ip> "whoami"
+
 # 1. Prepare the VPS (installs curl, git, htpasswd; clones the repo)
-ssh <user>@<vps-ip> "curl -fsSL https://raw.githubusercontent.com/<org>/dark-factory/main/infra/scripts/setup-vps.sh | sudo bash -s -- https://github.com/<org>/dark-factory.git"
+ssh deploy@<vps-ip> "sudo bash -c 'curl -fsSL https://raw.githubusercontent.com/<org>/dark-factory/main/infra/scripts/setup-vps.sh | bash -s -- https://github.com/<org>/dark-factory.git'"
 
 # — or, if the VPS has no outbound access to GitHub yet —
-scp infra/scripts/setup-vps.sh <user>@<vps-ip>:~/
-ssh <user>@<vps-ip> "sudo bash setup-vps.sh https://github.com/<org>/dark-factory.git"
+scp infra/scripts/setup-vps.sh deploy@<vps-ip>:~/
+ssh deploy@<vps-ip> "sudo bash setup-vps.sh https://github.com/<org>/dark-factory.git"
 
 # 2. Place the production .env file (NEVER commit or pass through CI)
-scp infra/.env <user>@<vps-ip>:/app/dark-factory/infra/.env
+scp infra/.env deploy@<vps-ip>:/app/dark-factory/infra/.env
 
 # 3. Run the k3s cluster setup
-ssh <user>@<vps-ip> "sudo bash /app/dark-factory/infra/scripts/setup-k3s.sh --dashboard-password <your-password>"
+ssh deploy@<vps-ip> "sudo bash /app/dark-factory/infra/scripts/setup-k3s.sh --dashboard-password <your-password>"
 
 # 2. Copy kubeconfig to local machine
 scp <user>@<vps-ip>:/etc/rancher/k3s/k3s.yaml ~/.kube/dark-factory-k3s.yaml
