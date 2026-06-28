@@ -1,0 +1,95 @@
+# kube-prometheus-stack Helm values for Dark Factory
+# Install with:
+#   helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+#     -n monitoring --create-namespace \
+#     -f k8s/monitoring/values-prometheus.yaml
+
+grafana:
+  enabled: true
+  adminPassword: ""  # Set via grafana-admin-secret or Helm --set
+  # Alternatively, reference a Secret:
+  # admin:
+  #   existingSecret: grafana-admin-secret
+  #   userKey: admin-user
+  #   passwordKey: admin-password
+  ingress:
+    enabled: false  # Managed by k8s/monitoring/grafana-ingress.yaml
+
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: default
+          orgId: 1
+          folder: Dark Factory
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+
+  # Pre-imported community dashboards
+  dashboards:
+    default:
+      node-exporter:
+        # Node Exporter Full — node CPU, memory, disk, network
+        gnetId: 1860
+        revision: 37
+        datasource: Prometheus
+      kubernetes-pods:
+        # Kubernetes Pod Overview — pod restarts, resource usage
+        gnetId: 6417
+        revision: 1
+        datasource: Prometheus
+      fastapi-service:
+        # FastAPI Observability — HTTP request latency per service
+        gnetId: 16110
+        revision: 1
+        datasource: Prometheus
+
+prometheus:
+  prometheusSpec:
+    # Discover ServiceMonitors in all namespaces (dark-factory + monitoring)
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelector: {}
+    serviceMonitorNamespaceSelector: {}
+    # Retain 15 days of metrics
+    retention: 15d
+    retentionSize: "10GB"
+
+nodeExporter:
+  enabled: true
+
+kubeStateMetrics:
+  enabled: true
+
+alertmanager:
+  enabled: false  # Enable when alerting rules are defined
+
+# postgres-exporter subchart
+prometheus-postgres-exporter:
+  enabled: true
+  config:
+    datasource:
+      host: postgres.dark-factory.svc.cluster.local
+      port: 5432
+      user: ""  # Set via dark-factory-secrets (POSTGRES_USER)
+      password: ""  # Set via dark-factory-secrets (POSTGRES_PASSWORD)
+      database: postgres
+      sslmode: disable
+  serviceMonitor:
+    enabled: true
+    labels:
+      release: kube-prometheus-stack
+    namespace: dark-factory
+
+# mongodb-exporter subchart
+prometheus-mongodb-exporter:
+  enabled: true
+  mongodb:
+    uri: "mongodb://mongo.dark-factory.svc.cluster.local:27017"
+  serviceMonitor:
+    enabled: true
+    additionalLabels:
+      release: kube-prometheus-stack
+    namespace: dark-factory

@@ -43,6 +43,12 @@ development/**/credentials.json
 
 # Monorepo infra
 infra/.env
+
+# Kubernetes — never commit secrets or kubeconfig
+*.secret.yaml
+k8s/secrets/
+kubeconfig*
+.kube/
 **/coverage/
 **/.vite/
 

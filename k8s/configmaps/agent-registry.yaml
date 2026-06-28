@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-registry
+  namespace: dark-factory
+binaryData: {}
+# registry.yaml content is mounted from the live source file during deployment.
+# Apply with:
+#   kubectl create configmap agent-registry \
+#     --from-file=registry.yaml=development/agents/registry.yaml \
+#     -n dark-factory --dry-run=client -o yaml | kubectl apply -f -
+#
+# The ConfigMap below is a placeholder — replace data.registry\.yaml with the
+# actual content from development/agents/registry.yaml at deploy time, or use
+# the kubectl create command above which reads the file directly.
+data:
+  registry.yaml: |
+    # Generated from development/agents/registry.yaml — update via:
+    # kubectl create configmap agent-registry \
+    #   --from-file=registry.yaml=development/agents/registry.yaml \
+    #   -n dark-factory --dry-run=client -o yaml | kubectl apply -f -

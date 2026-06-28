@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.api.v1.distill import router as distill_router
 from src.api.v1.memory import router as memory_router
@@ -36,6 +37,8 @@ app = FastAPI(title="ContextDistiller", version="1.0.0", lifespan=lifespan)
 
 app.include_router(distill_router)
 app.include_router(memory_router)
+
+Instrumentator().instrument(app).expose(app)
 
 
 @app.get("/health", response_model=HealthResponse)

@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: dark-factory
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:16-alpine
+          command:
+            - sh
+            - -c
+            - until pg_isready -h postgres -p 5432 -U $(POSTGRES_USER); do echo "waiting for postgres..."; sleep 3; done
+          envFrom:
+            - secretRef:
+                name: dark-factory-secrets
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:25.0
+          command:
+            - /bin/bash
+            - -c
+            - /entrypoint/substitute-env.sh && /opt/keycloak/bin/kc.sh start --import-realm
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: dark-factory-secrets
+          env:
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL
+              value: jdbc:postgresql://postgres:5432/keycloak
+            - name: KC_HTTP_ENABLED
+              value: "true"
+            - name: KC_PROXY
+              value: edge
+          volumeMounts:
+            - name: realm-export
+              mountPath: /opt/keycloak-import-src
+              readOnly: true
+            - name: substitute-script
+              mountPath: /entrypoint
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 90
+            periodSeconds: 15
+            failureThreshold: 3
+      volumes:
+        - name: realm-export
+          configMap:
+            name: keycloak-realm
+            items:
+              - key: realm-export.json
+                path: realm-export.json
+        - name: substitute-script
+          configMap:
+            name: keycloak-realm
+            items:
+              - key: substitute-env.sh
+                path: substitute-env.sh
+            defaultMode: 0755

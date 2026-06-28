@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 from sqlalchemy import text
 
 from src.api.v1.router import router
@@ -38,6 +39,8 @@ app.add_middleware(
 )
 app.add_middleware(RequestLoggingMiddleware)
 app.include_router(router)
+
+Instrumentator().instrument(app).expose(app)
 
 
 @app.get("/health", tags=["System"])

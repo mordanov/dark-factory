@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ticket-manager
+  namespace: dark-factory
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ticket-manager
+  template:
+    metadata:
+      labels:
+        app: ticket-manager
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: ticket-manager
+          image: ghcr.io/OWNER/ticket-manager:REPLACE_SHA
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: dark-factory-secrets
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3

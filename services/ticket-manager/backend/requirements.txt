@@ -1,0 +1,2 @@
+# k3s observability
+prometheus-fastapi-instrumentator==7.0.0
