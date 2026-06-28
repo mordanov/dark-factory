@@ -13,7 +13,12 @@ from src.core.config import Settings
 from src.db.session import Base
 from src.main import create_app
 
-TEST_DATABASE_URL = "postgresql+asyncpg://aleksandr@localhost/df_dispatcher_test"
+import os as _os
+
+TEST_DATABASE_URL = _os.environ.get(
+    "DATABASE_URL",
+    "postgresql+asyncpg://aleksandr@localhost/df_dispatcher_test",
+)
 _TEST_JWT_SECRET = "test-secret-do-not-use-in-production"
 
 
@@ -32,18 +37,75 @@ def mock_settings() -> Settings:
     )
 
 
+def _make_engine(url: str):
+    """Create an async engine; strip pool args unsupported by SQLite."""
+    if url.startswith("sqlite"):
+        import sqlite3
+        import uuid as _uuid_mod
+
+        from sqlalchemy.pool import StaticPool
+
+        # SQLite doesn't know uuid.UUID — serialize to string at the adapter level
+        sqlite3.register_adapter(_uuid_mod.UUID, str)
+        sqlite3.register_converter("UUID", lambda b: _uuid_mod.UUID(b.decode()))
+
+        return create_async_engine(
+            url,
+            echo=False,
+            connect_args={"check_same_thread": False, "detect_types": sqlite3.PARSE_DECLTYPES},
+            poolclass=StaticPool,
+        )
+    return create_async_engine(url, echo=False)
+
+
+def _create_all_compat(conn):
+    """create_all with PostgreSQL-type fallbacks for SQLite."""
+    from sqlalchemy import JSON, String
+    from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
+    from sqlalchemy.dialects.postgresql import JSONB, UUID
+
+    is_sqlite = conn.dialect.name == "sqlite"
+    if not is_sqlite:
+        Base.metadata.create_all(conn)
+        return
+
+    # Swap out PostgreSQL-only types so SQLite can create the schema
+    from sqlalchemy import ARRAY as SA_ARRAY
+    from sqlalchemy import event
+
+    def _before_create(target, connection, **kw):
+        for table in target.tables.values():
+            for col in table.columns:
+                if isinstance(col.type, JSONB):
+                    col.type = JSON()
+                elif isinstance(col.type, UUID):
+                    col.type = String(36)
+                elif isinstance(col.type, (PG_ARRAY, SA_ARRAY)):
+                    col.type = JSON()
+
+    event.listen(Base.metadata, "before_create", _before_create)
+    try:
+        Base.metadata.create_all(conn)
+    finally:
+        event.remove(Base.metadata, "before_create", _before_create)
+
+
+def _drop_all_compat(conn):
+    Base.metadata.drop_all(conn)
+
+
 @pytest.fixture
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+    engine = _make_engine(TEST_DATABASE_URL)
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_create_all_compat)
 
     factory = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
     async with factory() as session:
         yield session
 
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(_drop_all_compat)
     await engine.dispose()
 
 
