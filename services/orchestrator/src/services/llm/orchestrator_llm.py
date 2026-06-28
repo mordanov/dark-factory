@@ -168,7 +168,8 @@ def _build_user_message(
         parts.append(
             f"[BRAINSTORM TRANSCRIPT]\n"
             f"Project: {transcript_raw.get('project_name', '?')}\n"
-            f"Round: {transcript_raw.get('round_number', '?')} of {transcript_raw.get('max_rounds', '?')}\n"
+            f"Round: {transcript_raw.get('round_number', '?')} "
+            f"of {transcript_raw.get('max_rounds', '?')}\n"
             f"Consensus: {transcript_raw.get('consensus', 'inconclusive')}\n\n"
             + ("\n".join(msg_lines) or "(no messages)")
         )

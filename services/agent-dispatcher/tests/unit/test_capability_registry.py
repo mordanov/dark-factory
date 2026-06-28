@@ -6,14 +6,12 @@ import textwrap
 from pathlib import Path
 
 import pytest
-
 from src.services.capability_registry import (
     AgentCapability,
     CapabilityRegistry,
     get_registry,
     load_registry,
 )
-
 
 MINIMAL_YAML = textwrap.dedent(
     """\

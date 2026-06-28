@@ -9,7 +9,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from src.schemas.schemas import TmTicket
 from src.services.fsm.agent_selector import select_agent
 
-
 SAMPLE_REGISTRY_YAML = """
 version: "1.0"
 brainstorm_project_template: "df-{ticket_id}"
@@ -211,7 +210,7 @@ async def test_invalid_llm_response_falls_back_to_first_candidate() -> None:
 
 
 async def test_llm_timeout_falls_back() -> None:
-    with _patch_llm_create(asyncio.TimeoutError()):
+    with _patch_llm_create(TimeoutError()):
         with patch("src.services.fsm.agent_selector.get_settings") as mock_settings:
             mock_settings.return_value = MagicMock(
                 openai_api_key="sk-test", openai_model="gpt-4o-mini"
