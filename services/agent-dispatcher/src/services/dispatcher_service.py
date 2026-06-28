@@ -46,8 +46,13 @@ def _strip_service_jwt(text: str, jwt_value: str, extra_secret: str = "") -> str
     return text
 
 
-async def process_ticket(ticket: Any, db: AsyncSession) -> None:
+async def process_ticket(
+    ticket: Any,
+    db: AsyncSession,
+    required_capabilities: list[str] | None = None,
+) -> None:
     from src.services.capability_registry import get_registry
+    from src.services.worker_service import AgentWorkerService
 
     settings = get_settings()
     agent_id = ticket.assigned_agent
@@ -75,6 +80,45 @@ async def process_ticket(ticket: Any, db: AsyncSession) -> None:
             ticket, db, repo, reporter, settings, participants=participants, registry=registry
         )
         return
+
+    # Capability-based assignment: if required_capabilities are specified, attempt to
+    # resolve the best-matched idle worker and override the statically assigned agent_id.
+    matched_capability_record: dict | None = None
+    matched_worker_id = None
+    if required_capabilities:
+        worker_svc = AgentWorkerService(db)
+        matched = await worker_svc.resolve_capable_worker(required_capabilities)
+        if matched:
+            agent_id = matched.role_id
+            import dataclasses
+
+            matched_capability_record = dataclasses.asdict(matched)
+            # Find the actual worker record ID for lifecycle tracking
+            from src.repositories.worker_repository import AgentWorkerRepository
+
+            worker_repo = AgentWorkerRepository(db)
+            idle_workers = await worker_repo.get_by_role_status(matched.role_id, "idle")
+            if idle_workers:
+                matched_worker_id = idle_workers[0].id
+                await worker_repo.update_status(matched_worker_id, "busy")
+                await worker_repo.write_lifecycle_event(
+                    matched_worker_id,
+                    matched.role_id,
+                    "assigned",
+                    {"ticket_id": ticket_id},
+                )
+                await db.commit()
+            logger.info(
+                "Capability-based assignment resolved",
+                required=required_capabilities,
+                selected_role=agent_id,
+            )
+        else:
+            logger.warning(
+                "No capable worker found; falling back to static assignment",
+                required=required_capabilities,
+                static_agent_id=agent_id,
+            )
 
     try:
         prompt_path = _resolve_prompt_path(settings.agent_prompts_dir, agent_id)
@@ -185,11 +229,25 @@ async def process_ticket(ticket: Any, db: AsyncSession) -> None:
         return
 
     result = parse_result(safe_stdout)
+    result.matched_capability_record = matched_capability_record
 
     if result.status == "completed":
         await repo.mark_done(run.id, result.model_dump(), safe_stdout)
     else:
         await repo.mark_needs_review(run.id, result.model_dump(), safe_stdout)
+
+    if matched_worker_id is not None:
+        from src.repositories.worker_repository import AgentWorkerRepository
+
+        worker_repo = AgentWorkerRepository(db)
+        await worker_repo.update_status(matched_worker_id, "idle")
+        await worker_repo.write_lifecycle_event(
+            matched_worker_id,
+            agent_id,
+            "run_completed",
+            {"run_id": str(run.id), "status": result.status},
+        )
+
     await db.commit()
 
     await reporter.report_result(

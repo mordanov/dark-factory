@@ -358,3 +358,135 @@ def test_load_valid_template_with_prefix_suffix(tmp_path: Path) -> None:
     reg = CapabilityRegistry(str(f))
     reg.load()
     assert reg.brainstorm_project_name("TKT-1") == "proj-TKT-1-v2"
+
+
+# ---------------------------------------------------------------------------
+# get_by_capability / confidence (US1 extensions)
+# ---------------------------------------------------------------------------
+
+CAPABILITY_YAML = textwrap.dedent("""\
+    brainstorm_project_template: "df-{ticket_id}"
+    agents:
+      - role_id: backend
+        display_name: Backend
+        skill_file: backend.md
+        coordinator: false
+        capabilities:
+          - python_backend
+          - code_review_skill
+        fsm_ownership:
+          - backend_development
+        preferred_for: []
+        brainstorm_also_for: []
+        brainstorm_role: contributor
+        confidence:
+          python_backend: 95
+          code_review_skill: 80
+
+      - role_id: security
+        display_name: Security
+        skill_file: security.md
+        coordinator: false
+        capabilities:
+          - security_assessment
+          - code_review_skill
+        fsm_ownership:
+          - security_review
+        preferred_for: []
+        brainstorm_also_for: []
+        brainstorm_role: contributor
+        confidence:
+          security_assessment: 90
+
+      - role_id: frontend
+        display_name: Frontend
+        skill_file: frontend.md
+        coordinator: false
+        capabilities:
+          - typescript_frontend
+        fsm_ownership:
+          - frontend_development
+        preferred_for: []
+        brainstorm_also_for: []
+        brainstorm_role: contributor
+""")
+
+
+@pytest.fixture()
+def cap_registry(tmp_path: Path) -> CapabilityRegistry:
+    f = tmp_path / "cap_registry.yaml"
+    f.write_text(CAPABILITY_YAML, encoding="utf-8")
+    reg = CapabilityRegistry(str(f))
+    reg.load()
+    return reg
+
+
+def test_confidence_loaded(cap_registry: CapabilityRegistry) -> None:
+    backend = cap_registry.get_by_role_id("backend")
+    assert backend is not None
+    assert backend.confidence == {"python_backend": 95, "code_review_skill": 80}
+
+
+def test_confidence_absent_defaults_empty(cap_registry: CapabilityRegistry) -> None:
+    frontend = cap_registry.get_by_role_id("frontend")
+    assert frontend is not None
+    assert frontend.confidence == {}
+
+
+def test_get_by_capability_single(cap_registry: CapabilityRegistry) -> None:
+    results = cap_registry.get_by_capability(["security_assessment"])
+    assert [r.role_id for r in results] == ["security"]
+
+
+def test_get_by_capability_all_required(cap_registry: CapabilityRegistry) -> None:
+    results = cap_registry.get_by_capability(["code_review_skill", "security_assessment"])
+    role_ids = [r.role_id for r in results]
+    assert "security" in role_ids
+    assert "backend" not in role_ids
+
+
+def test_get_by_capability_empty_input_returns_empty(cap_registry: CapabilityRegistry) -> None:
+    assert cap_registry.get_by_capability([]) == []
+
+
+def test_get_by_capability_unknown_cap_returns_empty(cap_registry: CapabilityRegistry) -> None:
+    assert cap_registry.get_by_capability(["no_such_skill"]) == []
+
+
+def test_get_by_capability_min_confidence_excludes_low(cap_registry: CapabilityRegistry) -> None:
+    # backend has code_review_skill at 80; security has no explicit entry → defaults 100
+    results = cap_registry.get_by_capability(["code_review_skill"], min_confidence=85)
+    role_ids = [r.role_id for r in results]
+    assert "security" in role_ids
+    assert "backend" not in role_ids
+
+
+def test_get_by_capability_min_confidence_zero_includes_all(
+    cap_registry: CapabilityRegistry,
+) -> None:
+    results = cap_registry.get_by_capability(["code_review_skill"], min_confidence=0)
+    role_ids = {r.role_id for r in results}
+    assert {"backend", "security"} == role_ids
+
+
+def test_missing_confidence_entry_treated_as_100(cap_registry: CapabilityRegistry) -> None:
+    # frontend has typescript_frontend with no confidence entry → treated as 100
+    results = cap_registry.get_by_capability(["typescript_frontend"], min_confidence=99)
+    assert any(r.role_id == "frontend" for r in results)
+
+
+def test_get_candidates_with_confidence_intersects_state(
+    cap_registry: CapabilityRegistry,
+) -> None:
+    results = cap_registry.get_candidates_with_confidence(
+        "backend_development", ["python_backend"]
+    )
+    assert len(results) == 1
+    assert results[0].role_id == "backend"
+
+
+def test_get_candidates_with_confidence_no_match(cap_registry: CapabilityRegistry) -> None:
+    results = cap_registry.get_candidates_with_confidence(
+        "backend_development", ["security_assessment"]
+    )
+    assert results == []

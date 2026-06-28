@@ -60,7 +60,11 @@ class DispatchWorker:
         async with self._semaphore:
             try:
                 async with AsyncSessionLocal() as db:
-                    await process_ticket(ticket, db)
+                    await process_ticket(
+                        ticket,
+                        db,
+                        required_capabilities=getattr(ticket, "required_capabilities", None),
+                    )
                     await db.commit()
             except Exception as exc:
                 logger.error(

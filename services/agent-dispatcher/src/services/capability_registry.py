@@ -26,6 +26,8 @@ class AgentCapability:
     preferred_for: list[str]
     brainstorm_also_for: list[str]
     brainstorm_role: str
+    confidence: dict[str, int] = field(default_factory=dict)
+    # Maps skill name → confidence score 0-100. Missing entry = treat as 100.
 
 
 class CapabilityRegistry:
@@ -76,6 +78,12 @@ class CapabilityRegistry:
             if brainstorm_role not in ("coordinator", "contributor"):
                 raise ValueError(f"Invalid brainstorm_role {brainstorm_role!r} for {role_id!r}")
 
+            raw_confidence = entry.get("confidence", {})
+            confidence: dict[str, int] = (
+                {k: int(v) for k, v in raw_confidence.items()}
+                if isinstance(raw_confidence, dict)
+                else {}
+            )
             agent = AgentCapability(
                 role_id=role_id,
                 display_name=entry.get("display_name", role_id),
@@ -86,6 +94,7 @@ class CapabilityRegistry:
                 preferred_for=list(entry.get("preferred_for", [])),
                 brainstorm_also_for=list(entry.get("brainstorm_also_for", [])),
                 brainstorm_role=brainstorm_role,
+                confidence=confidence,
             )
             agents.append(agent)
 
@@ -100,6 +109,39 @@ class CapabilityRegistry:
 
         registry_hash = hashlib.sha256(self._raw_yaml.encode()).hexdigest()[:16]
         logger.info("Registry loaded: %d agents, sha256=%s", len(agents), registry_hash)
+
+    def get_by_capability(
+        self,
+        required_capabilities: list[str],
+        min_confidence: int = 0,
+    ) -> list[AgentCapability]:
+        """Return agents that declare ALL required_capabilities at >= min_confidence."""
+        if not required_capabilities:
+            return []
+        results: list[AgentCapability] = []
+        for agent in self._agents:
+            agent_caps = set(agent.capabilities)
+            if not all(cap in agent_caps for cap in required_capabilities):
+                continue
+            if min_confidence > 0:
+                if any(
+                    agent.confidence.get(cap, 100) < min_confidence
+                    for cap in required_capabilities
+                ):
+                    continue
+            results.append(agent)
+        return results
+
+    def get_candidates_with_confidence(
+        self,
+        state: str,
+        required_capabilities: list[str],
+        min_confidence: int = 0,
+    ) -> list[AgentCapability]:
+        """Combine FSM-state eligibility with capability requirement filter."""
+        state_eligible = {a.role_id for a in self.get_candidates_for_state(state)}
+        capable = self.get_by_capability(required_capabilities, min_confidence)
+        return [a for a in capable if a.role_id in state_eligible]
 
     def get_candidates_for_state(self, fsm_state: str) -> list[AgentCapability]:
         return list(self._by_state.get(fsm_state, []))

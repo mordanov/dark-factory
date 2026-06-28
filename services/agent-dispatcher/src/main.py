@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 
 import structlog
@@ -9,7 +10,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from src.api.v1 import runs
+from src.api.v1 import consultation, runs, workers, working_memory
 from src.core.auth_adapter import prefetch_jwks
 from src.core.config import get_settings
 from src.core.exceptions import AppError
@@ -57,7 +58,48 @@ async def lifespan(app: FastAPI):
 
     worker = DispatchWorker()
     await worker.start()
+
+    from src.services.worker_service import AgentWorkerService
+
+    async def _liveness_sweep_loop() -> None:
+        import asyncio
+
+        while True:
+            await asyncio.sleep(60)
+            try:
+                async with AsyncSessionLocal() as db:
+                    svc = AgentWorkerService(db)
+                    swept = await svc.run_liveness_sweep()
+                    if swept:
+                        logger.info("Liveness sweep marked workers unhealthy", count=swept)
+                    await db.commit()
+            except Exception as exc:
+                logger.warning("Liveness sweep error", error=str(exc))
+
+    async def _wm_cleanup_loop() -> None:
+        import asyncio
+
+        from src.services.working_memory_service import WorkingMemoryService
+
+        while True:
+            await asyncio.sleep(86400)  # daily
+            try:
+                async with AsyncSessionLocal() as db:
+                    svc = WorkingMemoryService(db)
+                    deleted = await svc.cleanup_expired()
+                    if deleted:
+                        logger.info("WM cleanup deleted expired entries", count=deleted)
+                    await db.commit()
+            except Exception as exc:
+                logger.warning("WM cleanup error", error=str(exc))
+
+    sweep_task = asyncio.create_task(_liveness_sweep_loop())
+    cleanup_task = asyncio.create_task(_wm_cleanup_loop())
+
     yield
+
+    sweep_task.cancel()
+    cleanup_task.cancel()
     await worker.stop()
 
 
@@ -86,6 +128,9 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(runs.router, prefix="/api/v1")
+    app.include_router(workers.router, prefix="/api/v1")
+    app.include_router(consultation.router, prefix="/api/v1")
+    app.include_router(working_memory.router, prefix="/api/v1")
 
     @app.get("/api/health", tags=["health"])
     async def health():

@@ -40,6 +40,7 @@ class Reporter:
             headers,
             registry=registry,
             brainstorm_result=brainstorm_result,
+            matched_capability_record=result.matched_capability_record,
         )
 
     async def _post_tm_comment(
@@ -66,11 +67,14 @@ class Reporter:
         headers: dict,
         registry: object | None = None,
         brainstorm_result: dict | None = None,
+        matched_capability_record: dict | None = None,
     ) -> None:
         url = f"{orch_url}/api/v1/jobs/trigger"
         payload: dict = {"ticket_id": ticket_id, "project_id": project_id}
         if registry is not None:
             payload["registry_yaml"] = registry.to_yaml_string()  # type: ignore[union-attr]
+        if matched_capability_record is not None:
+            payload["matched_capability_record"] = matched_capability_record
         if brainstorm_result and brainstorm_result.get("transcript"):
             t = brainstorm_result["transcript"]
             payload["brainstorm_transcript"] = {

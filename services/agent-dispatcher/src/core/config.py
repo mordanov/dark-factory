@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     # Worker
     worker_max_concurrent_runs: int = 3
     poll_interval_seconds: int = 10
+    heartbeat_interval_seconds: int = 30
+    worker_liveness_threshold_multiplier: float = 2.0
 
     # Brainstorm
     brainstorm_agents: str = "software-architect,security-architect"

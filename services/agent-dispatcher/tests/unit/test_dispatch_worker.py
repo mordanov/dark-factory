@@ -77,7 +77,9 @@ async def test_run_with_semaphore_calls_process_ticket():
         mock_pt = AsyncMock()
         with patch("src.services.dispatcher_service.process_ticket", mock_pt):
             await worker._run_with_semaphore(mock_ticket)
-            mock_pt.assert_called_once_with(mock_ticket, mock_db)
+            mock_pt.assert_called_once_with(
+                mock_ticket, mock_db, required_capabilities=mock_ticket.required_capabilities
+            )
 
 
 async def test_run_with_semaphore_swallows_exception():
