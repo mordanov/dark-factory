@@ -36,9 +36,18 @@ After the k3s migration, replace the three VPS SSH secrets with two k8s secrets:
 ### First-Time k3s Cluster Setup
 
 ```bash
-# 1. Copy repo (or just the needed files) and run setup script on VPS
-scp -r infra/ k8s/ <user>@<vps-ip>:~/dark-factory/
-ssh <user>@<vps-ip> "bash ~/dark-factory/infra/scripts/setup-k3s.sh --dashboard-password <your-password>"
+# 1. Prepare the VPS (installs curl, git, htpasswd; clones the repo)
+ssh <user>@<vps-ip> "curl -fsSL https://raw.githubusercontent.com/<org>/dark-factory/main/infra/scripts/setup-vps.sh | sudo bash -s -- https://github.com/<org>/dark-factory.git"
+
+# — or, if the VPS has no outbound access to GitHub yet —
+scp infra/scripts/setup-vps.sh <user>@<vps-ip>:~/
+ssh <user>@<vps-ip> "sudo bash setup-vps.sh https://github.com/<org>/dark-factory.git"
+
+# 2. Place the production .env file (NEVER commit or pass through CI)
+scp infra/.env <user>@<vps-ip>:/app/dark-factory/infra/.env
+
+# 3. Run the k3s cluster setup
+ssh <user>@<vps-ip> "sudo bash /app/dark-factory/infra/scripts/setup-k3s.sh --dashboard-password <your-password>"
 
 # 2. Copy kubeconfig to local machine
 scp <user>@<vps-ip>:/etc/rancher/k3s/k3s.yaml ~/.kube/dark-factory-k3s.yaml
