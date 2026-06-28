@@ -3,11 +3,13 @@
 # Run this first on a fresh Ubuntu 26.04 VPS, then run setup-k3s.sh.
 # Safe to re-run: each step checks current state before acting.
 #
-# Usage: sudo bash setup-vps.sh <repo-url> [--app-dir <path>]
+# Usage: bash setup-vps.sh <repo-url> [--app-dir <path>]
 #   repo-url   HTTPS clone URL, e.g. https://github.com/your-org/dark-factory.git
 #   --app-dir  Installation directory (default: /app/dark-factory)
 #
 set -euo pipefail
+
+[ "$(id -u)" -ne 0 ] && exec sudo bash "$0" "$@"
 
 REPO_URL="${1:?Usage: sudo bash setup-vps.sh <repo-url> [--app-dir <path>]}"
 APP_DIR="/app/dark-factory"

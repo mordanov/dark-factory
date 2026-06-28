@@ -7,6 +7,8 @@
 #
 set -euo pipefail
 
+[ "$(id -u)" -ne 0 ] && exec sudo bash "$0" "$@"
+
 DEPLOY_USER=""
 PUBKEY=""
 
@@ -57,7 +59,18 @@ else
   log "SSH key installed"
 fi
 
-# ── 4. Disable root SSH login ─────────────────────────────────────────────────
+# ── 4. Grant passwordless sudo ───────────────────────────────────────────────
+SUDOERS_FILE="/etc/sudoers.d/${DEPLOY_USER}"
+if [ -f "$SUDOERS_FILE" ]; then
+  log "Passwordless sudo already configured for '${DEPLOY_USER}' — skipping"
+else
+  log "Granting passwordless sudo to '${DEPLOY_USER}'..."
+  echo "${DEPLOY_USER} ALL=(ALL) NOPASSWD:ALL" > "$SUDOERS_FILE"
+  chmod 440 "$SUDOERS_FILE"
+  log "Passwordless sudo granted"
+fi
+
+# ── 5. Disable root SSH login ─────────────────────────────────────────────────
 SSHD_CONFIG="/etc/ssh/sshd_config"
 
 # Disable PermitRootLogin

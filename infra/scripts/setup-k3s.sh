@@ -5,8 +5,11 @@
 # Safe to run multiple times — each step checks before acting.
 #
 # Usage: bash setup-k3s.sh --dashboard-password <password>
+#        (re-execs itself with sudo if not already root)
 #
 set -euo pipefail
+
+[ "$(id -u)" -ne 0 ] && exec sudo bash "$0" "$@"
 
 INGRESS_NGINX_VERSION="4.11.3"
 CERT_MANAGER_VERSION="v1.16.2"
