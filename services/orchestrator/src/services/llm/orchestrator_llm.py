@@ -158,6 +158,27 @@ def _build_user_message(
     else:
         parts.append("[ADR LIST]\n[]  # no ADRs yet")
 
+    # --- Brainstorm Transcript ---
+    transcript_raw = (job_payload or {}).get("brainstorm_transcript")
+    if transcript_raw:
+        msg_lines = [
+            f"  [{m['author']}]: {m['content']}"
+            for m in transcript_raw.get("messages", [])
+        ]
+        parts.append(
+            f"[BRAINSTORM TRANSCRIPT]\n"
+            f"Project: {transcript_raw.get('project_name', '?')}\n"
+            f"Round: {transcript_raw.get('round_number', '?')} of {transcript_raw.get('max_rounds', '?')}\n"
+            f"Consensus: {transcript_raw.get('consensus', 'inconclusive')}\n\n"
+            + ("\n".join(msg_lines) or "(no messages)")
+        )
+    elif ticket.fsm_status == "architecture_review":
+        parts.append(
+            "[BRAINSTORM TRANSCRIPT]\n"
+            "No transcript yet. Agents have not completed brainstorm. "
+            "Set action: WAIT unless brainstorm_round >= max_rounds."
+        )
+
     # --- Dependency statuses ---
     if dependency_statuses:
         dep_lines = "\n".join(f"  {tid}: {st}" for tid, st in dependency_statuses.items())

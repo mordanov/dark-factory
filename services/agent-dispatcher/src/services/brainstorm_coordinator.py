@@ -8,10 +8,16 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import get_settings
-from src.core.exceptions import PromptNotFoundError
+from src.core.exceptions import PromptNotFoundError, UpstreamError
 from src.repositories.brainstorm_repo import BrainstormSessionRepository
 from src.repositories.run_repo import AgentRunRepository
 from src.schemas.schemas import AgentResult
+from src.services.brainstorm.cli_reader import (
+    BrainstormCLIReader,
+    BrainstormTranscript,
+    derive_consensus,
+)
+from src.services.capability_registry import CapabilityRegistry
 from src.services.context_builder import build_context, build_context_snapshot
 from src.services.dispatcher_service import _resolve_prompt_path, _strip_service_jwt
 from src.services.result_parser import parse_result
@@ -21,8 +27,9 @@ logger = structlog.get_logger(__name__)
 
 
 class BrainstormCoordinator:
-    def __init__(self, runner: AgentRunner) -> None:
+    def __init__(self, runner: AgentRunner, registry: CapabilityRegistry) -> None:
         self._runner = runner
+        self._registry = registry
 
     async def run_brainstorm(
         self,
@@ -125,9 +132,36 @@ class BrainstormCoordinator:
             await bs_repo.conclude(session.id, "disagreed")
             await db.flush()
 
+        project_name = self._registry.brainstorm_project_name(ticket.id)
+        reader = BrainstormCLIReader(
+            npx_prefix=settings.brainstorm_npx_prefix,
+            timeout_seconds=settings.brainstorm_cli_timeout_seconds,
+        )
+        try:
+            messages = await reader.read(project_name)
+            logger.info(
+                "Brainstorm session read",
+                project_name=project_name,
+                round=round_num,
+                message_count=len(messages),
+            )
+        except UpstreamError as exc:
+            logger.warning("Could not read brainstorm session", error=str(exc))
+            messages = []
+
+        consensus_str = derive_consensus(agent_results)
+        transcript = BrainstormTranscript(
+            project_name=project_name,
+            round_number=round_num,
+            max_rounds=max_rounds,
+            messages=messages,
+            consensus=consensus_str,
+        )
+
         return {
             "concluded": True,
             "consensus": consensus,
             "rounds_completed": round_num,
             "agent_results": agent_results,
+            "transcript": transcript,
         }

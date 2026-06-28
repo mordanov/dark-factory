@@ -262,7 +262,7 @@ async def _run_brainstorm(
     from src.services.brainstorm_coordinator import BrainstormCoordinator
 
     runner = get_runner()
-    coordinator = BrainstormCoordinator(runner)
+    coordinator = BrainstormCoordinator(runner, registry)
     data = await coordinator.run_brainstorm(ticket, db, participants=participants)
     result = aggregate_brainstorm(data)
     await reporter.report_result(
@@ -270,6 +270,7 @@ async def _run_brainstorm(
         project_id=ticket.project_id,
         result=result,
         registry=registry,
+        brainstorm_result=data,
     )
 
 

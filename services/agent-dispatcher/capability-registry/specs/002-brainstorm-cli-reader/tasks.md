@@ -18,7 +18,7 @@
 
 **Purpose**: Create the new `brainstorm` subpackage so imports resolve before any code is written.
 
-- [ ] T001 Create `services/agent-dispatcher/src/services/brainstorm/__init__.py` (empty file — establishes subpackage)
+- [x] T001 Create `services/agent-dispatcher/src/services/brainstorm/__init__.py` (empty file — establishes subpackage)
 
 ---
 
@@ -28,7 +28,7 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T002 Add `brainstorm_npx_prefix: str = Field(default="~/.local/share/brainstorm-mcp")` and `brainstorm_cli_timeout_seconds: float = Field(default=30.0)` to the `Settings` class in `services/agent-dispatcher/src/core/config.py`
+- [x] T002 Add `brainstorm_npx_prefix: str = Field(default="~/.local/share/brainstorm-mcp")` and `brainstorm_cli_timeout_seconds: float = Field(default=30.0)` to the `Settings` class in `services/agent-dispatcher/src/core/config.py`
 
 **Checkpoint**: Config fields available — user story implementation can begin.
 
@@ -42,19 +42,19 @@
 
 ### Implementation
 
-- [ ] T003 [P] [US1] Define `BrainstormMessage` and `BrainstormTranscript` dataclasses (with `author`, `content`, `timestamp` and `project_name`, `round_number`, `max_rounds`, `messages`, `consensus` fields respectively) in `services/agent-dispatcher/src/services/brainstorm/cli_reader.py`
-- [ ] T004 [P] [US1] Implement `derive_consensus(results: list[AgentResult]) -> str` — returns `"agreed"` if all non-null consensus == agreed, `"disagreed"` if any == disagreed, `"inconclusive"` otherwise — in `services/agent-dispatcher/src/services/brainstorm/cli_reader.py`
-- [ ] T005 [US1] Implement `BrainstormCLIReader` class: `__init__(npx_prefix, timeout_seconds=30.0)` and `async read(project_name) -> list[BrainstormMessage]` — use `os.path.expanduser()` on prefix, call `asyncio.create_subprocess_exec("npx", "--prefix", expanded_prefix, "brainstorm-messages", project_name)`, wrap `proc.communicate()` in `asyncio.wait_for`, parse stdout as JSON array, map field aliases (`author`/`sender`, `content`/`message`, `timestamp`/`created_at`) — in `services/agent-dispatcher/src/services/brainstorm/cli_reader.py` (depends on T003)
-- [ ] T006 [US1] Update `BrainstormCoordinator.__init__` to `(self, runner: AgentRunner, registry: CapabilityRegistry)` storing `self._registry = registry`, then after all agents for a round complete in `run_brainstorm()`: call `self._registry.brainstorm_project_name(ticket.id)`, instantiate `BrainstormCLIReader` from settings, call `await reader.read(project_name)` wrapped in try/except UpstreamError (log warning, set `messages=[]`), call `derive_consensus(agent_results)`, build `BrainstormTranscript`, add `"transcript": transcript` to the return dict — in `services/agent-dispatcher/src/services/brainstorm_coordinator.py` (depends on T002, T005)
-- [ ] T007 [US1] Update `_run_brainstorm()` in `services/agent-dispatcher/src/services/dispatcher_service.py` to construct `BrainstormCoordinator(runner, registry)` (instead of `BrainstormCoordinator(runner)`) and pass `brainstorm_result=data` to `reporter.report_result()` (depends on T006)
-- [ ] T008 [US1] Update `Reporter.report_result()` signature to add `brainstorm_result: dict | None = None` and update `_trigger_orchestrator()` to accept and forward it; in `_trigger_orchestrator()` serialize `brainstorm_result["transcript"]` into `payload["brainstorm_transcript"]` as `{project_name, round_number, max_rounds, consensus, messages: [{author, content, timestamp}]}` when transcript is present — in `services/agent-dispatcher/src/services/reporter.py` (depends on T006)
+- [x] T003 [P] [US1] Define `BrainstormMessage` and `BrainstormTranscript` dataclasses (with `author`, `content`, `timestamp` and `project_name`, `round_number`, `max_rounds`, `messages`, `consensus` fields respectively) in `services/agent-dispatcher/src/services/brainstorm/cli_reader.py`
+- [x] T004 [P] [US1] Implement `derive_consensus(results: list[AgentResult]) -> str` — returns `"agreed"` if all non-null consensus == agreed, `"disagreed"` if any == disagreed, `"inconclusive"` otherwise — in `services/agent-dispatcher/src/services/brainstorm/cli_reader.py`
+- [x] T005 [US1] Implement `BrainstormCLIReader` class: `__init__(npx_prefix, timeout_seconds=30.0)` and `async read(project_name) -> list[BrainstormMessage]` — use `os.path.expanduser()` on prefix, call `asyncio.create_subprocess_exec("npx", "--prefix", expanded_prefix, "brainstorm-messages", project_name)`, wrap `proc.communicate()` in `asyncio.wait_for`, parse stdout as JSON array, map field aliases (`author`/`sender`, `content`/`message`, `timestamp`/`created_at`) — in `services/agent-dispatcher/src/services/brainstorm/cli_reader.py` (depends on T003)
+- [x] T006 [US1] Update `BrainstormCoordinator.__init__` to `(self, runner: AgentRunner, registry: CapabilityRegistry)` storing `self._registry = registry`, then after all agents for a round complete in `run_brainstorm()`: call `self._registry.brainstorm_project_name(ticket.id)`, instantiate `BrainstormCLIReader` from settings, call `await reader.read(project_name)` wrapped in try/except UpstreamError (log warning, set `messages=[]`), call `derive_consensus(agent_results)`, build `BrainstormTranscript`, add `"transcript": transcript` to the return dict — in `services/agent-dispatcher/src/services/brainstorm_coordinator.py` (depends on T002, T005)
+- [x] T007 [US1] Update `_run_brainstorm()` in `services/agent-dispatcher/src/services/dispatcher_service.py` to construct `BrainstormCoordinator(runner, registry)` (instead of `BrainstormCoordinator(runner)`) and pass `brainstorm_result=data` to `reporter.report_result()` (depends on T006)
+- [x] T008 [US1] Update `Reporter.report_result()` signature to add `brainstorm_result: dict | None = None` and update `_trigger_orchestrator()` to accept and forward it; in `_trigger_orchestrator()` serialize `brainstorm_result["transcript"]` into `payload["brainstorm_transcript"]` as `{project_name, round_number, max_rounds, consensus, messages: [{author, content, timestamp}]}` when transcript is present — in `services/agent-dispatcher/src/services/reporter.py` (depends on T006)
 
 ### Tests
 
-- [ ] T009 [P] [US1] Update all existing `BrainstormCoordinator` tests in `services/agent-dispatcher/tests/unit/test_brainstorm_coordinator.py` to pass a mock registry (`MagicMock()` with `brainstorm_project_name.return_value = "df-TKT-BS-TEST"`) as the second constructor argument; add `test_cli_reader_called_after_round` (mock reader returns 2 messages → `result["transcript"].messages` has 2 items), `test_transcript_in_return_value` (`result["transcript"]` is a `BrainstormTranscript`), `test_project_name_from_registry` (reader.read called with `"df-TKT-BS-TEST"`)
-- [ ] T010 [P] [US1] Write `test_read_returns_messages_on_success` (returncode=0, stdout JSON with `author`/`content`/`timestamp` → list of BrainstormMessage with correct fields) and `test_read_handles_sender_alias` (stdout uses `sender`/`message` keys → author/content mapped correctly) in `services/agent-dispatcher/tests/unit/test_brainstorm_cli_reader.py` — mock `asyncio.create_subprocess_exec` throughout
-- [ ] T011 [P] [US1] Write `test_all_agreed`, `test_any_disagreed`, `test_null_consensus_is_inconclusive`, `test_empty_results`, `test_mixed_with_null` in `services/agent-dispatcher/tests/unit/test_derive_consensus.py`
-- [ ] T012 [P] [US1] Add `test_report_result_includes_transcript_in_payload` (brainstorm_result with transcript → `payload["brainstorm_transcript"]` present, all fields correct including `messages` list) to `services/agent-dispatcher/tests/unit/test_reporter.py`
+- [x] T009 [P] [US1] Update all existing `BrainstormCoordinator` tests in `services/agent-dispatcher/tests/unit/test_brainstorm_coordinator.py` to pass a mock registry (`MagicMock()` with `brainstorm_project_name.return_value = "df-TKT-BS-TEST"`) as the second constructor argument; add `test_cli_reader_called_after_round` (mock reader returns 2 messages → `result["transcript"].messages` has 2 items), `test_transcript_in_return_value` (`result["transcript"]` is a `BrainstormTranscript`), `test_project_name_from_registry` (reader.read called with `"df-TKT-BS-TEST"`)
+- [x] T010 [P] [US1] Write `test_read_returns_messages_on_success` (returncode=0, stdout JSON with `author`/`content`/`timestamp` → list of BrainstormMessage with correct fields) and `test_read_handles_sender_alias` (stdout uses `sender`/`message` keys → author/content mapped correctly) in `services/agent-dispatcher/tests/unit/test_brainstorm_cli_reader.py` — mock `asyncio.create_subprocess_exec` throughout
+- [x] T011 [P] [US1] Write `test_all_agreed`, `test_any_disagreed`, `test_null_consensus_is_inconclusive`, `test_empty_results`, `test_mixed_with_null` in `services/agent-dispatcher/tests/unit/test_derive_consensus.py`
+- [x] T012 [P] [US1] Add `test_report_result_includes_transcript_in_payload` (brainstorm_result with transcript → `payload["brainstorm_transcript"]` present, all fields correct including `messages` list) to `services/agent-dispatcher/tests/unit/test_reporter.py`
 
 **Checkpoint**: User Story 1 fully functional — transcript flows from CLI through coordinator, reporter, to Orchestrator payload.
 
@@ -68,9 +68,9 @@
 
 ### Tests
 
-- [ ] T013 [P] [US2] Write `test_read_returns_empty_on_empty_stdout` (returncode=0, stdout=`[]`), `test_read_returns_empty_on_missing_project` (returncode=1, stderr="project not found"), `test_read_raises_on_other_error` (returncode=1, stderr="unexpected error" → UpstreamError), `test_read_raises_on_timeout` (communicate() hangs → UpstreamError matching "timed out"), `test_tilde_expanded_in_prefix` (monkeypatch HOME; assert subprocess called with expanded path, no `~`) in `services/agent-dispatcher/tests/unit/test_brainstorm_cli_reader.py`
-- [ ] T014 [P] [US2] Add `test_cli_reader_failure_does_not_abort` (mock BrainstormCLIReader.read raises UpstreamError → `run_brainstorm()` still returns result dict with `transcript.messages == []` and `transcript.consensus == "inconclusive"`) to `services/agent-dispatcher/tests/unit/test_brainstorm_coordinator.py`
-- [ ] T015 [P] [US2] Add `test_report_result_no_transcript_when_none` (brainstorm_result=None → no `brainstorm_transcript` key in trigger payload) and `test_report_result_empty_messages_list_included` (transcript with `messages=[]` → payload includes `brainstorm_transcript` with `messages: []`) to `services/agent-dispatcher/tests/unit/test_reporter.py`
+- [x] T013 [P] [US2] Write `test_read_returns_empty_on_empty_stdout` (returncode=0, stdout=`[]`), `test_read_returns_empty_on_missing_project` (returncode=1, stderr="project not found"), `test_read_raises_on_other_error` (returncode=1, stderr="unexpected error" → UpstreamError), `test_read_raises_on_timeout` (communicate() hangs → UpstreamError matching "timed out"), `test_tilde_expanded_in_prefix` (monkeypatch HOME; assert subprocess called with expanded path, no `~`) in `services/agent-dispatcher/tests/unit/test_brainstorm_cli_reader.py`
+- [x] T014 [P] [US2] Add `test_cli_reader_failure_does_not_abort` (mock BrainstormCLIReader.read raises UpstreamError → `run_brainstorm()` still returns result dict with `transcript.messages == []` and `transcript.consensus == "inconclusive"`) to `services/agent-dispatcher/tests/unit/test_brainstorm_coordinator.py`
+- [x] T015 [P] [US2] Add `test_report_result_no_transcript_when_none` (brainstorm_result=None → no `brainstorm_transcript` key in trigger payload) and `test_report_result_empty_messages_list_included` (transcript with `messages=[]` → payload includes `brainstorm_transcript` with `messages: []`) to `services/agent-dispatcher/tests/unit/test_reporter.py`
 
 **Checkpoint**: All empty/error resilience paths verified — empty session never blocks brainstorm round completion.
 
@@ -84,11 +84,11 @@
 
 ### Implementation
 
-- [ ] T016 [US3] Review all `reporter.report_result()` call sites in `services/agent-dispatcher/src/services/dispatcher_service.py` (there are 5 total); confirm the non-brainstorm calls do not pass `brainstorm_result` (they use the new keyword arg's default `None`). If any call explicitly passes it, remove. No new code needed if defaults are correct — this is a verification + sign-off task.
+- [x] T016 [US3] Review all `reporter.report_result()` call sites in `services/agent-dispatcher/src/services/dispatcher_service.py` (there are 5 total); confirm the non-brainstorm calls do not pass `brainstorm_result` (they use the new keyword arg's default `None`). If any call explicitly passes it, remove. No new code needed if defaults are correct — this is a verification + sign-off task.
 
 ### Tests
 
-- [ ] T017 [P] [US3] Add `test_no_brainstorm_transcript_for_non_architecture_review` — simulate a regular (non-brainstorm) `report_result()` call without `brainstorm_result`; assert the Orchestrator trigger payload has no `brainstorm_transcript` key — in `services/agent-dispatcher/tests/unit/test_reporter.py`
+- [x] T017 [P] [US3] Add `test_no_brainstorm_transcript_for_non_architecture_review` — simulate a regular (non-brainstorm) `report_result()` call without `brainstorm_result`; assert the Orchestrator trigger payload has no `brainstorm_transcript` key — in `services/agent-dispatcher/tests/unit/test_reporter.py`
 
 **Checkpoint**: Single-agent path confirmed clean — no transcript leaks into non-architecture_review payloads.
 
@@ -102,12 +102,12 @@
 
 ### Implementation
 
-- [ ] T018 [P] [US4] Add `BrainstormMessagePayload(BaseModel)` with fields `author: str`, `content: str`, `timestamp: str` and `BrainstormTranscriptPayload(BaseModel)` with fields `project_name: str`, `round_number: int`, `max_rounds: int`, `consensus: str`, `messages: list[BrainstormMessagePayload]` to `services/orchestrator/src/schemas/schemas.py`
-- [ ] T019 [US4] Insert `[BRAINSTORM TRANSCRIPT]` section into `_build_user_message()` in `services/orchestrator/src/services/llm/orchestrator_llm.py`: after `[ADR LIST]`, before `[DEPENDENCY STATUSES]` — if `brainstorm_transcript` in job_payload: render project name, round N of max_rounds, consensus, and all agent messages as `  [author]: content`; elif `ticket.fsm_status == "architecture_review"`: render WAIT hint; else: no section (depends on T018)
+- [x] T018 [P] [US4] Add `BrainstormMessagePayload(BaseModel)` with fields `author: str`, `content: str`, `timestamp: str` and `BrainstormTranscriptPayload(BaseModel)` with fields `project_name: str`, `round_number: int`, `max_rounds: int`, `consensus: str`, `messages: list[BrainstormMessagePayload]` to `services/orchestrator/src/schemas/schemas.py`
+- [x] T019 [US4] Insert `[BRAINSTORM TRANSCRIPT]` section into `_build_user_message()` in `services/orchestrator/src/services/llm/orchestrator_llm.py`: after `[ADR LIST]`, before `[DEPENDENCY STATUSES]` — if `brainstorm_transcript` in job_payload: render project name, round N of max_rounds, consensus, and all agent messages as `  [author]: content`; elif `ticket.fsm_status == "architecture_review"`: render WAIT hint; else: no section (depends on T018)
 
 ### Tests
 
-- [ ] T020 [P] [US4] Add `test_transcript_section_rendered` (payload with 2-message transcript → prompt contains `[BRAINSTORM TRANSCRIPT]`, both author names, message content, `Round: 1 of 3`, `inconclusive`), `test_no_transcript_for_arch_review_shows_wait_hint` (architecture_review ticket, no transcript → prompt contains "WAIT" or "No transcript"), `test_no_transcript_for_other_states_no_section` (implementation ticket, no transcript → no `[BRAINSTORM TRANSCRIPT]` in prompt) to `services/orchestrator/tests/unit/test_orchestrator_llm.py`
+- [x] T020 [P] [US4] Add `test_transcript_section_rendered` (payload with 2-message transcript → prompt contains `[BRAINSTORM TRANSCRIPT]`, both author names, message content, `Round: 1 of 3`, `inconclusive`), `test_no_transcript_for_arch_review_shows_wait_hint` (architecture_review ticket, no transcript → prompt contains "WAIT" or "No transcript"), `test_no_transcript_for_other_states_no_section` (implementation ticket, no transcript → no `[BRAINSTORM TRANSCRIPT]` in prompt) to `services/orchestrator/tests/unit/test_orchestrator_llm.py`
 
 **Checkpoint**: Orchestrator LLM receives and uses transcript — gate evaluation can proceed with full brainstorm context.
 
@@ -115,7 +115,7 @@
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T021 [P] Add brainstorm MCP section to `infra/.env.example`: `BRAINSTORM_NPX_PREFIX=~/.local/share/brainstorm-mcp` with comment "Path to the brainstorm-mcp installation; run \`which brainstorm-messages\` or check your MCP config to find this" and `BRAINSTORM_CLI_TIMEOUT_SECONDS=30` with comment "Timeout for reading brainstorm session messages via CLI (seconds)"
+- [x] T021 [P] Add brainstorm MCP section to `infra/.env.example`: `BRAINSTORM_NPX_PREFIX=~/.local/share/brainstorm-mcp` with comment "Path to the brainstorm-mcp installation; run \`which brainstorm-messages\` or check your MCP config to find this" and `BRAINSTORM_CLI_TIMEOUT_SECONDS=30` with comment "Timeout for reading brainstorm session messages via CLI (seconds)"
 
 ---
 

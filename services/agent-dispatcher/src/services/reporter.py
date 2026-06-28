@@ -20,6 +20,7 @@ class Reporter:
         project_id: str,
         result: AgentResult,
         registry: object | None = None,
+        brainstorm_result: dict | None = None,
     ) -> None:
         settings = get_settings()
         headers = {**await get_kc_client().async_auth_headers(), "Content-Type": "application/json"}
@@ -38,6 +39,7 @@ class Reporter:
             project_id,
             headers,
             registry=registry,
+            brainstorm_result=brainstorm_result,
         )
 
     async def _post_tm_comment(
@@ -63,11 +65,24 @@ class Reporter:
         project_id: str,
         headers: dict,
         registry: object | None = None,
+        brainstorm_result: dict | None = None,
     ) -> None:
         url = f"{orch_url}/api/v1/jobs/trigger"
         payload: dict = {"ticket_id": ticket_id, "project_id": project_id}
         if registry is not None:
             payload["registry_yaml"] = registry.to_yaml_string()  # type: ignore[union-attr]
+        if brainstorm_result and brainstorm_result.get("transcript"):
+            t = brainstorm_result["transcript"]
+            payload["brainstorm_transcript"] = {
+                "project_name": t.project_name,
+                "round_number": t.round_number,
+                "max_rounds": t.max_rounds,
+                "consensus": t.consensus,
+                "messages": [
+                    {"author": m.author, "content": m.content, "timestamp": m.timestamp}
+                    for m in t.messages
+                ],
+            }
 
         for attempt in range(2):
             try:

@@ -224,3 +224,181 @@ async def test_report_result_no_registry_yaml_when_registry_none():
 
     assert len(trigger_payloads) == 1
     assert "registry_yaml" not in trigger_payloads[0]
+
+
+# ---------------------------------------------------------------------------
+# T012 / T015 / T017 — brainstorm_transcript tests
+# ---------------------------------------------------------------------------
+
+
+def _make_transcript(messages=None):
+    from src.services.brainstorm.cli_reader import BrainstormMessage, BrainstormTranscript
+
+    msgs = messages if messages is not None else [
+        BrainstormMessage(author="software-architect", content="Use CQRS.", timestamp="2026-01-01T00:00:00Z"),
+    ]
+    return BrainstormTranscript(
+        project_name="df-TKT-1",
+        round_number=1,
+        max_rounds=3,
+        messages=msgs,
+        consensus="inconclusive",
+    )
+
+
+async def test_report_result_includes_transcript_in_payload():
+    """brainstorm_result with transcript → payload["brainstorm_transcript"] present."""
+    with (
+        patch("src.services.reporter.get_settings") as mock_settings,
+        _kc_mock(),
+        patch("src.services.reporter.httpx.AsyncClient") as mock_client_cls,
+    ):
+        settings = MagicMock()
+        settings.ticket_manager_base_url = "http://tm"
+        settings.orchestrator_base_url = "http://orch"
+        mock_settings.return_value = settings
+
+        trigger_payloads: list = []
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status = MagicMock()
+
+        async def post_side_effect(url, **kwargs):
+            if "trigger" in url:
+                trigger_payloads.append(kwargs.get("json", {}))
+            return mock_resp
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        mock_client.post.side_effect = post_side_effect
+        mock_client_cls.return_value = mock_client
+
+        from src.services.reporter import Reporter
+
+        reporter = Reporter()
+        result = AgentResult(status="completed", summary="done", tm_comment="ok")
+        brainstorm_result = {"transcript": _make_transcript()}
+        await reporter.report_result("TKT-1", "proj-1", result, brainstorm_result=brainstorm_result)
+
+    assert len(trigger_payloads) == 1
+    assert "brainstorm_transcript" in trigger_payloads[0]
+    bt = trigger_payloads[0]["brainstorm_transcript"]
+    assert bt["project_name"] == "df-TKT-1"
+    assert bt["round_number"] == 1
+    assert bt["max_rounds"] == 3
+    assert bt["consensus"] == "inconclusive"
+    assert len(bt["messages"]) == 1
+    assert bt["messages"][0]["author"] == "software-architect"
+    assert bt["messages"][0]["content"] == "Use CQRS."
+    assert bt["messages"][0]["timestamp"] == "2026-01-01T00:00:00Z"
+
+
+async def test_report_result_no_transcript_when_none():
+    """brainstorm_result=None → no brainstorm_transcript key in trigger payload."""
+    with (
+        patch("src.services.reporter.get_settings") as mock_settings,
+        _kc_mock(),
+        patch("src.services.reporter.httpx.AsyncClient") as mock_client_cls,
+    ):
+        settings = MagicMock()
+        settings.ticket_manager_base_url = "http://tm"
+        settings.orchestrator_base_url = "http://orch"
+        mock_settings.return_value = settings
+
+        trigger_payloads: list = []
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status = MagicMock()
+
+        async def post_side_effect(url, **kwargs):
+            if "trigger" in url:
+                trigger_payloads.append(kwargs.get("json", {}))
+            return mock_resp
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        mock_client.post.side_effect = post_side_effect
+        mock_client_cls.return_value = mock_client
+
+        from src.services.reporter import Reporter
+
+        reporter = Reporter()
+        result = AgentResult(status="completed", summary="done", tm_comment="ok")
+        await reporter.report_result("TKT-2", "proj-1", result, brainstorm_result=None)
+
+    assert "brainstorm_transcript" not in trigger_payloads[0]
+
+
+async def test_report_result_empty_messages_list_included():
+    """Transcript with messages=[] → payload still includes brainstorm_transcript with empty list."""
+    with (
+        patch("src.services.reporter.get_settings") as mock_settings,
+        _kc_mock(),
+        patch("src.services.reporter.httpx.AsyncClient") as mock_client_cls,
+    ):
+        settings = MagicMock()
+        settings.ticket_manager_base_url = "http://tm"
+        settings.orchestrator_base_url = "http://orch"
+        mock_settings.return_value = settings
+
+        trigger_payloads: list = []
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status = MagicMock()
+
+        async def post_side_effect(url, **kwargs):
+            if "trigger" in url:
+                trigger_payloads.append(kwargs.get("json", {}))
+            return mock_resp
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        mock_client.post.side_effect = post_side_effect
+        mock_client_cls.return_value = mock_client
+
+        from src.services.reporter import Reporter
+
+        reporter = Reporter()
+        result = AgentResult(status="completed", summary="done", tm_comment="ok")
+        brainstorm_result = {"transcript": _make_transcript(messages=[])}
+        await reporter.report_result("TKT-3", "proj-1", result, brainstorm_result=brainstorm_result)
+
+    bt = trigger_payloads[0]["brainstorm_transcript"]
+    assert bt["messages"] == []
+
+
+async def test_no_brainstorm_transcript_for_non_architecture_review():
+    """Regular (non-brainstorm) report_result call omits brainstorm_transcript from payload."""
+    with (
+        patch("src.services.reporter.get_settings") as mock_settings,
+        _kc_mock(),
+        patch("src.services.reporter.httpx.AsyncClient") as mock_client_cls,
+    ):
+        settings = MagicMock()
+        settings.ticket_manager_base_url = "http://tm"
+        settings.orchestrator_base_url = "http://orch"
+        mock_settings.return_value = settings
+
+        trigger_payloads: list = []
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status = MagicMock()
+
+        async def post_side_effect(url, **kwargs):
+            if "trigger" in url:
+                trigger_payloads.append(kwargs.get("json", {}))
+            return mock_resp
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        mock_client.post.side_effect = post_side_effect
+        mock_client_cls.return_value = mock_client
+
+        from src.services.reporter import Reporter
+
+        reporter = Reporter()
+        result = AgentResult(status="completed", summary="done", tm_comment="ok")
+        # Simulating a non-brainstorm call site — no brainstorm_result passed
+        await reporter.report_result("TKT-4", "proj-1", result)
+
+    assert "brainstorm_transcript" not in trigger_payloads[0]
