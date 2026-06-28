@@ -7,7 +7,6 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from src.core.exceptions import UpstreamError
 from src.schemas.schemas import AgentResult
 from src.services.brainstorm.cli_reader import BrainstormCLIReader, derive_consensus
@@ -132,7 +131,7 @@ async def test_read_raises_on_bad_json():
 async def test_read_raises_on_timeout():
     proc = MagicMock()
     proc.returncode = None
-    proc.communicate = AsyncMock(side_effect=asyncio.TimeoutError())
+    proc.communicate = AsyncMock(side_effect=TimeoutError())
     proc.kill = MagicMock()
 
     with patch("asyncio.create_subprocess_exec", return_value=proc):
