@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 
 import pytest
-
 from src.repositories.working_memory_repository import WorkingMemoryRepository
 from src.services.working_memory_service import WorkingMemoryService
 
@@ -86,9 +85,7 @@ async def test_list_filters_by_author_role(db_session):
     await svc.append("TICKET-AUTHOR", run.id, "security-architect", "observation", "sec note")
     await db_session.commit()
 
-    arch_entries = await svc.list_for_ticket(
-        "TICKET-AUTHOR", author_role_id="software-architect"
-    )
+    arch_entries = await svc.list_for_ticket("TICKET-AUTHOR", author_role_id="software-architect")
     assert len(arch_entries) == 1
     assert arch_entries[0].author_role_id == "software-architect"
 
@@ -155,7 +152,6 @@ async def test_cleanup_expired_deletes_old_entries(db_session):
     from datetime import UTC, datetime, timedelta
 
     from sqlalchemy import update as sa_update
-
     from src.models.models import WorkingMemoryEntry
 
     run = await _make_run(db_session, ticket_id="TICKET-EXPIRE")

@@ -60,8 +60,7 @@ class WorkingMemoryService:
             run_ticket = await self._repo.get_run_ticket(requester_run_id)
             if run_ticket is not None and run_ticket != ticket_id:
                 raise PermissionError(
-                    f"Run {requester_run_id} belongs to ticket {run_ticket!r}, "
-                    f"not {ticket_id!r}"
+                    f"Run {requester_run_id} belongs to ticket {run_ticket!r}, not {ticket_id!r}"
                 )
 
         return await self._repo.list_for_ticket(

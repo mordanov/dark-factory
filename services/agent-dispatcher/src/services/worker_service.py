@@ -142,9 +142,9 @@ class AgentWorkerService:
         # Rank by: (1) count of required caps covered, (2) avg confidence for those caps
         def _score(agent: AgentCapability) -> tuple[int, float]:
             covered = sum(1 for c in required_capabilities if c in agent.capabilities)
-            avg_conf = sum(
-                agent.confidence.get(c, 100) for c in required_capabilities
-            ) / len(required_capabilities)
+            avg_conf = sum(agent.confidence.get(c, 100) for c in required_capabilities) / len(
+                required_capabilities
+            )
             return (covered, avg_conf)
 
         candidates = [a for a in capable_agents if a.role_id in idle_role_ids]
@@ -155,9 +155,7 @@ class AgentWorkerService:
     # Liveness sweep
     # ------------------------------------------------------------------
 
-    async def run_liveness_sweep(
-        self, threshold_seconds: float | None = None
-    ) -> int:
+    async def run_liveness_sweep(self, threshold_seconds: float | None = None) -> int:
         """Mark workers with stale heartbeats as unhealthy.
 
         Returns the count of workers transitioned.

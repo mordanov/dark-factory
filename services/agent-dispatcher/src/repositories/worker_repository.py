@@ -47,9 +47,7 @@ class AgentWorkerRepository:
         )
         return result.scalar_one_or_none()
 
-    async def get_by_role_status(
-        self, role_id: str, status: str
-    ) -> list[AgentWorkerRecord]:
+    async def get_by_role_status(self, role_id: str, status: str) -> list[AgentWorkerRecord]:
         result = await self.db.execute(
             select(AgentWorkerRecord).where(
                 AgentWorkerRecord.role_id == role_id,
@@ -68,21 +66,15 @@ class AgentWorkerRepository:
         if offline_at is not None:
             values["offline_at"] = offline_at
         await self.db.execute(
-            update(AgentWorkerRecord)
-            .where(AgentWorkerRecord.id == worker_id)
-            .values(**values)
+            update(AgentWorkerRecord).where(AgentWorkerRecord.id == worker_id).values(**values)
         )
 
-    async def update_heartbeat(
-        self, worker_id: uuid.UUID, new_status: str | None = None
-    ) -> None:
+    async def update_heartbeat(self, worker_id: uuid.UUID, new_status: str | None = None) -> None:
         values: dict = {"last_heartbeat_at": datetime.now(UTC)}
         if new_status is not None:
             values["status"] = new_status
         await self.db.execute(
-            update(AgentWorkerRecord)
-            .where(AgentWorkerRecord.id == worker_id)
-            .values(**values)
+            update(AgentWorkerRecord).where(AgentWorkerRecord.id == worker_id).values(**values)
         )
 
     async def list_all(

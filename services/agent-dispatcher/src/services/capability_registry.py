@@ -125,8 +125,7 @@ class CapabilityRegistry:
                 continue
             if min_confidence > 0:
                 if any(
-                    agent.confidence.get(cap, 100) < min_confidence
-                    for cap in required_capabilities
+                    agent.confidence.get(cap, 100) < min_confidence for cap in required_capabilities
                 ):
                     continue
             results.append(agent)

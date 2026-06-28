@@ -6,7 +6,6 @@ import uuid
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from src.repositories.worker_repository import AgentWorkerRepository
 from src.schemas.schemas import ConsultRequest
 from src.services.capability_registry import AgentCapability

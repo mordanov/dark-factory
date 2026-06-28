@@ -28,9 +28,7 @@ class WorkingMemoryRepository:
         tags: list[str] | None = None,
     ) -> WorkingMemoryEntry:
         if len(content) > _MAX_CONTENT_LEN:
-            raise ValueError(
-                f"content exceeds maximum length of {_MAX_CONTENT_LEN} characters"
-            )
+            raise ValueError(f"content exceeds maximum length of {_MAX_CONTENT_LEN} characters")
         entry = WorkingMemoryEntry(
             ticket_id=ticket_id,
             run_id=run_id,
@@ -72,15 +70,11 @@ class WorkingMemoryRepository:
         """Return the ticket_id for the given run_id from agent_runs, or None."""
         from src.models.models import AgentRun
 
-        result = await self.db.execute(
-            select(AgentRun.ticket_id).where(AgentRun.id == run_id)
-        )
+        result = await self.db.execute(select(AgentRun.ticket_id).where(AgentRun.id == run_id))
         return result.scalar_one_or_none()
 
     async def delete_expired(self) -> int:
         result = await self.db.execute(
-            delete(WorkingMemoryEntry).where(
-                WorkingMemoryEntry.expires_at < datetime.now(UTC)
-            )
+            delete(WorkingMemoryEntry).where(WorkingMemoryEntry.expires_at < datetime.now(UTC))
         )
         return result.rowcount  # type: ignore[return-value]

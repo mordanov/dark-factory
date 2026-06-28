@@ -478,9 +478,7 @@ def test_missing_confidence_entry_treated_as_100(cap_registry: CapabilityRegistr
 def test_get_candidates_with_confidence_intersects_state(
     cap_registry: CapabilityRegistry,
 ) -> None:
-    results = cap_registry.get_candidates_with_confidence(
-        "backend_development", ["python_backend"]
-    )
+    results = cap_registry.get_candidates_with_confidence("backend_development", ["python_backend"])
     assert len(results) == 1
     assert results[0].role_id == "backend"
 

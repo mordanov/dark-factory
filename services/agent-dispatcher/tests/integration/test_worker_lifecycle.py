@@ -7,7 +7,6 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
-
 from src.repositories.worker_repository import AgentWorkerRepository
 from src.services.capability_registry import AgentCapability
 from src.services.worker_service import AgentWorkerService
@@ -121,7 +120,6 @@ async def test_liveness_sweep_marks_stale_worker_unhealthy(worker_svc, db_sessio
     await repo.update_heartbeat(worker.id)
     # Directly set a stale timestamp via SQL
     from sqlalchemy import update as sa_update
-
     from src.models.models import AgentWorkerRecord
 
     await db_session.execute(

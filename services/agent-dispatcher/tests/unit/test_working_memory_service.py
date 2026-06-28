@@ -6,7 +6,6 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from src.services.working_memory_service import WorkingMemoryService
 
 

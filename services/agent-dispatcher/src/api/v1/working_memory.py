@@ -37,7 +37,9 @@ async def _verify_token(
 )
 async def list_working_memory(
     ticket_id: str,
-    run_id: str | None = Query(default=None, description="Caller's run_id for cross-ticket isolation check"),
+    run_id: str | None = Query(
+        default=None, description="Caller's run_id for cross-ticket isolation check"
+    ),
     author_role_id: str | None = Query(default=None),
     entry_type: str | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),

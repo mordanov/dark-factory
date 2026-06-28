@@ -64,9 +64,7 @@ async def poll_once(db: AsyncSession) -> list[TmTicket]:
                 title=t.get("title", ""),
                 description=t.get("description", ""),
                 tags=tags,
-                required_capabilities=derive_required_capabilities(
-                    t.get("fsm_status", ""), tags
-                ),
+                required_capabilities=derive_required_capabilities(t.get("fsm_status", ""), tags),
             )
         )
     return result

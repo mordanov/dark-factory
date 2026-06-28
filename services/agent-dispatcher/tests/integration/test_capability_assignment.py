@@ -6,12 +6,10 @@ from dataclasses import dataclass, field
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from src.repositories.run_repo import AgentRunRepository
 from src.repositories.worker_repository import AgentWorkerRepository
 from src.schemas.schemas import AgentResult
 from src.services.capability_registry import AgentCapability
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -74,7 +72,11 @@ async def _run_process_ticket(ticket, db, required_capabilities=None):
             "src.services.dispatcher_service.build_context_snapshot",
             return_value={"ticket_id": ticket.id},
         ),
-        patch("src.services.dispatcher_service._write_credentials", new_callable=AsyncMock, return_value=""),
+        patch(
+            "src.services.dispatcher_service._write_credentials",
+            new_callable=AsyncMock,
+            return_value="",
+        ),
     ):
         settings = MagicMock()
         settings.agent_prompts_dir = str(prompts_dir)
@@ -154,9 +156,7 @@ async def test_empty_required_capabilities_uses_static_assignment(db_session):
     """Empty required_capabilities list → static assignment, no capability resolution attempted."""
     ticket = make_ticket()
     with patch("src.services.worker_service.AgentWorkerService") as mock_svc_cls:
-        reporter = await _run_process_ticket(
-            ticket, db_session, required_capabilities=[]
-        )
+        reporter = await _run_process_ticket(ticket, db_session, required_capabilities=[])
         # WorkerService should never be called for capability resolution
         mock_svc_cls.assert_not_called()
 
