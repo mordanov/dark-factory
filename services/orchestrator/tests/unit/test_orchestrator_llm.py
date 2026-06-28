@@ -202,3 +202,82 @@ async def test_call_orchestrator_llm_bad_json():
     with patch("src.services.llm.orchestrator_llm.AsyncOpenAI", return_value=mock_client):
         with pytest.raises(UpstreamError, match="non-JSON"):
             await call_orchestrator_llm(ticket, ev, None, [], {}, job_payload={})
+
+
+# ---------------------------------------------------------------------------
+# T020 — Brainstorm Transcript section tests
+# ---------------------------------------------------------------------------
+
+
+def make_arch_ticket() -> TmTicket:
+    return TmTicket(
+        id="t-arch",
+        project_id="p-1",
+        title="Architecture Review",
+        description="## Acceptance Criteria\n- [ ] arch AC1",
+        ticket_type="feature",
+        tags=[],
+        fsm_status="architecture_review",
+    )
+
+
+def test_transcript_section_rendered():
+    ticket = make_arch_ticket()
+    ev = sample_eval(ticket)
+    payload = {
+        "brainstorm_transcript": {
+            "project_name": "df-t1",
+            "round_number": 1,
+            "max_rounds": 3,
+            "consensus": "inconclusive",
+            "messages": [
+                {"author": "software-architect", "content": "Use event sourcing.", "timestamp": ""},
+                {"author": "security-architect", "content": "Agreed but add audit log.", "timestamp": ""},
+            ],
+        }
+    }
+    msg = _build_user_message(ticket, ev, None, [], {}, job_payload=payload)
+
+    assert "[BRAINSTORM TRANSCRIPT]" in msg
+    assert "software-architect" in msg
+    assert "Use event sourcing" in msg
+    assert "security-architect" in msg
+    assert "add audit log" in msg
+    assert "Round: 1 of 3" in msg
+    assert "inconclusive" in msg
+    assert "df-t1" in msg
+
+
+def test_transcript_section_no_messages_shows_placeholder():
+    ticket = make_arch_ticket()
+    ev = sample_eval(ticket)
+    payload = {
+        "brainstorm_transcript": {
+            "project_name": "df-t1",
+            "round_number": 1,
+            "max_rounds": 3,
+            "consensus": "inconclusive",
+            "messages": [],
+        }
+    }
+    msg = _build_user_message(ticket, ev, None, [], {}, job_payload=payload)
+
+    assert "[BRAINSTORM TRANSCRIPT]" in msg
+    assert "(no messages)" in msg
+
+
+def test_no_transcript_for_arch_review_shows_wait_hint():
+    ticket = make_arch_ticket()
+    ev = sample_eval(ticket)
+    msg = _build_user_message(ticket, ev, None, [], {}, job_payload={})
+
+    assert "[BRAINSTORM TRANSCRIPT]" in msg
+    assert "WAIT" in msg or "No transcript" in msg
+
+
+def test_no_transcript_for_other_states_no_section():
+    ticket = sample_ticket()  # fsm_status="triage"
+    ev = sample_eval(ticket)
+    msg = _build_user_message(ticket, ev, None, [], {}, job_payload={})
+
+    assert "[BRAINSTORM TRANSCRIPT]" not in msg

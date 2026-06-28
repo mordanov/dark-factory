@@ -39,3 +39,12 @@ class TMCommentError(AppError):
 
     def __init__(self, detail: str = "Ticket Manager comment failed") -> None:
         super().__init__(detail)
+
+
+class UpstreamError(AppError):
+    """Raised when an upstream CLI tool or external service call fails."""
+
+    status_code = 502
+
+    def __init__(self, detail: str = "Upstream service error") -> None:
+        super().__init__(detail)

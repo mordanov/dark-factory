@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     # Brainstorm
     brainstorm_agents: str = "software-architect,security-architect"
     brainstorm_max_rounds: int = 3
+    brainstorm_npx_prefix: str = Field(default="~/.local/share/brainstorm-mcp")
+    brainstorm_cli_timeout_seconds: float = Field(default=30.0)
 
     # Agent registry
     agent_registry_path: str = ""  # override path; empty = use resolved_registry_path

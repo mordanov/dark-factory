@@ -190,3 +190,22 @@ class AdrSummary(BaseModel):
 
 class AdrListResponse(BaseModel):
     adrs: list[AdrSummary]
+
+
+# ---------------------------------------------------------------------------
+# Brainstorm transcript payload (type-documentation; not enforced at runtime)
+# ---------------------------------------------------------------------------
+
+
+class BrainstormMessagePayload(BaseModel):
+    author: str
+    content: str
+    timestamp: str
+
+
+class BrainstormTranscriptPayload(BaseModel):
+    project_name: str
+    round_number: int
+    max_rounds: int
+    consensus: str
+    messages: list[BrainstormMessagePayload]
