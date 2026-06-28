@@ -5,9 +5,10 @@ for backward compatibility during the Keycloak migration but is no longer used
 by the primary auth path. AUTH_MODE=local uses KeycloakValidator with HS256.
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 from jose import JWTError
-from unittest.mock import patch, MagicMock
 
 
 def _mock_settings():
