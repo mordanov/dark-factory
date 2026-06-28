@@ -74,9 +74,7 @@ class CapabilityRegistry:
 
             brainstorm_role = entry.get("brainstorm_role", "contributor")
             if brainstorm_role not in ("coordinator", "contributor"):
-                raise ValueError(
-                    f"Invalid brainstorm_role {brainstorm_role!r} for {role_id!r}"
-                )
+                raise ValueError(f"Invalid brainstorm_role {brainstorm_role!r} for {role_id!r}")
 
             agent = AgentCapability(
                 role_id=role_id,

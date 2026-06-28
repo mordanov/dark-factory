@@ -4,6 +4,7 @@ All HTTP clients are session-scoped (login once, reuse token).
 conftest.py MUST NOT call any registration or user-creation API endpoint —
 test users are provisioned by each service's startup seed script.
 """
+
 from __future__ import annotations
 
 import os

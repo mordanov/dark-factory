@@ -15,6 +15,7 @@ Steps match data-model.md Scenario A:
   Assert: ticket.tags contains "needs-estimation"
   Assert: ticket.description starts with "[needs-estimation]"
 """
+
 from __future__ import annotations
 
 import pytest
@@ -72,9 +73,7 @@ async def test_scenario_a_uim_to_tm_ticket_creation(
             "project_description": "A project created by integration test Scenario A.",
         },
     )
-    assert resp.status_code in (200, 201), (
-        f"Approve failed: {resp.status_code} {resp.text}"
-    )
+    assert resp.status_code in (200, 201), f"Approve failed: {resp.status_code} {resp.text}"
     approve_result = resp.json()
     ticket_id = approve_result["ticket_id"]
     project_id = approve_result["project_id"]
@@ -86,16 +85,12 @@ async def test_scenario_a_uim_to_tm_ticket_creation(
         f"/api/v1/tickets/{ticket_id}",
         headers=tm_auth_headers,
     )
-    assert resp.status_code == 200, (
-        f"TM ticket fetch failed: {resp.status_code} {resp.text}"
-    )
+    assert resp.status_code == 200, f"TM ticket fetch failed: {resp.status_code} {resp.text}"
     ticket = resp.json()
 
     # Assert: tag "needs-estimation" is present
     tag_names = [t["name"] if isinstance(t, dict) else t for t in ticket.get("tags", [])]
-    assert "needs-estimation" in tag_names, (
-        f"Expected tag 'needs-estimation' in {tag_names}"
-    )
+    assert "needs-estimation" in tag_names, f"Expected tag 'needs-estimation' in {tag_names}"
 
     # Assert: description starts with "[needs-estimation]"
     description = ticket.get("description", "")

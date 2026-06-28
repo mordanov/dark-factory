@@ -3,6 +3,7 @@
 Handles POST /v1/chat/completions with a canned response and GET /health.
 All requests are accepted; no authentication required.
 """
+
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel

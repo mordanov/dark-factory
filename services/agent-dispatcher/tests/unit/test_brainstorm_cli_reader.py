@@ -12,7 +12,9 @@ from src.schemas.schemas import AgentResult
 from src.services.brainstorm.cli_reader import BrainstormCLIReader, derive_consensus
 
 
-def make_reader(prefix: str = "~/.local/share/brainstorm-mcp", timeout: float = 5.0) -> BrainstormCLIReader:
+def make_reader(
+    prefix: str = "~/.local/share/brainstorm-mcp", timeout: float = 5.0
+) -> BrainstormCLIReader:
     return BrainstormCLIReader(npx_prefix=prefix, timeout_seconds=timeout)
 
 
@@ -30,7 +32,13 @@ def make_mock_proc(returncode: int, stdout: bytes = b"", stderr: bytes = b"") ->
 
 
 async def test_read_returns_messages_on_success():
-    data = [{"author": "backend", "content": "I suggest event sourcing.", "timestamp": "2026-01-01T00:00:00Z"}]
+    data = [
+        {
+            "author": "backend",
+            "content": "I suggest event sourcing.",
+            "timestamp": "2026-01-01T00:00:00Z",
+        }
+    ]
     proc = make_mock_proc(0, stdout=json.dumps(data).encode())
 
     with patch("asyncio.create_subprocess_exec", return_value=proc):
@@ -44,7 +52,9 @@ async def test_read_returns_messages_on_success():
 
 
 async def test_read_handles_sender_alias():
-    data = [{"sender": "frontend", "message": "I propose a SPA.", "created_at": "2026-01-01T00:00:01Z"}]
+    data = [
+        {"sender": "frontend", "message": "I propose a SPA.", "created_at": "2026-01-01T00:00:01Z"}
+    ]
     proc = make_mock_proc(0, stdout=json.dumps(data).encode())
 
     with patch("asyncio.create_subprocess_exec", return_value=proc):

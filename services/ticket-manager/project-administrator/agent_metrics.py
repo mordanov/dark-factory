@@ -431,7 +431,7 @@ def build_html_report(aggregates: dict[str, object]) -> str:
   <h2>Reporting Gaps by Agent</h2>
   <table>
     <thead><tr><th>Agent</th><th>Events Needing Follow-up</th><th>Missing Tokens</th><th>Zero Time</th><th>Non-self-reported</th><th>Non-completed Status</th></tr></thead>
-    <tbody>{''.join(gap_rows) if gap_rows else '<tr><td colspan="6">No reporting gaps detected</td></tr>'}</tbody>
+    <tbody>{"".join(gap_rows) if gap_rows else '<tr><td colspan="6">No reporting gaps detected</td></tr>'}</tbody>
   </table>
 
   <h2>Events Needing Follow-up</h2>
@@ -442,7 +442,7 @@ def build_html_report(aggregates: dict[str, object]) -> str:
       </tr>
     </thead>
     <tbody>
-      {''.join(gap_event_rows) if gap_event_rows else '<tr><td colspan="5">No follow-up required</td></tr>'}
+      {"".join(gap_event_rows) if gap_event_rows else '<tr><td colspan="5">No follow-up required</td></tr>'}
     </tbody>
   </table>
 
@@ -454,7 +454,7 @@ def build_html_report(aggregates: dict[str, object]) -> str:
       </tr>
     </thead>
     <tbody>
-      {''.join(event_rows) if event_rows else '<tr><td colspan="10">No events recorded</td></tr>'}
+      {"".join(event_rows) if event_rows else '<tr><td colspan="10">No events recorded</td></tr>'}
     </tbody>
   </table>
 </body>

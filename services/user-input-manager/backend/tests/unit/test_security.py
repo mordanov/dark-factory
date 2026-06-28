@@ -21,6 +21,7 @@ def _mock_settings():
 
 def test_hash_and_verify_password():
     from src.core.security import hash_password, verify_password
+
     plain = "SuperSecret123!"
     hashed = hash_password(plain)
     assert hashed != plain
@@ -31,6 +32,7 @@ def test_hash_and_verify_password():
 def test_access_token_roundtrip():
     with patch("src.core.security.settings", _mock_settings()):
         from src.core.security import create_access_token, verify_access_token
+
         token = create_access_token("user-id-123", is_admin=True)
         payload = verify_access_token(token)
     assert payload["sub"] == "user-id-123"
@@ -41,6 +43,7 @@ def test_access_token_roundtrip():
 def test_refresh_token_roundtrip():
     with patch("src.core.security.settings", _mock_settings()):
         from src.core.security import create_refresh_token, verify_refresh_token
+
         token = create_refresh_token("user-id-456")
         payload = verify_refresh_token(token)
     assert payload["sub"] == "user-id-456"
@@ -50,6 +53,7 @@ def test_refresh_token_roundtrip():
 def test_access_token_rejected_as_refresh():
     with patch("src.core.security.settings", _mock_settings()):
         from src.core.security import create_access_token, verify_refresh_token
+
         token = create_access_token("x", is_admin=False)
         with pytest.raises(JWTError):
             verify_refresh_token(token)
@@ -58,6 +62,7 @@ def test_access_token_rejected_as_refresh():
 def test_refresh_token_rejected_as_access():
     with patch("src.core.security.settings", _mock_settings()):
         from src.core.security import create_refresh_token, verify_access_token
+
         token = create_refresh_token("x")
         with pytest.raises(JWTError):
             verify_access_token(token)
@@ -66,6 +71,7 @@ def test_refresh_token_rejected_as_access():
 def test_tampered_token_raises():
     with patch("src.core.security.settings", _mock_settings()):
         from src.core.security import create_access_token, verify_access_token
+
         token = create_access_token("x", is_admin=False)
         tampered = token[:-4] + "xxxx"
         with pytest.raises(JWTError):

@@ -76,7 +76,9 @@ def test_build_user_message_includes_registry_section():
         "    capabilities: [python_backend]\n    fsm_ownership: [implementation]\n"
         "    preferred_for: []\n    brainstorm_also_for: []\n    brainstorm_role: contributor\n"
     )
-    msg = _build_user_message(ticket, ev, None, [], {}, job_payload={"registry_yaml": registry_yaml})
+    msg = _build_user_message(
+        ticket, ev, None, [], {}, job_payload={"registry_yaml": registry_yaml}
+    )
     assert "[AGENT REGISTRY]" in msg
     assert "backend" in msg
 
@@ -232,7 +234,11 @@ def test_transcript_section_rendered():
             "consensus": "inconclusive",
             "messages": [
                 {"author": "software-architect", "content": "Use event sourcing.", "timestamp": ""},
-                {"author": "security-architect", "content": "Agreed but add audit log.", "timestamp": ""},
+                {
+                    "author": "security-architect",
+                    "content": "Agreed but add audit log.",
+                    "timestamp": "",
+                },
             ],
         }
     }

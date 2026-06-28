@@ -53,14 +53,10 @@ class BrainstormCLIReader:
             stderr=asyncio.subprocess.PIPE,
         )
         try:
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(), timeout=self._timeout
-            )
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=self._timeout)
         except TimeoutError:
             proc.kill()
-            raise UpstreamError(
-                f"brainstorm-messages timed out after {self._timeout}s"
-            )
+            raise UpstreamError(f"brainstorm-messages timed out after {self._timeout}s")
 
         if proc.returncode != 0:
             err = stderr.decode()[:300]

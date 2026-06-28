@@ -364,9 +364,7 @@ async def test_project_memory_included_in_user_message() -> None:
                 project_memory="This project uses Python microservices.",
             )
 
-    user_content = next(
-        m["content"] for m in captured[0]["messages"] if m["role"] == "user"
-    )
+    user_content = next(m["content"] for m in captured[0]["messages"] if m["role"] == "user")
     assert "Python microservices" in user_content
 
 
@@ -400,9 +398,7 @@ async def test_prompt_injection_in_description_returns_valid_candidate() -> None
                 project_memory=None,
             )
 
-    assert result in ("backend", "frontend"), (
-        f"Injected role must be rejected; got: {result!r}"
-    )
+    assert result in ("backend", "frontend"), f"Injected role must be rejected; got: {result!r}"
 
 
 # ---------------------------------------------------------------------------

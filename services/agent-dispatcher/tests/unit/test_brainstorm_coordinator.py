@@ -76,7 +76,10 @@ async def test_two_agents_run_sequentially(db_session, tmp_path):
             return_value=("context", "jwt-token"),
         ),
         patch("src.services.brainstorm_coordinator.build_context_snapshot", return_value={}),
-        patch("src.services.brainstorm_coordinator.BrainstormCLIReader", return_value=make_mock_cli_reader()),
+        patch(
+            "src.services.brainstorm_coordinator.BrainstormCLIReader",
+            return_value=make_mock_cli_reader(),
+        ),
     ):
         settings = MagicMock()
         settings.agent_prompts_dir = str(prompts_dir)
@@ -121,7 +124,10 @@ async def test_two_agents_run_sequentially_with_explicit_participants(db_session
             return_value=("context", "jwt-token"),
         ),
         patch("src.services.brainstorm_coordinator.build_context_snapshot", return_value={}),
-        patch("src.services.brainstorm_coordinator.BrainstormCLIReader", return_value=make_mock_cli_reader()),
+        patch(
+            "src.services.brainstorm_coordinator.BrainstormCLIReader",
+            return_value=make_mock_cli_reader(),
+        ),
     ):
         settings = MagicMock()
         settings.agent_prompts_dir = str(prompts_dir)
@@ -167,7 +173,10 @@ async def test_early_exit_on_first_agent_agreed(db_session, tmp_path):
             "src.services.brainstorm_coordinator.build_context", return_value=("ctx", "jwt-token")
         ),
         patch("src.services.brainstorm_coordinator.build_context_snapshot", return_value={}),
-        patch("src.services.brainstorm_coordinator.BrainstormCLIReader", return_value=make_mock_cli_reader()),
+        patch(
+            "src.services.brainstorm_coordinator.BrainstormCLIReader",
+            return_value=make_mock_cli_reader(),
+        ),
     ):
         settings = MagicMock()
         settings.agent_prompts_dir = str(prompts_dir)
@@ -213,7 +222,10 @@ async def test_max_rounds_enforced(db_session, tmp_path):
             "src.services.brainstorm_coordinator.build_context", return_value=("ctx", "jwt-token")
         ),
         patch("src.services.brainstorm_coordinator.build_context_snapshot", return_value={}),
-        patch("src.services.brainstorm_coordinator.BrainstormCLIReader", return_value=make_mock_cli_reader()),
+        patch(
+            "src.services.brainstorm_coordinator.BrainstormCLIReader",
+            return_value=make_mock_cli_reader(),
+        ),
     ):
         settings = MagicMock()
         settings.agent_prompts_dir = str(prompts_dir)
@@ -259,7 +271,10 @@ async def test_api_mode_injects_previous_responses(db_session, tmp_path):
         patch("src.services.brainstorm_coordinator.get_settings") as mock_settings,
         patch("src.services.brainstorm_coordinator.build_context", side_effect=mock_build_context),
         patch("src.services.brainstorm_coordinator.build_context_snapshot", return_value={}),
-        patch("src.services.brainstorm_coordinator.BrainstormCLIReader", return_value=make_mock_cli_reader()),
+        patch(
+            "src.services.brainstorm_coordinator.BrainstormCLIReader",
+            return_value=make_mock_cli_reader(),
+        ),
     ):
         settings = MagicMock()
         settings.agent_prompts_dir = str(prompts_dir)
@@ -340,7 +355,10 @@ async def test_transcript_in_return_value(db_session, tmp_path):
         patch("src.services.brainstorm_coordinator.get_settings") as mock_settings,
         patch("src.services.brainstorm_coordinator.build_context", return_value=("ctx", "jwt")),
         patch("src.services.brainstorm_coordinator.build_context_snapshot", return_value={}),
-        patch("src.services.brainstorm_coordinator.BrainstormCLIReader", return_value=make_mock_cli_reader()),
+        patch(
+            "src.services.brainstorm_coordinator.BrainstormCLIReader",
+            return_value=make_mock_cli_reader(),
+        ),
     ):
         settings = MagicMock()
         settings.agent_prompts_dir = str(prompts_dir)
@@ -416,7 +434,9 @@ async def test_cli_reader_failure_does_not_abort(db_session, tmp_path):
         patch("src.services.brainstorm_coordinator.get_settings") as mock_settings,
         patch("src.services.brainstorm_coordinator.build_context", return_value=("ctx", "jwt")),
         patch("src.services.brainstorm_coordinator.build_context_snapshot", return_value={}),
-        patch("src.services.brainstorm_coordinator.BrainstormCLIReader", return_value=failing_reader),
+        patch(
+            "src.services.brainstorm_coordinator.BrainstormCLIReader", return_value=failing_reader
+        ),
     ):
         settings = MagicMock()
         settings.agent_prompts_dir = str(prompts_dir)

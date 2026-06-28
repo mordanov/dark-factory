@@ -234,9 +234,15 @@ async def test_report_result_no_registry_yaml_when_registry_none():
 def _make_transcript(messages=None):
     from src.services.brainstorm.cli_reader import BrainstormMessage, BrainstormTranscript
 
-    msgs = messages if messages is not None else [
-        BrainstormMessage(author="software-architect", content="Use CQRS.", timestamp="2026-01-01T00:00:00Z"),
-    ]
+    msgs = (
+        messages
+        if messages is not None
+        else [
+            BrainstormMessage(
+                author="software-architect", content="Use CQRS.", timestamp="2026-01-01T00:00:00Z"
+            ),
+        ]
+    )
     return BrainstormTranscript(
         project_name="df-TKT-1",
         round_number=1,

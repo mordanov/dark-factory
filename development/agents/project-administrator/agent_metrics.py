@@ -85,9 +85,7 @@ def cmd_summary(args):
         print("[agent_metrics] No database found. Run: python agent_metrics.py init")
         return
     conn = get_conn()
-    rows = conn.execute(
-        "SELECT * FROM task_events ORDER BY agent_name, timestamp"
-    ).fetchall()
+    rows = conn.execute("SELECT * FROM task_events ORDER BY agent_name, timestamp").fetchall()
     conn.close()
 
     if not rows:
@@ -156,9 +154,7 @@ def cmd_report_html(args):
         print("[agent_metrics] No database found.")
         return
     conn = get_conn()
-    rows = conn.execute(
-        "SELECT * FROM task_events ORDER BY timestamp"
-    ).fetchall()
+    rows = conn.execute("SELECT * FROM task_events ORDER BY timestamp").fetchall()
     conn.close()
 
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")

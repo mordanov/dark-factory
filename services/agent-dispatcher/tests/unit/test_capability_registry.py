@@ -340,7 +340,7 @@ def test_load_template_injection_attempt(tmp_path: Path) -> None:
     bad = tmp_path / "injection_template.yaml"
     bad.write_text(
         "version: '1.0'\n"
-        "brainstorm_project_template: '{__import__(\"os\").system(\"id\")}'\n"
+        'brainstorm_project_template: \'{__import__("os").system("id")}\'\n'
         "agents: []\n",
         encoding="utf-8",
     )
@@ -352,9 +352,7 @@ def test_load_template_injection_attempt(tmp_path: Path) -> None:
 def test_load_valid_template_with_prefix_suffix(tmp_path: Path) -> None:
     f = tmp_path / "registry.yaml"
     f.write_text(
-        "version: '1.0'\n"
-        "brainstorm_project_template: 'proj-{ticket_id}-v2'\n"
-        "agents: []\n",
+        "version: '1.0'\nbrainstorm_project_template: 'proj-{ticket_id}-v2'\nagents: []\n",
         encoding="utf-8",
     )
     reg = CapabilityRegistry(str(f))

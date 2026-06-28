@@ -162,8 +162,7 @@ def _build_user_message(
     transcript_raw = (job_payload or {}).get("brainstorm_transcript")
     if transcript_raw:
         msg_lines = [
-            f"  [{m['author']}]: {m['content']}"
-            for m in transcript_raw.get("messages", [])
+            f"  [{m['author']}]: {m['content']}" for m in transcript_raw.get("messages", [])
         ]
         parts.append(
             f"[BRAINSTORM TRANSCRIPT]\n"

@@ -13,6 +13,7 @@ Steps match data-model.md Scenario C:
   Assert: memory_content is non-null
   Assert: parsed YAML has required top-level keys
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -39,6 +40,7 @@ async def test_scenario_c_orchestrator_memory(
 
     # Step 2a: Create a project in TM.
     import time
+
     project_name = f"Scenario C Project {int(time.time())}"
     resp = await tm_client.post(
         "/api/v1/projects",
@@ -93,9 +95,7 @@ async def test_scenario_c_orchestrator_memory(
             f"/api/v1/orchestrator/jobs/{job_id}",
             headers=uim_auth_headers,
         )
-        assert resp.status_code == 200, (
-            f"Job poll failed: {resp.status_code} {resp.text}"
-        )
+        assert resp.status_code == 200, f"Job poll failed: {resp.status_code} {resp.text}"
         final_status = resp.json().get("status")
         if final_status in ("done", "failed", "error"):
             break
@@ -110,9 +110,7 @@ async def test_scenario_c_orchestrator_memory(
         f"/api/v1/orchestrator/memory/{tm_project_id}",
         headers=uim_auth_headers,
     )
-    assert resp.status_code == 200, (
-        f"Project memory fetch failed: {resp.status_code} {resp.text}"
-    )
+    assert resp.status_code == 200, f"Project memory fetch failed: {resp.status_code} {resp.text}"
     memory_response = resp.json()
 
     # Assert: memory content is non-null
