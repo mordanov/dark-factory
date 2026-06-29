@@ -48,11 +48,11 @@ export function Navbar() {
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-64">
-            <SheetHeader>
-              <SheetTitle className="text-left">Ticket Manager</SheetTitle>
-            </SheetHeader>
-            <nav className="flex flex-col gap-1 mt-4">
+           <SheetContent side="left" className="w-64">
+             <SheetHeader>
+               <SheetTitle className="text-left">Dark Quark AI Factory</SheetTitle>
+             </SheetHeader>
+             <nav className="flex flex-col gap-1 mt-4">
               <Button variant="ghost" size="sm" asChild className="justify-start" onClick={() => setMobileOpen(false)}>
                 <Link to="/projects">{t("nav.projects")}</Link>
               </Button>
@@ -71,7 +71,7 @@ export function Navbar() {
           </SheetContent>
         </Sheet>
 
-        <span className="text-xl font-semibold text-foreground mr-4">Ticket Manager</span>
+        <span className="text-xl font-semibold text-foreground mr-4">Dark Quark AI Factory</span>
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-1">
