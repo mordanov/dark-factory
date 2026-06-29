@@ -128,7 +128,14 @@ else
   log "kubeconfig written to ${DEST_KUBECONFIG}"
 fi
 
-# ── 8. Apply Headlamp Ingress ─────────────────────────────────────────────────
+# ── 8. Wait for NGINX admission webhook ──────────────────────────────────────
+log "Waiting for NGINX Ingress admission webhook to be ready..."
+kubectl wait --namespace ingress-nginx \
+  --for=condition=ready pod \
+  --selector=app.kubernetes.io/component=controller \
+  --timeout=120s
+
+# ── 9. Apply Headlamp Ingress ────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 MONITORING_MANIFESTS="${REPO_ROOT}/k8s/monitoring"
@@ -140,7 +147,7 @@ fi
 log "Applying Headlamp Ingress..."
 kubectl apply -f "${MONITORING_MANIFESTS}/headlamp-ingress.yaml"
 
-# ── 9. Create Headlamp basic-auth secret ──────────────────────────────────────
+# ── 10. Create Headlamp basic-auth secret ────────────────────────────────────
 if kubectl get secret headlamp-basic-auth -n headlamp &>/dev/null 2>&1; then
   log "headlamp-basic-auth secret already exists — skipping"
 else
@@ -154,7 +161,7 @@ else
   log "headlamp-basic-auth secret created"
 fi
 
-# ── 10. Health check ───────────────────────────────────────────────────────────
+# ── 11. Health check ──────────────────────────────────────────────────────────
 log "Verifying cluster health..."
 NODE_STATUS=$(kubectl get nodes --no-headers 2>/dev/null | awk '{print $2}' | head -1)
 if [ "$NODE_STATUS" != "Ready" ]; then
