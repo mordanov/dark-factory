@@ -85,6 +85,16 @@ else
     --set controller.service.type=LoadBalancer \
     --wait --timeout 120s
   log "NGINX Ingress Controller installed"
+
+  log "Waiting for NGINX admission webhook endpoint to be ready..."
+  kubectl rollout status deployment/ingress-nginx-controller \
+    -n ingress-nginx --timeout=120s
+  until kubectl get endpoints ingress-nginx-controller-admission \
+      -n ingress-nginx -o jsonpath='{.subsets[0].addresses[0].ip}' \
+      2>/dev/null | grep -q '.'; do
+    sleep 2
+  done
+  log "NGINX admission webhook ready"
 fi
 
 # ── 5. Install cert-manager ───────────────────────────────────────────────────
@@ -128,13 +138,6 @@ else
   log "kubeconfig written to ${DEST_KUBECONFIG}"
 fi
 
-# ── 8. Wait for NGINX admission webhook ──────────────────────────────────────
-log "Waiting for NGINX Ingress admission webhook to be ready..."
-kubectl wait --namespace ingress-nginx \
-  --for=condition=ready pod \
-  --selector=app.kubernetes.io/component=controller \
-  --timeout=120s
-
 # ── 9. Apply Headlamp Ingress ────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
@@ -147,7 +150,7 @@ fi
 log "Applying Headlamp Ingress..."
 kubectl apply -f "${MONITORING_MANIFESTS}/headlamp-ingress.yaml"
 
-# ── 10. Create Headlamp basic-auth secret ────────────────────────────────────
+# ── 10. Create Headlamp basic-auth secret ─────────────────────────────────────
 if kubectl get secret headlamp-basic-auth -n headlamp &>/dev/null 2>&1; then
   log "headlamp-basic-auth secret already exists — skipping"
 else
