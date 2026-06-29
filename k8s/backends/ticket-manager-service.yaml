@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ticket-manager
+  namespace: dark-factory
+  labels:
+    app: ticket-manager
+spec:
+  selector:
+    app: ticket-manager
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000

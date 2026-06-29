@@ -9,6 +9,7 @@ import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.api.v1 import consultation, runs, workers, working_memory
 from src.core.auth_adapter import prefetch_jwks
@@ -135,6 +136,8 @@ def create_app() -> FastAPI:
     @app.get("/api/health", tags=["health"])
     async def health():
         return {"status": "ok", "runner_mode": settings.agent_runner_mode}
+
+    Instrumentator().instrument(app).expose(app)
 
     return app
 

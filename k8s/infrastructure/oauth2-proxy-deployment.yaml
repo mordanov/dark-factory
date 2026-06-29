@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oauth2-proxy
+  namespace: dark-factory
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oauth2-proxy
+  template:
+    metadata:
+      labels:
+        app: oauth2-proxy
+    spec:
+      containers:
+        - name: oauth2-proxy
+          image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
+          args:
+            - --config=/etc/oauth2_proxy/config.cfg
+          ports:
+            - containerPort: 4180
+          envFrom:
+            - secretRef:
+                name: dark-factory-secrets
+          volumeMounts:
+            - name: oauth2-proxy-config
+              mountPath: /etc/oauth2_proxy
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: 4180
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 4180
+            initialDelaySeconds: 15
+            periodSeconds: 10
+      volumes:
+        - name: oauth2-proxy-config
+          configMap:
+            name: oauth2-proxy-config

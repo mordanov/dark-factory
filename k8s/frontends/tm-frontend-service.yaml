@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: tm-frontend
+  namespace: dark-factory
+spec:
+  selector:
+    app: tm-frontend
+  ports:
+    - port: 80
+      targetPort: 80

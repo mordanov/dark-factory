@@ -186,9 +186,9 @@ jobs:
         if: contains(fromJSON('["nginx","agent-tools"]'), matrix.service)
         run: echo "No test suite for ${{ matrix.service }} — skipping test stage."
 
-  # ─── Stage 4: Deploy (SSH to VPS) ────────────────────────────────────────────
+  # ─── Stage 4: Deploy (k3s / kubectl) ────────────────────────────────────────
   deploy:
-    name: Deploy to VPS
+    name: Deploy to k3s
     needs: [detect, test]
     if: needs.detect.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
@@ -200,168 +200,107 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
-      - name: Build service list for deployment
-        id: svclist
+      - name: Configure kubectl
         run: |
-          SERVICES='${{ needs.detect.outputs.services }}'
-          # Convert JSON array to space-separated list for shell use
-          SVC_SPACE=$(echo "$SERVICES" | python3 -c "import sys,json; print(' '.join(json.load(sys.stdin)))")
-          echo "space_list=${SVC_SPACE}" >> "$GITHUB_OUTPUT"
-          echo "json_list=${SERVICES}" >> "$GITHUB_OUTPUT"
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17  # v1.2.0
+      - name: Install kubectl
+        uses: azure/setup-kubectl@3e0aec4d80787158d308d7b364cb1381784a5774  # v4.0.0
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Deploy changed services
         env:
           SERVICES_JSON: ${{ needs.detect.outputs.services }}
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          envs: SERVICES_JSON
-          script: |
-            set -euo pipefail
-            cd /app/dark-factory
+          OWNER: ${{ github.repository_owner }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
 
-            # ── 1. Pull latest code ──────────────────────────────────────────
-            git pull origin main
+          SERVICES=$(echo "$SERVICES_JSON" | python3 -c "import sys,json; print(' '.join(json.load(sys.stdin)))")
 
-            # ── 2. Parse service list ────────────────────────────────────────
-            SERVICES=$(echo "$SERVICES_JSON" | python3 -c "import sys,json; print(' '.join(json.load(sys.stdin)))")
+          # Service → k8s Deployment name + build path
+          k8s_name() {
+            case "$1" in
+              uim-backend)       echo "user-input-manager" ;;
+              tm-backend)        echo "ticket-manager" ;;
+              orchestrator)      echo "orchestrator" ;;
+              context-distiller) echo "context-distiller" ;;
+              agent-dispatcher)  echo "agent-dispatcher" ;;
+              agent-tools)       echo "agent-tools" ;;
+              uim-frontend)      echo "uim-frontend" ;;
+              tm-frontend)       echo "tm-frontend" ;;
+              *)                 echo "$1" ;;
+            esac
+          }
 
-            # Service → compose name mapping
-            compose_name() {
-              case "$1" in
-                uim-backend)       echo "user-input-manager" ;;
-                tm-backend)        echo "ticket-manager" ;;
-                orchestrator)      echo "orchestrator" ;;
-                context-distiller) echo "context-distiller" ;;
-                agent-dispatcher)  echo "agent-dispatcher" ;;
-                agent-tools)       echo "agent-tools" ;;
-                uim-frontend)      echo "uim-frontend" ;;
-                tm-frontend)       echo "tm-frontend" ;;
-                nginx)             echo "nginx" ;;
-                *)                 echo "$1" ;;
-              esac
-            }
+          # Service → GHCR image name (matches k8s_name)
+          image_name() { k8s_name "$1"; }
 
-            # Health path mapping (empty = no health check; use docker compose exec not host port)
-            health_path() {
-              case "$1" in
-                uim-backend)       echo "/health" ;;
-                tm-backend)        echo "/health" ;;
-                orchestrator)      echo "/health" ;;
-                context-distiller) echo "/health" ;;
-                agent-dispatcher)  echo "/api/health" ;;
-                agent-tools)       echo "" ;;
-                uim-frontend)      echo "" ;;
-                tm-frontend)       echo "" ;;
-                nginx)             echo "" ;;
-                *)                 echo "" ;;
-              esac
-            }
+          # Migration-enabled backend services
+          needs_migration() {
+            case "$1" in
+              uim-backend|tm-backend|orchestrator|context-distiller|agent-dispatcher) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
 
-            # Migration-enabled services
-            needs_migration() {
-              case "$1" in
-                uim-backend|tm-backend|orchestrator|context-distiller|agent-dispatcher) return 0 ;;
-                *) return 1 ;;
-              esac
-            }
+          ROLLBACK_NEEDED=""
 
-            TIMESTAMP=$(date +%Y%m%d%H%M%S)
-            COMPOSE="docker compose -f infra/docker-compose.yml"
+          for SVC in $SERVICES; do
+            K8S=$(k8s_name "$SVC")
+            IMG="ghcr.io/${OWNER}/${K8S}:${SHA}"
 
-            # ── 3. Snapshot current images ───────────────────────────────────
-            echo "=== Snapshotting current images ==="
-            for SVC in $SERVICES; do
-              CSVC=$(compose_name "$SVC")
-              IMAGE="dark-factory-${CSVC}:latest"
-              if docker image inspect "$IMAGE" >/dev/null 2>&1; then
-                docker tag "$IMAGE" "dark-factory-${CSVC}:rollback-${TIMESTAMP}"
-                echo "  Snapshot: dark-factory-${CSVC}:rollback-${TIMESTAMP}"
-                # Retain only 3 most recent rollback tags
-                docker images --format '{{.Tag}}' "dark-factory-${CSVC}" \
-                  | grep '^rollback-' | sort -r | tail -n +4 \
-                  | xargs -I{} docker rmi "dark-factory-${CSVC}:{}" 2>/dev/null || true
-              else
-                echo "  No existing image for ${CSVC}, skipping snapshot"
+            # ── 1. Resolve service build path ────────────────────────────────
+            chmod +x .github/scripts/service-to-path.sh
+            BUILD_PATH=$(.github/scripts/service-to-path.sh "$SVC" | tail -1)
+
+            echo "=== Building ${K8S} from ${BUILD_PATH} ==="
+            docker build -t "$IMG" "$BUILD_PATH"
+            docker push "$IMG"
+
+            # ── 2. Run Alembic migrations (before rollout) ───────────────────
+            if needs_migration "$SVC"; then
+              echo "=== Running Alembic migration for ${K8S} ==="
+              JOB_NAME="alembic-${K8S}-${SHA:0:8}"
+              if ! kubectl run "$JOB_NAME" \
+                --image="$IMG" \
+                --rm --restart=Never \
+                -n dark-factory \
+                --env-from=secret/dark-factory-secrets \
+                --timeout=120s \
+                -- alembic upgrade head; then
+                echo "ERROR: Migration failed for ${K8S}. Aborting deploy."
+                exit 1
               fi
-            done
-
-            # ── 4. Build new images on VPS ───────────────────────────────────
-            echo "=== Building images ==="
-            COMPOSE_SERVICES=""
-            for SVC in $SERVICES; do
-              CSVC=$(compose_name "$SVC")
-              COMPOSE_SERVICES="$COMPOSE_SERVICES $CSVC"
-            done
-            $COMPOSE build $COMPOSE_SERVICES
-
-            # ── 5. Run database migrations ───────────────────────────────────
-            echo "=== Running migrations ==="
-            for SVC in $SERVICES; do
-              if needs_migration "$SVC"; then
-                CSVC=$(compose_name "$SVC")
-                echo "  Migrating ${CSVC}..."
-                if ! $COMPOSE run --rm "$CSVC" alembic upgrade head; then
-                  echo "ERROR: Migration failed for ${CSVC}. Aborting deploy — old containers remain running."
-                  exit 1
-                fi
-              fi
-            done
-
-            # ── 6. Restart containers ────────────────────────────────────────
-            echo "=== Restarting containers ==="
-            for SVC in $SERVICES; do
-              CSVC=$(compose_name "$SVC")
-              $COMPOSE up -d "$CSVC"
-            done
-
-            # ── 7. Health check poll (90s window) ────────────────────────────
-            # Uses docker compose exec to reach the internal container port (no host port mapping needed)
-            echo "=== Health checking ==="
-            UNHEALTHY=""
-            for SVC in $SERVICES; do
-              HPATH=$(health_path "$SVC")
-              CSVC=$(compose_name "$SVC")
-              if [ -z "$HPATH" ]; then
-                echo "  ${SVC}: no health endpoint, skipping"
-                continue
-              fi
-              echo "  Waiting for ${SVC} at ${HPATH}..."
-              DEADLINE=$((SECONDS + 90))
-              OK=false
-              while [ $SECONDS -lt $DEADLINE ]; do
-                if $COMPOSE exec -T "$CSVC" python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000${HPATH}')" >/dev/null 2>&1; then
-                  echo "  ${SVC}: healthy"
-                  OK=true
-                  break
-                fi
-                sleep 5
-              done
-              if [ "$OK" = false ]; then
-                echo "  ${SVC}: UNHEALTHY after 90s"
-                UNHEALTHY="$UNHEALTHY $SVC"
-              fi
-            done
-
-            # ── 8. Auto-rollback on health check failure ─────────────────────
-            if [ -n "$UNHEALTHY" ]; then
-              echo "=== ROLLBACK: restoring previous images for:${UNHEALTHY} ==="
-              for SVC in $UNHEALTHY; do
-                CSVC=$(compose_name "$SVC")
-                ROLLBACK_TAG=$(docker images --format '{{.Tag}}' "dark-factory-${CSVC}" \
-                  | grep '^rollback-' | sort -r | head -1 || true)
-                if [ -n "$ROLLBACK_TAG" ]; then
-                  docker tag "dark-factory-${CSVC}:${ROLLBACK_TAG}" "dark-factory-${CSVC}:latest"
-                  $COMPOSE up -d "$CSVC"
-                  echo "  Restored ${CSVC} from ${ROLLBACK_TAG}"
-                else
-                  echo "  WARNING: No rollback tag found for ${CSVC}"
-                fi
-              done
-              echo "=== Rollback complete. Pipeline exiting as failed. ==="
-              exit 1
             fi
 
-            echo "=== Deployment successful ==="
+            # ── 3. Update Deployment image ───────────────────────────────────
+            echo "=== Updating Deployment ${K8S} ==="
+            kubectl set image "deployment/${K8S}" "${K8S}=${IMG}" -n dark-factory
+
+            # ── 4. Wait for rollout ──────────────────────────────────────────
+            echo "=== Waiting for rollout: ${K8S} ==="
+            if ! kubectl rollout status "deployment/${K8S}" -n dark-factory --timeout=120s; then
+              echo "ERROR: Rollout failed for ${K8S}"
+              ROLLBACK_NEEDED="$ROLLBACK_NEEDED $K8S"
+            else
+              echo "=== ${K8S} rolled out successfully ==="
+            fi
+          done
+
+          # ── 5. Auto-rollback any failed Deployments ──────────────────────
+          if [ -n "$ROLLBACK_NEEDED" ]; then
+            echo "=== ROLLBACK: reverting failed deployments:${ROLLBACK_NEEDED} ==="
+            for K8S in $ROLLBACK_NEEDED; do
+              kubectl rollout undo "deployment/${K8S}" -n dark-factory
+              echo "  Rolled back ${K8S}"
+            done
+            echo "=== Rollback complete. Pipeline exiting as failed. ==="
+            exit 1
+          fi
+
+          echo "=== Deployment successful ==="

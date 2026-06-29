@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: dark-factory
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      initContainers:
+        - name: copy-init-scripts
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - cp /init-src/01_create_databases.sh /docker-entrypoint-initdb.d/ && chmod +x /docker-entrypoint-initdb.d/01_create_databases.sh
+          volumeMounts:
+            - name: postgres-init-src
+              mountPath: /init-src
+            - name: postgres-initdb
+              mountPath: /docker-entrypoint-initdb.d
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: dark-factory-secrets
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+            - name: postgres-initdb
+              mountPath: /docker-entrypoint-initdb.d
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - $(POSTGRES_USER)
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - $(POSTGRES_USER)
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      volumes:
+        - name: postgres-init-src
+          configMap:
+            name: postgres-init-sql
+            defaultMode: 0755
+        - name: postgres-initdb
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 10Gi

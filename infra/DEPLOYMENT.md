@@ -1,6 +1,235 @@
 # Deployment Guide — Dark Factory
 
-## GitHub Actions Secrets
+> **Migration note (feature 007-k3s-migration):** This project has been migrated from Docker
+> Compose + VPS SSH to **k3s (Kubernetes)**. The Docker Compose sections below are preserved
+> for reference. The k3s deployment procedure starts at [k3s Deployment](#k3s-deployment).
+
+---
+
+## k3s Deployment
+
+### GitHub Actions Secrets
+
+After the k3s migration, replace the three VPS SSH secrets with two k8s secrets:
+
+**Add these secrets:**
+
+| Secret | Value | How to generate |
+|--------|-------|----------------|
+| `KUBECONFIG` | base64-encoded kubeconfig | `cat ~/.kube/dark-factory-k3s.yaml \| base64` |
+| `GHCR_TOKEN` | GitHub PAT with `write:packages` scope | GitHub → Settings → Developer Settings → PATs |
+
+**Remove these secrets (no longer used):**
+
+| Secret | Reason |
+|--------|--------|
+| `VPS_HOST` | SSH deploy replaced by kubectl |
+| `VPS_USER` | SSH deploy replaced by kubectl |
+| `VPS_SSH_KEY` | SSH deploy replaced by kubectl |
+
+> **Constitution note:** This change supersedes Principles XXII (VPS-only builds) and XXVI
+> (3-secret CI rule). A container registry is architecturally required for Kubernetes.
+> See `specs/007-k3s-migration/plan.md` — Constitution Check section.
+
+---
+
+### First-Time k3s Cluster Setup
+
+```bash
+# 0. Initialise the server — run once as root on a fresh VPS
+#    Creates a deploy user, installs your SSH key, disables root SSH login
+scp infra/scripts/init-server.sh root@<vps-ip>:~/
+ssh root@<vps-ip> "bash init-server.sh --user deploy --pubkey \"$(cat ~/.ssh/id_ed25519.pub)\""
+
+# Verify the new user works before closing the root session
+ssh deploy@<vps-ip> "whoami"
+
+# 1. Prepare the VPS (installs curl, git, htpasswd; clones the repo)
+ssh deploy@<vps-ip> "sudo bash -c 'curl -fsSL https://raw.githubusercontent.com/<org>/dark-factory/main/infra/scripts/setup-vps.sh | bash -s -- https://github.com/<org>/dark-factory.git'"
+
+# — or, if the VPS has no outbound access to GitHub yet —
+scp infra/scripts/setup-vps.sh deploy@<vps-ip>:~/
+ssh deploy@<vps-ip> "sudo bash setup-vps.sh https://github.com/<org>/dark-factory.git"
+
+# 2. Place the production .env file (NEVER commit or pass through CI)
+scp infra/.env deploy@<vps-ip>:/app/dark-factory/infra/.env
+
+# 3. Run the k3s cluster setup
+ssh deploy@<vps-ip> "sudo bash /app/dark-factory/infra/scripts/setup-k3s.sh --dashboard-password <your-password>"
+
+# 2. Copy kubeconfig to local machine
+scp <user>@<vps-ip>:/etc/rancher/k3s/k3s.yaml ~/.kube/dark-factory-k3s.yaml
+sed -i 's/127.0.0.1/<vps-public-ip>/g' ~/.kube/dark-factory-k3s.yaml
+export KUBECONFIG=~/.kube/dark-factory-k3s.yaml
+
+# 3. Create namespace and secrets (run once, manually — NEVER in CI)
+kubectl create namespace dark-factory
+
+kubectl create secret generic dark-factory-secrets \
+  --from-env-file=infra/.env \
+  -n dark-factory
+
+kubectl create secret docker-registry ghcr-pull-secret \
+  --docker-server=ghcr.io \
+  --docker-username=<github-username> \
+  --docker-password=<ghcr-token> \
+  -n dark-factory
+```
+
+### Building and Pushing Initial Images
+
+```bash
+export OWNER=<github-repository-owner>
+export SHA=$(git rev-parse HEAD)
+
+for SERVICE in user-input-manager ticket-manager orchestrator context-distiller agent-tools agent-dispatcher uim-frontend tm-frontend; do
+  docker build -t ghcr.io/$OWNER/$SERVICE:$SHA services/$SERVICE/
+  docker push ghcr.io/$OWNER/$SERVICE:$SHA
+done
+```
+
+Substitute image tags in manifests:
+```bash
+find k8s/ -name '*.yaml' -exec sed -i "s|REPLACE_SHA|$SHA|g; s|OWNER|$OWNER|g" {} \;
+```
+
+The `agent-registry` ConfigMap must be populated from the live registry.yaml:
+```bash
+kubectl create configmap agent-registry \
+  --from-file=registry.yaml=development/agents/registry.yaml \
+  -n dark-factory --dry-run=client -o yaml | kubectl apply -f -
+```
+
+### Apply Manifests
+
+```bash
+kubectl apply -f k8s/
+```
+
+### Run Database Migrations (first deploy)
+
+```bash
+for SERVICE in user-input-manager ticket-manager orchestrator context-distiller agent-dispatcher; do
+  kubectl run alembic-$SERVICE \
+    --image=ghcr.io/$OWNER/$SERVICE:$SHA \
+    --rm --restart=Never -n dark-factory \
+    --env-from=secret/dark-factory-secrets \
+    -- alembic upgrade head
+done
+```
+
+### cert-manager ClusterIssuers
+
+```bash
+# Apply ClusterIssuers (update email address in k8s/ingress/cluster-issuer.yaml first)
+kubectl apply -f k8s/ingress/cluster-issuer.yaml
+
+# Verify cert-manager obtained certificates after Ingress is applied
+kubectl describe certificate dark-factory-tls -n dark-factory
+```
+
+### DNS Requirements
+
+Before applying the Ingress, create DNS A records pointing to the VPS public IP:
+
+| Hostname | Target |
+|----------|--------|
+| `studio.dark-factory.local` | VPS public IP |
+| `tickets.dark-factory.local` | VPS public IP |
+| `grafana.dark-factory.local` | VPS public IP |
+| `k8s.dark-factory.local` | VPS public IP |
+
+### Verify Health
+
+```bash
+kubectl get pods -n dark-factory
+kubectl rollout status deployment/user-input-manager -n dark-factory
+kubectl rollout status deployment/keycloak -n dark-factory
+kubectl rollout status statefulset/postgres -n dark-factory
+kubectl rollout status statefulset/mongo -n dark-factory
+```
+
+### Rollback (manual)
+
+```bash
+kubectl rollout undo deployment/<service-name> -n dark-factory
+
+# Rollback to a specific revision:
+kubectl rollout history deployment/<service-name> -n dark-factory
+kubectl rollout undo deployment/<service-name> --to-revision=<n> -n dark-factory
+```
+
+---
+
+## How the k3s CI/CD Pipeline Works (updated)
+
+Every push to `main` triggers `.github/workflows/ci-cd.yml`:
+
+1. **detect** — identifies which services changed (unchanged)
+2. **validate** — ruff + docker build for changed services (unchanged)
+3. **test** — pytest/vitest with SQLite + AUTH_MODE=local (unchanged)
+4. **deploy** — for each changed service:
+   - Writes `KUBECONFIG` secret to `~/.kube/config`
+   - Logs in to GHCR with `GHCR_TOKEN`
+   - Builds and pushes image to `ghcr.io/<owner>/<service>:<sha>`
+   - For DB-backed services: runs `kubectl run --rm` Alembic migration
+   - `kubectl set image` to update the Deployment
+   - `kubectl rollout status --timeout=120s`
+   - On failure: `kubectl rollout undo` + pipeline exits 1
+
+---
+
+## Observability (optional)
+
+Install after core stack is verified:
+
+```bash
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+
+helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+  -n monitoring --create-namespace \
+  -f k8s/monitoring/values-prometheus.yaml
+
+kubectl apply -f k8s/monitoring/service-monitors.yaml
+kubectl apply -f k8s/monitoring/grafana-ingress.yaml
+```
+
+Create Grafana basic-auth secret before applying grafana-ingress:
+```bash
+kubectl create secret generic grafana-basic-auth \
+  --from-literal=auth="$(htpasswd -nb admin <your-password>)" \
+  -n monitoring
+```
+
+---
+
+## Headlamp (Kubernetes UI)
+
+Installed and fully configured by `setup-k3s.sh --dashboard-password <password>` — no extra
+steps required. The script installs the Helm chart, applies the Ingress, and creates the
+basic-auth secret in one pass.
+
+After setup, generate a login token:
+
+```bash
+kubectl create token headlamp -n headlamp --duration=8760h
+```
+
+Open `https://k8s.dark-factory.local`, authenticate with basic-auth (user: `admin`, password
+as supplied to the script), then paste the token into the Headlamp login screen.
+
+> **Security note:** The basic-auth layer protects the Ingress path. Headlamp itself
+> requires token login — two independent auth gates before any cluster state is visible.
+
+---
+
+## Legacy: Docker Compose Deployment (pre-k3s)
+
+> The sections below document the original VPS + Docker Compose deployment.
+> They are retained for reference during the migration period.
+
+### GitHub Actions Secrets (legacy)
 
 Configure exactly three secrets in **Repository → Settings → Secrets → Actions**:
 

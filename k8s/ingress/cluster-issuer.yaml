@@ -1,0 +1,35 @@
+---
+# Staging issuer — use for initial testing to avoid Let's Encrypt rate limits.
+# Certificates from this issuer are NOT trusted by browsers.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: admin@dark-factory.local  # Replace with actual admin email
+    privateKeySecretRef:
+      name: letsencrypt-staging-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: nginx
+
+---
+# Production issuer — switch to this once staging certificates validate correctly.
+# Certificates from this issuer are trusted by browsers.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@dark-factory.local  # Replace with actual admin email
+    privateKeySecretRef:
+      name: letsencrypt-prod-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: nginx

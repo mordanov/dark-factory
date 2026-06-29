@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.api.v1 import audit, jobs, memory
 from src.core.auth_adapter import prefetch_jwks
@@ -54,6 +55,8 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["health"])
     async def health():
         return {"status": "ok", "service": "orchestrator"}
+
+    Instrumentator().instrument(app).expose(app)
 
     return app
 

@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana
+  namespace: monitoring
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: grafana-basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Grafana — Dark Factory"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - grafana.dark-factory.local
+      secretName: grafana-tls
+  rules:
+    - host: grafana.dark-factory.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kube-prometheus-stack-grafana
+                port:
+                  number: 80

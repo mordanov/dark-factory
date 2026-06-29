@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oauth2-proxy-config
+  namespace: dark-factory
+data:
+  config.cfg: |
+    provider = "keycloak-oidc"
+    oidc_issuer_url = "http://keycloak:8080/realms/dark-factory"
+    client_id = "oauth2-proxy"
+
+    set_xauthrequest = true
+    pass_user_headers = true
+    pass_access_token = false
+
+    email_domains = ["*"]
+
+    upstreams = ["http://127.0.0.1:4181"]
+    http_address = "0.0.0.0:4180"
+
+    skip_jwt_bearer_tokens = true
+
+    cookie_secure = true
+    cookie_name = "_oauth2_proxy_df"

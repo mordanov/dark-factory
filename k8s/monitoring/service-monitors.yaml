@@ -1,0 +1,119 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: user-input-manager
+  namespace: dark-factory
+  labels:
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: user-input-manager
+  namespaceSelector:
+    matchNames:
+      - dark-factory
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ticket-manager
+  namespace: dark-factory
+  labels:
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: ticket-manager
+  namespaceSelector:
+    matchNames:
+      - dark-factory
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: orchestrator
+  namespace: dark-factory
+  labels:
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: orchestrator
+  namespaceSelector:
+    matchNames:
+      - dark-factory
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: context-distiller
+  namespace: dark-factory
+  labels:
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: context-distiller
+  namespaceSelector:
+    matchNames:
+      - dark-factory
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: agent-tools
+  namespace: dark-factory
+  labels:
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: agent-tools
+  namespaceSelector:
+    matchNames:
+      - dark-factory
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: agent-dispatcher
+  namespace: dark-factory
+  labels:
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: agent-dispatcher
+  namespaceSelector:
+    matchNames:
+      - dark-factory
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s

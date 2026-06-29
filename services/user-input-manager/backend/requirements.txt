@@ -19,3 +19,5 @@ pytest-cov==6.0.0
 anyio==4.4.0
 factory-boy==3.3.1
 structlog==24.4.0
+# k3s observability
+prometheus-fastapi-instrumentator==7.0.0

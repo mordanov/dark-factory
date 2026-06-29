@@ -49,3 +49,11 @@ The complete system is provisioned through Docker Compose, which manages service
 - PostgreSQL: 16, MongoDB: 7, Nginx: alpine
 
 See `pyproject.toml [tool.versions]` and `package.json canonicalVersions` for pinned versions.
+
+<!-- SPECKIT START -->
+## Current Feature
+
+**Branch**: `007-k3s-migration`
+**Plan**: `specs/007-k3s-migration/plan.md`
+**Spec**: `specs/007-k3s-migration/spec.md`
+<!-- SPECKIT END -->
