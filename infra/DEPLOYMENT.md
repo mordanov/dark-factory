@@ -204,23 +204,22 @@ kubectl create secret generic grafana-basic-auth \
 
 ---
 
-## Kubernetes Dashboard
+## Headlamp (Kubernetes UI)
 
 Installed and fully configured by `setup-k3s.sh --dashboard-password <password>` — no extra
-steps required. The script installs the Helm chart, applies RBAC and Ingress, and creates the
+steps required. The script installs the Helm chart, applies the Ingress, and creates the
 basic-auth secret in one pass.
 
-After setup, retrieve the login token:
+After setup, generate a login token:
 
 ```bash
-kubectl get secret dashboard-admin-token -n kubernetes-dashboard \
-  -o jsonpath='{.data.token}' | base64 -d
+kubectl create token headlamp -n headlamp --duration=8760h
 ```
 
 Open `https://k8s.dark-factory.local`, authenticate with basic-auth (user: `admin`, password
-as supplied to the script), then paste the token into the Dashboard login screen.
+as supplied to the script), then paste the token into the Headlamp login screen.
 
-> **Security note:** The basic-auth layer protects the Ingress path. The Dashboard itself
+> **Security note:** The basic-auth layer protects the Ingress path. Headlamp itself
 > requires token login — two independent auth gates before any cluster state is visible.
 
 ---

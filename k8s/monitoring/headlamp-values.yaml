@@ -1,0 +1,19 @@
+# Headlamp Helm values for Dark Factory
+# Install with:
+#   helm repo add headlamp https://kubernetes-sigs.github.io/headlamp/
+#   helm install headlamp headlamp/headlamp \
+#     -n headlamp --create-namespace \
+#     -f k8s/monitoring/headlamp-values.yaml
+
+replicaCount: 1
+
+config:
+  inCluster: true
+  inClusterContextName: "dark-factory"
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false  # Managed by k8s/monitoring/headlamp-ingress.yaml

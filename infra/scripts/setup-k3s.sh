@@ -13,7 +13,7 @@ set -euo pipefail
 
 INGRESS_NGINX_VERSION="4.11.3"
 CERT_MANAGER_VERSION="v1.16.2"
-DASHBOARD_VERSION="7.10.0"
+HEADLAMP_VERSION="0.43.0"
 KUBECONFIG_PATH="/etc/rancher/k3s/k3s.yaml"
 DASHBOARD_PASSWORD=""
 
@@ -58,11 +58,20 @@ else
 fi
 
 # ── 3. Add Helm repositories ──────────────────────────────────────────────────
-log "Updating Helm repos..."
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx 2>/dev/null || true
-helm repo add jetstack https://charts.jetstack.io 2>/dev/null || true
-helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/ 2>/dev/null || true
-helm repo update
+helm_repo_add() {
+  local name="$1" url="$2"
+  if helm repo list 2>/dev/null | grep -q "^${name}[[:space:]]"; then
+    log "Helm repo '${name}' already registered — skipping add"
+  else
+    log "Adding Helm repo '${name}' (${url})..."
+    helm repo add "${name}" "${url}"
+  fi
+  helm repo update "${name}"
+}
+
+helm_repo_add ingress-nginx    https://kubernetes.github.io/ingress-nginx
+helm_repo_add jetstack         https://charts.jetstack.io
+helm_repo_add headlamp             https://kubernetes-sigs.github.io/headlamp/
 
 # ── 4. Install NGINX Ingress Controller ───────────────────────────────────────
 if helm status ingress-nginx -n ingress-nginx &>/dev/null 2>&1; then
@@ -73,9 +82,7 @@ else
     --namespace ingress-nginx \
     --create-namespace \
     --version "${INGRESS_NGINX_VERSION}" \
-    --set controller.service.type=NodePort \
-    --set controller.service.nodePorts.http=80 \
-    --set controller.service.nodePorts.https=443 \
+    --set controller.service.type=LoadBalancer \
     --wait --timeout 120s
   log "NGINX Ingress Controller installed"
 fi
@@ -94,22 +101,19 @@ else
   log "cert-manager installed"
 fi
 
-# ── 6. Install Kubernetes Dashboard ──────────────────────────────────────────
-if helm status kubernetes-dashboard -n kubernetes-dashboard &>/dev/null 2>&1; then
-  log "Kubernetes Dashboard already installed — skipping"
+# ── 6. Install Headlamp ───────────────────────────────────────────────────────
+if helm status headlamp -n headlamp &>/dev/null 2>&1; then
+  log "Headlamp already installed — skipping"
 else
-  log "Installing Kubernetes Dashboard v${DASHBOARD_VERSION}..."
-  helm install kubernetes-dashboard kubernetes-dashboard/kubernetes-dashboard \
-    --namespace kubernetes-dashboard \
+  log "Installing Headlamp v${HEADLAMP_VERSION}..."
+  helm install headlamp headlamp/headlamp \
+    --namespace headlamp \
     --create-namespace \
-    --version "${DASHBOARD_VERSION}" \
-    --set nginx.enabled=false \
-    --set cert-manager.enabled=false \
-    --set app.ingress.enabled=false \
-    --set kong.proxy.type=ClusterIP \
-    --set kong.proxy.tls.enabled=false \
+    --version "${HEADLAMP_VERSION}" \
+    --set ingress.enabled=false \
+    --set service.type=ClusterIP \
     --wait --timeout 120s
-  log "Kubernetes Dashboard installed"
+  log "Headlamp installed"
 fi
 
 # ── 7. Configure kubeconfig for current user ─────────────────────────────────
@@ -124,33 +128,30 @@ else
   log "kubeconfig written to ${DEST_KUBECONFIG}"
 fi
 
-# ── 8. Apply Dashboard RBAC and Ingress ──────────────────────────────────────
+# ── 8. Apply Headlamp Ingress ─────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-DASHBOARD_MANIFESTS="${REPO_ROOT}/k8s/monitoring"
+MONITORING_MANIFESTS="${REPO_ROOT}/k8s/monitoring"
 
-if [ ! -d "$DASHBOARD_MANIFESTS" ]; then
-  die "Cannot find k8s/monitoring/ at ${DASHBOARD_MANIFESTS}. Run from a checkout of the repo."
+if [ ! -d "$MONITORING_MANIFESTS" ]; then
+  die "Cannot find k8s/monitoring/ at ${MONITORING_MANIFESTS}. Run from a checkout of the repo."
 fi
 
-log "Applying Dashboard RBAC..."
-kubectl apply -f "${DASHBOARD_MANIFESTS}/kubernetes-dashboard-rbac.yaml"
+log "Applying Headlamp Ingress..."
+kubectl apply -f "${MONITORING_MANIFESTS}/headlamp-ingress.yaml"
 
-log "Applying Dashboard Ingress..."
-kubectl apply -f "${DASHBOARD_MANIFESTS}/kubernetes-dashboard-ingress.yaml"
-
-# ── 9. Create Dashboard basic-auth secret ────────────────────────────────────
-if kubectl get secret dashboard-basic-auth -n kubernetes-dashboard &>/dev/null 2>&1; then
-  log "dashboard-basic-auth secret already exists — skipping"
+# ── 9. Create Headlamp basic-auth secret ──────────────────────────────────────
+if kubectl get secret headlamp-basic-auth -n headlamp &>/dev/null 2>&1; then
+  log "headlamp-basic-auth secret already exists — skipping"
 else
   if ! command -v htpasswd &>/dev/null; then
     die "htpasswd not found. Install it with: apt-get install -y apache2-utils"
   fi
-  log "Creating dashboard-basic-auth secret..."
-  kubectl create secret generic dashboard-basic-auth \
+  log "Creating headlamp-basic-auth secret..."
+  kubectl create secret generic headlamp-basic-auth \
     --from-literal=auth="$(htpasswd -nb admin "${DASHBOARD_PASSWORD}")" \
-    -n kubernetes-dashboard
-  log "dashboard-basic-auth secret created"
+    -n headlamp
+  log "headlamp-basic-auth secret created"
 fi
 
 # ── 10. Health check ───────────────────────────────────────────────────────────
@@ -177,7 +178,7 @@ log "Setup complete. Next steps:"
 log "  1. Copy kubeconfig to local machine:"
 log "     scp <user>@<vps-ip>:${DEST_KUBECONFIG} ~/.kube/dark-factory-k3s.yaml"
 log "     sed -i 's/127.0.0.1/<vps-public-ip>/g' ~/.kube/dark-factory-k3s.yaml"
-log "  2. Retrieve the Dashboard login token:"
-log "     kubectl get secret dashboard-admin-token -n kubernetes-dashboard \\"
-log "       -o jsonpath='{.data.token}' | base64 -d"
+log "  2. Open https://k8s.dark-factory.local — Headlamp will prompt for a token."
+log "     Generate one with:"
+log "     kubectl create token headlamp -n headlamp --duration=8760h"
 log "  3. Follow: specs/007-k3s-migration/quickstart.md"
