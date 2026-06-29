@@ -73,14 +73,30 @@ helm_repo_add ingress-nginx    https://kubernetes.github.io/ingress-nginx
 helm_repo_add jetstack         https://charts.jetstack.io
 helm_repo_add headlamp             https://kubernetes-sigs.github.io/headlamp/
 
+# helper: uninstall a release if it is in a failed/unknown state
+helm_clean_install() {
+  local name="$1" ns="$2"; shift 2
+  local status
+  status=$(helm status "$name" -n "$ns" -o json 2>/dev/null | grep -o '"status":"[^"]*"' | cut -d'"' -f4 || true)
+  case "$status" in
+    deployed) log "Helm release '${name}' already deployed — upgrading..." ;;
+    failed|pending-install|pending-upgrade|uninstalling)
+      log "Helm release '${name}' is in state '${status}' — uninstalling before reinstall..."
+      helm uninstall "$name" -n "$ns" --wait 2>/dev/null || true
+      kubectl delete namespace "$ns" --ignore-not-found --wait
+      ;;
+    "") log "Helm release '${name}' not found — installing..." ;;
+  esac
+  helm upgrade --install "$name" "$@" \
+    --namespace "$ns" --create-namespace --wait --timeout 120s
+}
+
 # ── 4. Install NGINX Ingress Controller ───────────────────────────────────────
 log "Installing/upgrading NGINX Ingress Controller v${INGRESS_NGINX_VERSION}..."
-helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
-  --namespace ingress-nginx \
-  --create-namespace \
+helm_clean_install ingress-nginx ingress-nginx \
+  ingress-nginx/ingress-nginx \
   --version "${INGRESS_NGINX_VERSION}" \
-  --set controller.service.type=LoadBalancer \
-  --wait --timeout 120s
+  --set controller.service.type=LoadBalancer
 log "NGINX Ingress Controller ready"
 
 log "Waiting for NGINX admission webhook endpoint..."
@@ -93,23 +109,19 @@ log "NGINX admission webhook ready"
 
 # ── 5. Install cert-manager ───────────────────────────────────────────────────
 log "Installing/upgrading cert-manager ${CERT_MANAGER_VERSION}..."
-helm upgrade --install cert-manager jetstack/cert-manager \
-  --namespace cert-manager \
-  --create-namespace \
+helm_clean_install cert-manager cert-manager \
+  jetstack/cert-manager \
   --version "${CERT_MANAGER_VERSION}" \
-  --set crds.enabled=true \
-  --wait --timeout 120s
+  --set crds.enabled=true
 log "cert-manager ready"
 
 # ── 6. Install Headlamp ───────────────────────────────────────────────────────
 log "Installing/upgrading Headlamp v${HEADLAMP_VERSION}..."
-helm upgrade --install headlamp headlamp/headlamp \
-  --namespace headlamp \
-  --create-namespace \
+helm_clean_install headlamp headlamp \
+  headlamp/headlamp \
   --version "${HEADLAMP_VERSION}" \
   --set ingress.enabled=false \
-  --set service.type=ClusterIP \
-  --wait --timeout 120s
+  --set service.type=ClusterIP
 log "Headlamp ready"
 
 # ── 7. Configure kubeconfig for current user ─────────────────────────────────
