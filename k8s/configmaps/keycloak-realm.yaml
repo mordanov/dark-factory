@@ -188,6 +188,7 @@ data:
     INPUT="/opt/keycloak-import-src/realm-export.json"
     OUTPUT="/opt/keycloak/data/import/realm.json"
 
+    mkdir -p "$(dirname "$OUTPUT")"
     cp "$INPUT" "$OUTPUT"
 
     for var in \
