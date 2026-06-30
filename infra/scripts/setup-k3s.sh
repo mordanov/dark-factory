@@ -124,16 +124,23 @@ helm_clean_install headlamp headlamp \
   --set service.type=ClusterIP
 log "Headlamp ready"
 
-# ── 7. Configure kubeconfig for current user ─────────────────────────────────
-DEST_KUBECONFIG="${HOME}/.kube/config"
-mkdir -p "${HOME}/.kube"
-if [ -f "$DEST_KUBECONFIG" ]; then
-  log "kubeconfig already exists at ${DEST_KUBECONFIG} — skipping copy"
-else
-  sudo cp "$KUBECONFIG_PATH" "$DEST_KUBECONFIG"
-  sudo chown "$(id -u):$(id -g)" "$DEST_KUBECONFIG"
-  chmod 600 "$DEST_KUBECONFIG"
-  log "kubeconfig written to ${DEST_KUBECONFIG}"
+# ── 7. Configure kubeconfig ───────────────────────────────────────────────────
+# Always write to root's home (script runs as root)
+DEST_KUBECONFIG="/root/.kube/config"
+mkdir -p "/root/.kube"
+cp "$KUBECONFIG_PATH" "$DEST_KUBECONFIG"
+chmod 600 "$DEST_KUBECONFIG"
+log "kubeconfig written to ${DEST_KUBECONFIG}"
+
+# Also write to the deploy user's home so kubectl works without sudo
+REAL_USER="${SUDO_USER:-}"
+if [ -n "$REAL_USER" ] && [ "$REAL_USER" != "root" ]; then
+  REAL_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
+  mkdir -p "${REAL_HOME}/.kube"
+  cp "$KUBECONFIG_PATH" "${REAL_HOME}/.kube/config"
+  chown "${REAL_USER}:${REAL_USER}" "${REAL_HOME}/.kube/config"
+  chmod 600 "${REAL_HOME}/.kube/config"
+  log "kubeconfig also written to ${REAL_HOME}/.kube/config (user: ${REAL_USER})"
 fi
 
 # ── 9. Apply Headlamp Ingress ────────────────────────────────────────────────

@@ -37,7 +37,8 @@ Copy the kubeconfig to your local machine:
 ```bash
 scp <user>@<vps-ip>:/etc/rancher/k3s/k3s.yaml ~/.kube/dark-factory-k3s.yaml
 # Replace 127.0.0.1 with the VPS public IP:
-sed -i 's/127.0.0.1/<vps-public-ip>/g' ~/.kube/dark-factory-k3s.yaml
+sed -i '' 's/127.0.0.1/<vps-public-ip>/g' ~/.kube/dark-factory-k3s.yaml   # macOS
+# sed -i 's/127.0.0.1/<vps-public-ip>/g' ~/.kube/dark-factory-k3s.yaml  # Linux
 export KUBECONFIG=~/.kube/dark-factory-k3s.yaml
 ```
 
@@ -65,46 +66,89 @@ kubectl create secret docker-registry ghcr-pull-secret \
 
 ## Step 3: Build and Push Initial Images
 
-For the first deploy, build and push all service images:
+For the first deploy, build and push all service images from your local machine:
 
 ```bash
-export OWNER=<github-repository-owner>
+export OWNER=<github-repository-owner>   # e.g. mordanov
 export SHA=$(git rev-parse HEAD)
-for SERVICE in user-input-manager ticket-manager orchestrator context-distiller agent-tools agent-dispatcher uim-frontend tm-frontend; do
-  docker build -t ghcr.io/$OWNER/$SERVICE:$SHA services/$SERVICE/
+
+echo "<ghcr-token>" | docker login ghcr.io -u $OWNER --password-stdin
+
+# Backends (Dockerfile is in backend/ subdirectory)
+for SERVICE in user-input-manager ticket-manager orchestrator context-distiller agent-tools agent-dispatcher; do
+  docker build -t ghcr.io/$OWNER/$SERVICE:$SHA services/$SERVICE/backend/
   docker push ghcr.io/$OWNER/$SERVICE:$SHA
 done
+
+# Frontends
+docker build -t ghcr.io/$OWNER/uim-frontend:$SHA services/user-input-manager/frontend/
+docker push ghcr.io/$OWNER/uim-frontend:$SHA
+
+docker build -t ghcr.io/$OWNER/tm-frontend:$SHA services/ticket-manager/frontend/
+docker push ghcr.io/$OWNER/tm-frontend:$SHA
 ```
 
-Update the image tags in manifests (or use `kubectl set image` after apply):
+Update the image tags in manifests:
 ```bash
-# Replace placeholder SHA in manifests (if using static manifests)
-find k8s/ -name '*.yaml' -exec sed -i "s|:REPLACE_SHA|:$SHA|g" {} \;
+# macOS
+find k8s/ -name '*.yaml' -exec sed -i '' "s|:REPLACE_SHA|:$SHA|g" {} \;
+find k8s/ -name '*.yaml' -exec sed -i '' "s|/OWNER/|/$OWNER/|g" {} \;
+# Linux
+# find k8s/ -name '*.yaml' -exec sed -i "s|:REPLACE_SHA|:$SHA|g" {} \;
+# find k8s/ -name '*.yaml' -exec sed -i "s|/OWNER/|/$OWNER/|g" {} \;
 ```
 
 ---
 
 ## Step 4: Apply Manifests
 
+Apply core manifests only — `k8s/monitoring/` is applied separately in Step 7 after kube-prometheus-stack is installed (ServiceMonitor CRDs don't exist yet, and Helm values files aren't k8s manifests):
+
 ```bash
-kubectl apply -f k8s/
+kubectl apply -R -f k8s/namespace.yaml
+kubectl apply -R -f k8s/configmaps/
+kubectl apply -R -f k8s/infrastructure/
+kubectl apply -R -f k8s/backends/
+kubectl apply -R -f k8s/frontends/
+kubectl apply -R -f k8s/ingress/
 ```
 
-This creates all resources in the `dark-factory` namespace. cert-manager will begin certificate provisioning immediately (requires DNS to be live).
+cert-manager will begin certificate provisioning immediately (requires DNS to be live).
 
 ---
 
 ## Step 5: Run Database Migrations
 
-Run Alembic migrations for each DB-backed service before the first workload starts:
+Requires `$OWNER` and `$SHA` exported in Step 3. Run from your local machine (uses the kubeconfig set in Step 1):
 
 ```bash
+# If starting a new shell since Step 3:
+export OWNER=<github-repository-owner>
+export SHA=$(git rev-parse HEAD)
+
 for SERVICE in user-input-manager ticket-manager orchestrator context-distiller agent-dispatcher; do
-  kubectl run alembic-$SERVICE \
+  POD="alembic-${SERVICE}"
+
+  kubectl run "$POD" \
     --image=ghcr.io/$OWNER/$SERVICE:$SHA \
-    --rm --restart=Never -n dark-factory \
+    --restart=Never -n dark-factory \
     --env-from=secret/dark-factory-secrets \
+    --overrides='{"spec":{"imagePullSecrets":[{"name":"ghcr-pull-secret"}]}}' \
     -- alembic upgrade head
+
+  # Wait up to 5 minutes for the pod to finish
+  kubectl wait pod "$POD" -n dark-factory \
+    --for=jsonpath='{.status.phase}'=Succeeded \
+    --timeout=300s \
+  || {
+    echo "--- logs for failed migration: $SERVICE ---"
+    kubectl logs "$POD" -n dark-factory
+    kubectl delete pod "$POD" -n dark-factory --ignore-not-found
+    exit 1
+  }
+
+  kubectl logs "$POD" -n dark-factory
+  kubectl delete pod "$POD" -n dark-factory
 done
 ```
 

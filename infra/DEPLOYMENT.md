@@ -59,7 +59,8 @@ ssh deploy@<vps-ip> "sudo bash /app/dark-factory/infra/scripts/setup-k3s.sh --da
 
 # 2. Copy kubeconfig to local machine
 scp <user>@<vps-ip>:/etc/rancher/k3s/k3s.yaml ~/.kube/dark-factory-k3s.yaml
-sed -i 's/127.0.0.1/<vps-public-ip>/g' ~/.kube/dark-factory-k3s.yaml
+sed -i '' 's/127.0.0.1/<vps-public-ip>/g' ~/.kube/dark-factory-k3s.yaml   # macOS
+# sed -i 's/127.0.0.1/<vps-public-ip>/g' ~/.kube/dark-factory-k3s.yaml  # Linux
 export KUBECONFIG=~/.kube/dark-factory-k3s.yaml
 
 # 3. Create namespace and secrets (run once, manually — NEVER in CI)
