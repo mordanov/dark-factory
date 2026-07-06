@@ -1,3 +1,31 @@
+---
+# oauth2-proxy paths — no auth annotation, these ARE the auth flow
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: oauth2-proxy
+  namespace: dark-factory
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - dqaifactory.ru
+      secretName: dark-factory-tls
+  rules:
+    - host: dqaifactory.ru
+      http:
+        paths:
+          - path: /oauth2
+            pathType: Prefix
+            backend:
+              service:
+                name: oauth2-proxy
+                port:
+                  number: 4180
+---
+# Application routes — protected by oauth2-proxy
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -8,16 +36,6 @@ metadata:
     nginx.ingress.kubernetes.io/auth-url: "http://oauth2-proxy.dark-factory.svc.cluster.local:4180/oauth2/auth"
     nginx.ingress.kubernetes.io/auth-signin: "https://dqaifactory.ru/oauth2/sign_in?rd=$escaped_request_uri"
     nginx.ingress.kubernetes.io/auth-response-headers: "X-Auth-Request-User,X-Auth-Request-Email,X-Auth-Request-Groups"
-    # Exclude oauth2-proxy paths from the auth check
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      location ~* ^/oauth2 {
-        auth_request off;
-        proxy_pass http://oauth2-proxy.dark-factory.svc.cluster.local:4180;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-      }
 spec:
   ingressClassName: nginx
   tls:
