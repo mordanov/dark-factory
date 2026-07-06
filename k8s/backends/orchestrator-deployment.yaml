@@ -23,6 +23,21 @@ spec:
           envFrom:
             - secretRef:
                 name: dark-factory-secrets
+          env:
+            - name: _DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: dark-factory-secrets
+                  key: ORCH_DB_USER
+            - name: _DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dark-factory-secrets
+                  key: ORCH_DB_PASSWORD
+            - name: DATABASE_URL
+              value: "postgresql+asyncpg://$(_DB_USER):$(_DB_PASSWORD)@postgres:5432/df_orchestrator"
+            - name: DATABASE_URL_SYNC
+              value: "postgresql://$(_DB_USER):$(_DB_PASSWORD)@postgres:5432/df_orchestrator"
           readinessProbe:
             httpGet:
               path: /health

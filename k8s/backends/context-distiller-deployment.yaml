@@ -23,6 +23,19 @@ spec:
           envFrom:
             - secretRef:
                 name: dark-factory-secrets
+          env:
+            - name: _DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: dark-factory-secrets
+                  key: DISTILLER_DB_USER
+            - name: _DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dark-factory-secrets
+                  key: DISTILLER_DB_PASSWORD
+            - name: DATABASE_URL
+              value: "postgresql+asyncpg://$(_DB_USER):$(_DB_PASSWORD)@postgres:5432/df_distiller"
           readinessProbe:
             httpGet:
               path: /health

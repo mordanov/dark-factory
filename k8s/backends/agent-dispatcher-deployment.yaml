@@ -24,6 +24,18 @@ spec:
             - secretRef:
                 name: dark-factory-secrets
           env:
+            - name: _DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: dark-factory-secrets
+                  key: DISPATCHER_DB_USER
+            - name: _DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dark-factory-secrets
+                  key: DISPATCHER_DB_PASSWORD
+            - name: DATABASE_URL
+              value: "postgresql+asyncpg://$(_DB_USER):$(_DB_PASSWORD)@postgres:5432/df_dispatcher"
             - name: AGENT_REGISTRY_PATH
               value: /app/development/agents/registry.yaml
           volumeMounts:
