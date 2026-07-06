@@ -38,6 +38,16 @@ spec:
             - secretRef:
                 name: dark-factory-secrets
           env:
+            - name: KEYCLOAK_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: dark-factory-secrets
+                  key: KC_BOOTSTRAP_ADMIN_USERNAME
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dark-factory-secrets
+                  key: KC_BOOTSTRAP_ADMIN_PASSWORD
             - name: KC_DB
               value: postgres
             - name: KC_DB_URL
