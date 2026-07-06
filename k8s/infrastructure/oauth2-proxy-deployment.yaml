@@ -27,6 +27,14 @@ spec:
           envFrom:
             - secretRef:
                 name: dark-factory-secrets
+          env:
+            - name: _RAW_COOKIE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: dark-factory-secrets
+                  key: OAUTH2_PROXY_COOKIE_SECRET
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              value: "base64:$(_RAW_COOKIE_SECRET)"
           volumeMounts:
             - name: oauth2-proxy-config
               mountPath: /etc/oauth2_proxy
