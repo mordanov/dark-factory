@@ -7,6 +7,7 @@ data:
   config.cfg: |
     provider = "keycloak-oidc"
     client_id = "oauth2-proxy"
+    oidc_issuer_url = "https://dqaifactory.ru/realms/dark-factory"
 
     skip_oidc_discovery = true
     login_url = "https://dqaifactory.ru/realms/dark-factory/protocol/openid-connect/auth"
