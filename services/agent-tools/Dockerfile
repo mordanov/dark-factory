@@ -11,4 +11,4 @@ COPY src/ ./src/
 
 ENV PYTHONUNBUFFERED=1
 
-CMD ["python", "-m", "src.server"]
+CMD ["uvicorn", "src.sidecar:app", "--host", "0.0.0.0", "--port", "8000"]
