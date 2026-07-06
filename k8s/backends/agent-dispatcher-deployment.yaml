@@ -23,6 +23,9 @@ spec:
           envFrom:
             - secretRef:
                 name: dark-factory-secrets
+          env:
+            - name: AGENT_REGISTRY_PATH
+              value: /app/development/agents/registry.yaml
           volumeMounts:
             - name: agent-registry
               mountPath: /app/development/agents/registry.yaml
