@@ -17,7 +17,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: uim-frontend
-          image: ghcr.io/OWNER/uim-frontend:REPLACE_SHA
+          image: ghcr.io/mordanov/uim-frontend
           ports:
             - containerPort: 80
           readinessProbe:

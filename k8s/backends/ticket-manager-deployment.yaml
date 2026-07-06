@@ -17,7 +17,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: ticket-manager
-          image: ghcr.io/OWNER/ticket-manager:REPLACE_SHA
+          image: ghcr.io/mordanov/ticket-manager
           ports:
             - containerPort: 8000
           envFrom:

@@ -32,6 +32,8 @@ spec:
             - /entrypoint/substitute-env.sh && /opt/keycloak/bin/kc.sh start --import-realm
           ports:
             - containerPort: 8080
+            - containerPort: 9000
+              name: management
           envFrom:
             - secretRef:
                 name: dark-factory-secrets
@@ -44,6 +46,8 @@ spec:
               value: "true"
             - name: KC_PROXY
               value: edge
+            - name: KC_HEALTH_ENABLED
+              value: "true"
           volumeMounts:
             - name: realm-export
               mountPath: /opt/keycloak-import-src
@@ -53,14 +57,14 @@ spec:
           readinessProbe:
             httpGet:
               path: /health/ready
-              port: 8080
+              port: 9000
             initialDelaySeconds: 60
             periodSeconds: 10
             failureThreshold: 6
           livenessProbe:
             httpGet:
               path: /health/live
-              port: 8080
+              port: 9000
             initialDelaySeconds: 90
             periodSeconds: 15
             failureThreshold: 3
@@ -78,3 +82,4 @@ spec:
               - key: substitute-env.sh
                 path: substitute-env.sh
             defaultMode: 0755
+

@@ -6,8 +6,14 @@ metadata:
 data:
   config.cfg: |
     provider = "keycloak-oidc"
-    oidc_issuer_url = "http://keycloak:8080/realms/dark-factory"
     client_id = "oauth2-proxy"
+
+    skip_oidc_discovery = true
+    login_url = "https://dqaifactory.ru/realms/dark-factory/protocol/openid-connect/auth"
+    redeem_url = "http://keycloak:8080/realms/dark-factory/protocol/openid-connect/token"
+    oidc_jwks_url = "http://keycloak:8080/realms/dark-factory/protocol/openid-connect/certs"
+    profile_url = "http://keycloak:8080/realms/dark-factory/protocol/openid-connect/userinfo"
+    validate_url = "http://keycloak:8080/realms/dark-factory/protocol/openid-connect/userinfo"
 
     set_xauthrequest = true
     pass_user_headers = true

@@ -17,7 +17,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: orchestrator
-          image: ghcr.io/OWNER/orchestrator:REPLACE_SHA
+          image: ghcr.io/mordanov/orchestrator
           ports:
             - containerPort: 8000
           envFrom:

@@ -17,7 +17,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: agent-dispatcher
-          image: ghcr.io/OWNER/agent-dispatcher:REPLACE_SHA
+          image: ghcr.io/mordanov/agent-dispatcher
           ports:
             - containerPort: 8000
           envFrom:

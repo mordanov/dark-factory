@@ -17,7 +17,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: tm-frontend
-          image: ghcr.io/OWNER/tm-frontend:REPLACE_SHA
+          image: ghcr.io/mordanov/tm-frontend
           ports:
             - containerPort: 80
           readinessProbe:

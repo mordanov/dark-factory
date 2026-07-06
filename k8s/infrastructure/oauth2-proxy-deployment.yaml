@@ -13,15 +13,15 @@ spec:
       labels:
         app: oauth2-proxy
     spec:
+      hostAliases:
+        - ip: "10.43.24.229"
+          hostnames:
+            - "dqaifactory.ru"
       containers:
         - name: oauth2-proxy
           image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
-          command:
-            - /bin/sh
-            - -c
-            - |
-              export OAUTH2_PROXY_COOKIE_SECRET=$(echo "$OAUTH2_PROXY_COOKIE_SECRET" | base64 -d)
-              exec /bin/oauth2-proxy --config=/etc/oauth2_proxy/config.cfg
+          args:
+            - --config=/etc/oauth2_proxy/config.cfg
           ports:
             - containerPort: 4180
           envFrom:

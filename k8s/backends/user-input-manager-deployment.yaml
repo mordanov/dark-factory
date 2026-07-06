@@ -17,7 +17,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: user-input-manager
-          image: ghcr.io/OWNER/user-input-manager:REPLACE_SHA
+          image: ghcr.io/mordanov/user-input-manager:ae67fe562bf07f9d590346ad64afed8791d162de
           ports:
             - containerPort: 8000
           envFrom:

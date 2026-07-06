@@ -17,7 +17,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: agent-tools
-          image: ghcr.io/OWNER/agent-tools:REPLACE_SHA
+          image: ghcr.io/mordanov/agent-tools
           ports:
             - containerPort: 8000
           envFrom:
