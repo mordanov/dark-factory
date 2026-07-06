@@ -70,8 +70,14 @@ data:
           "enabled": true,
           "publicClient": false,
           "secret": "${OAUTH2_PROXY_CLIENT_SECRET}",
-          "standardFlowEnabled": false,
-          "serviceAccountsEnabled": false
+          "standardFlowEnabled": true,
+          "serviceAccountsEnabled": false,
+          "redirectUris": [
+            "https://dqaifactory.ru/oauth2/callback"
+          ],
+          "webOrigins": [
+            "https://dqaifactory.ru"
+          ]
         },
         {
           "clientId": "orchestrator",
