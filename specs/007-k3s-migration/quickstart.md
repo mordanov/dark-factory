@@ -126,15 +126,40 @@ Requires `$OWNER` and `$SHA` exported in Step 3. Run from your local machine (us
 export OWNER=<github-repository-owner>
 export SHA=$(git rev-parse HEAD)
 
+# Helper: read a key from the cluster Secret
+secret_val() {
+  kubectl get secret dark-factory-secrets -n dark-factory \
+    -o jsonpath="{.data.$1}" | base64 -d
+}
+
+# Per-service DB credentials
+declare -A DB_USER=( [user-input-manager]=UIM_DB_USER [ticket-manager]=TM_DB_USER [orchestrator]=ORCH_DB_USER [context-distiller]=DISTILLER_DB_USER [agent-dispatcher]=DISPATCHER_DB_USER )
+declare -A DB_PASS=( [user-input-manager]=UIM_DB_PASSWORD [ticket-manager]=TM_DB_PASSWORD [orchestrator]=ORCH_DB_PASSWORD [context-distiller]=DISTILLER_DB_PASSWORD [agent-dispatcher]=DISPATCHER_DB_PASSWORD )
+declare -A DB_NAME=( [user-input-manager]=df_user_input [ticket-manager]=df_ticket_manager [orchestrator]=df_orchestrator [context-distiller]=df_distiller [agent-dispatcher]=df_dispatcher )
+
 for SERVICE in user-input-manager ticket-manager orchestrator context-distiller agent-dispatcher; do
   POD="alembic-${SERVICE}"
+  IMG="ghcr.io/$OWNER/$SERVICE:$SHA"
+  U=$(secret_val "${DB_USER[$SERVICE]}")
+  P=$(secret_val "${DB_PASS[$SERVICE]}")
+  DB_URL="postgresql+asyncpg://$U:$P@postgres:5432/${DB_NAME[$SERVICE]}"
 
+  # kubectl run does not support --env-from; envFrom must go into --overrides
   kubectl run "$POD" \
-    --image=ghcr.io/$OWNER/$SERVICE:$SHA \
+    --image="$IMG" \
     --restart=Never -n dark-factory \
-    --env-from=secret/dark-factory-secrets \
-    --overrides='{"spec":{"imagePullSecrets":[{"name":"ghcr-pull-secret"}]}}' \
-    -- alembic upgrade head
+    --overrides="{
+      \"spec\": {
+        \"imagePullSecrets\": [{\"name\": \"ghcr-pull-secret\"}],
+        \"containers\": [{
+          \"name\": \"$POD\",
+          \"image\": \"$IMG\",
+          \"command\": [\"alembic\", \"upgrade\", \"head\"],
+          \"envFrom\": [{\"secretRef\": {\"name\": \"dark-factory-secrets\"}}],
+          \"env\": [{\"name\": \"DATABASE_URL\", \"value\": \"$DB_URL\"}]
+        }]
+      }
+    }"
 
   # Wait up to 5 minutes for the pod to finish
   kubectl wait pod "$POD" -n dark-factory \

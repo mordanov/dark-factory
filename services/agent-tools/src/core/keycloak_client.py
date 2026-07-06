@@ -8,7 +8,7 @@ import time
 import httpx
 import structlog
 
-from src.core.config import get_settings
+from src.config import get_settings
 
 log = structlog.get_logger(__name__)
 
