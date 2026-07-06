@@ -29,7 +29,8 @@ spec:
                 - --eval
                 - "db.adminCommand('ping')"
             initialDelaySeconds: 30
-            periodSeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 10
             failureThreshold: 3
           readinessProbe:
             exec:
@@ -38,7 +39,8 @@ spec:
                 - --eval
                 - "db.adminCommand('ping')"
             initialDelaySeconds: 10
-            periodSeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 10
   volumeClaimTemplates:
     - metadata:
         name: mongo-data
