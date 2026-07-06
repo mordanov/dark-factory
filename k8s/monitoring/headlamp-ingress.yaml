@@ -12,10 +12,10 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - k8s.dark-factory.local
+        - headlamp.dqaifactory.ru
       secretName: headlamp-tls
   rules:
-    - host: k8s.dark-factory.local
+    - host: headlamp.dqaifactory.ru
       http:
         paths:
           - path: /
