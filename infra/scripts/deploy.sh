@@ -8,14 +8,19 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # Args
 # ---------------------------------------------------------------------------
 OWNER=""
+SERVICES=()
 SKIP_BUILD=false
 SKIP_PUSH=false
 SKIP_APPLY=false
 
 usage() {
-  echo "Usage: $0 --owner <github-owner> [--skip-build] [--skip-push] [--skip-apply]"
+  echo "Usage: $0 --owner <github-owner> [--service <name>] [--skip-build] [--skip-push] [--skip-apply]"
   echo ""
   echo "  --owner       GitHub owner (e.g. mordanov)"
+  echo "  --service     Deploy only this service (can be repeated). Omit to deploy all."
+  echo "                Backend names: user-input-manager ticket-manager orchestrator"
+  echo "                               context-distiller agent-tools agent-dispatcher"
+  echo "                Frontend names: uim-frontend tm-frontend"
   echo "  --skip-build  Skip docker build steps"
   echo "  --skip-push   Skip docker push steps"
   echo "  --skip-apply  Skip kubectl apply + rollout restart"
@@ -24,9 +29,10 @@ usage() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --owner) OWNER="$2"; shift 2 ;;
+    --owner)   OWNER="$2"; shift 2 ;;
+    --service) SERVICES+=("$2"); shift 2 ;;
     --skip-build) SKIP_BUILD=true; shift ;;
-    --skip-push) SKIP_PUSH=true; shift ;;
+    --skip-push)  SKIP_PUSH=true; shift ;;
     --skip-apply) SKIP_APPLY=true; shift ;;
     *) echo "Unknown flag: $1"; usage ;;
   esac
@@ -43,7 +49,7 @@ log() { echo "[deploy] $*"; }
 # Build
 # ---------------------------------------------------------------------------
 
-BACKENDS=(
+ALL_BACKENDS=(
   user-input-manager
   ticket-manager
   orchestrator
@@ -51,28 +57,66 @@ BACKENDS=(
   agent-tools
   agent-dispatcher
 )
-
-FRONTENDS=(
-  user-input-manager
-  ticket-manager
+ALL_FRONTENDS=(uim-frontend tm-frontend)
+# Map frontend image name → source dir
+declare -A FRONTEND_SRC=(
+  [uim-frontend]="services/user-input-manager/frontend/"
+  [tm-frontend]="services/ticket-manager/frontend/"
 )
 
-if [[ "$SKIP_BUILD" == false ]]; then
-  log "Building backend images (SHA=$SHA)..."
-  for SVC in "${BACKENDS[@]}"; do
-    log "  building $SVC..."
-    # Some services have Dockerfile at root, others inside backend/
-    if [[ -f "$REPO_ROOT/services/$SVC/backend/Dockerfile" ]]; then
-      CTX="$REPO_ROOT/services/$SVC/backend/"
-    else
-      CTX="$REPO_ROOT/services/$SVC/"
-    fi
-    docker build -t "$REGISTRY/$SVC:$SHA" "$CTX"
-  done
+# If --service was given, scope work to those services only
+if [[ ${#SERVICES[@]} -eq 0 ]]; then
+  BUILD_BACKENDS=("${ALL_BACKENDS[@]}")
+  BUILD_FRONTENDS=("${ALL_FRONTENDS[@]}")
+  DEPLOY_SERVICES=("${ALL_BACKENDS[@]}" "${ALL_FRONTENDS[@]}")
+else
+  BUILD_BACKENDS=()
+  BUILD_FRONTENDS=()
+  DEPLOY_SERVICES=()
+  for SVC in "${SERVICES[@]}"; do
+    # Check if it's a known backend or frontend
+    is_backend=false
+    for b in "${ALL_BACKENDS[@]}"; do [[ "$b" == "$SVC" ]] && is_backend=true; done
+    is_frontend=false
+    for f in "${ALL_FRONTENDS[@]}"; do [[ "$f" == "$SVC" ]] && is_frontend=true; done
 
-  log "Building frontend images..."
-  docker build -t "$REGISTRY/uim-frontend:$SHA" "$REPO_ROOT/services/user-input-manager/frontend/"
-  docker build -t "$REGISTRY/tm-frontend:$SHA"  "$REPO_ROOT/services/ticket-manager/frontend/"
+    if $is_backend; then
+      BUILD_BACKENDS+=("$SVC")
+      DEPLOY_SERVICES+=("$SVC")
+    elif $is_frontend; then
+      BUILD_FRONTENDS+=("$SVC")
+      DEPLOY_SERVICES+=("$SVC")
+    else
+      echo "[deploy] Unknown service: $SVC"; usage
+    fi
+  done
+fi
+
+# ---------------------------------------------------------------------------
+# Build
+# ---------------------------------------------------------------------------
+
+if [[ "$SKIP_BUILD" == false ]]; then
+  if [[ ${#BUILD_BACKENDS[@]} -gt 0 ]]; then
+    log "Building backend images (SHA=$SHA)..."
+    for SVC in "${BUILD_BACKENDS[@]}"; do
+      log "  building $SVC..."
+      if [[ -f "$REPO_ROOT/services/$SVC/backend/Dockerfile" ]]; then
+        CTX="$REPO_ROOT/services/$SVC/backend/"
+      else
+        CTX="$REPO_ROOT/services/$SVC/"
+      fi
+      docker build -t "$REGISTRY/$SVC:$SHA" "$CTX"
+    done
+  fi
+
+  if [[ ${#BUILD_FRONTENDS[@]} -gt 0 ]]; then
+    log "Building frontend images..."
+    for SVC in "${BUILD_FRONTENDS[@]}"; do
+      log "  building $SVC..."
+      docker build -t "$REGISTRY/$SVC:$SHA" "$REPO_ROOT/${FRONTEND_SRC[$SVC]}"
+    done
+  fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -81,12 +125,16 @@ fi
 
 if [[ "$SKIP_PUSH" == false ]]; then
   log "Pushing images..."
-  for SVC in "${BACKENDS[@]}"; do
+  for SVC in "${BUILD_BACKENDS[@]:-}"; do
+    [[ -z "$SVC" ]] && continue
     log "  pushing $SVC..."
     docker push "$REGISTRY/$SVC:$SHA"
   done
-  docker push "$REGISTRY/uim-frontend:$SHA"
-  docker push "$REGISTRY/tm-frontend:$SHA"
+  for SVC in "${BUILD_FRONTENDS[@]:-}"; do
+    [[ -z "$SVC" ]] && continue
+    log "  pushing $SVC..."
+    docker push "$REGISTRY/$SVC:$SHA"
+  done
 fi
 
 # ---------------------------------------------------------------------------
@@ -96,44 +144,43 @@ fi
 if [[ "$SKIP_APPLY" == false ]]; then
   log "Applying manifests (SHA=$SHA, OWNER=$OWNER)..."
 
-  # Work on a temp copy so we don't dirty the repo
   TMPDIR=$(mktemp -d)
   trap 'rm -rf "$TMPDIR"' EXIT
 
   cp -r "$REPO_ROOT/k8s" "$TMPDIR/"
 
-  # Substitute placeholders AND tagless images
   find "$TMPDIR/k8s" -name '*.yaml' | while read -r f; do
     sed -i "s|:REPLACE_SHA|:$SHA|g"       "$f"
     sed -i "s|/OWNER/|/$OWNER/|g"         "$f"
-    # Tag images that have no tag (no colon after the image name)
     sed -i "s|ghcr.io/$OWNER/\([^:]*\)$|ghcr.io/$OWNER/\1:$SHA|g" "$f"
   done
 
-  for DIR in namespace.yaml configmaps infrastructure backends frontends ingress; do
-    TARGET="$TMPDIR/k8s/$DIR"
-    [[ -e "$TARGET" ]] || continue
-    if [[ -f "$TARGET" ]]; then
-      kubectl apply -f "$TARGET"
-    else
-      kubectl apply -R -f "$TARGET"
-    fi
-  done
+  if [[ ${#SERVICES[@]} -eq 0 ]]; then
+    # Full apply
+    for DIR in namespace.yaml configmaps infrastructure backends frontends ingress; do
+      TARGET="$TMPDIR/k8s/$DIR"
+      [[ -e "$TARGET" ]] || continue
+      if [[ -f "$TARGET" ]]; then
+        kubectl apply -f "$TARGET"
+      else
+        kubectl apply -R -f "$TARGET"
+      fi
+    done
+  else
+    # Apply only the specific deployment manifest(s)
+    for SVC in "${DEPLOY_SERVICES[@]}"; do
+      for MANIFEST in "$TMPDIR/k8s/backends/${SVC}-deployment.yaml" \
+                      "$TMPDIR/k8s/frontends/${SVC}-deployment.yaml"; do
+        [[ -f "$MANIFEST" ]] && kubectl apply -f "$MANIFEST"
+      done
+    done
+  fi
 
-  log "Restarting deployments..."
-  kubectl rollout restart deployment \
-    user-input-manager \
-    ticket-manager \
-    orchestrator \
-    context-distiller \
-    agent-tools \
-    agent-dispatcher \
-    uim-frontend \
-    tm-frontend \
-    -n dark-factory
+  log "Restarting deployments: ${DEPLOY_SERVICES[*]}"
+  kubectl rollout restart deployment "${DEPLOY_SERVICES[@]}" -n dark-factory
 
   log "Waiting for rollouts..."
-  for DEP in user-input-manager ticket-manager orchestrator context-distiller agent-tools agent-dispatcher uim-frontend tm-frontend; do
+  for DEP in "${DEPLOY_SERVICES[@]}"; do
     kubectl rollout status deployment/"$DEP" -n dark-factory --timeout=120s
   done
 fi
