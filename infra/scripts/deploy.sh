@@ -61,7 +61,13 @@ if [[ "$SKIP_BUILD" == false ]]; then
   log "Building backend images (SHA=$SHA)..."
   for SVC in "${BACKENDS[@]}"; do
     log "  building $SVC..."
-    docker build -t "$REGISTRY/$SVC:$SHA" "$REPO_ROOT/services/$SVC/backend/"
+    # Some services have Dockerfile at root, others inside backend/
+    if [[ -f "$REPO_ROOT/services/$SVC/backend/Dockerfile" ]]; then
+      CTX="$REPO_ROOT/services/$SVC/backend/"
+    else
+      CTX="$REPO_ROOT/services/$SVC/"
+    fi
+    docker build -t "$REGISTRY/$SVC:$SHA" "$CTX"
   done
 
   log "Building frontend images..."
