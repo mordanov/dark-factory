@@ -13,8 +13,9 @@ data:
     login_url = "https://dqaifactory.ru/realms/dark-factory/protocol/openid-connect/auth"
     redeem_url = "http://keycloak:8080/realms/dark-factory/protocol/openid-connect/token"
     oidc_jwks_url = "http://keycloak:8080/realms/dark-factory/protocol/openid-connect/certs"
-    profile_url = "http://keycloak:8080/realms/dark-factory/protocol/openid-connect/userinfo"
-    validate_url = "http://keycloak:8080/realms/dark-factory/protocol/openid-connect/userinfo"
+
+    scope = "openid email profile"
+    oidc_groups_claim = ""
 
     set_xauthrequest = true
     pass_user_headers = true
