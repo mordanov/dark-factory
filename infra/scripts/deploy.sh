@@ -112,9 +112,20 @@ if [[ "$SKIP_BUILD" == false ]]; then
 
   if [[ ${#BUILD_FRONTENDS[@]} -gt 0 ]]; then
     log "Building frontend images..."
+    KEYCLOAK_URL="${VITE_KEYCLOAK_URL:-https://dqaifactory.ru}"
     for SVC in "${BUILD_FRONTENDS[@]}"; do
       log "  building $SVC..."
-      docker build -t "$REGISTRY/$SVC:$SHA" "$REPO_ROOT/${FRONTEND_SRC[$SVC]}"
+      case "$SVC" in
+        uim-frontend) KC_CLIENT_ID=uim-frontend ;;
+        tm-frontend)  KC_CLIENT_ID=tm-frontend ;;
+        *)            KC_CLIENT_ID=$SVC ;;
+      esac
+      docker build \
+        --build-arg "VITE_KEYCLOAK_URL=$KEYCLOAK_URL" \
+        --build-arg "VITE_KEYCLOAK_REALM=dark-factory" \
+        --build-arg "VITE_KEYCLOAK_CLIENT_ID=$KC_CLIENT_ID" \
+        -t "$REGISTRY/$SVC:$SHA" \
+        "$REPO_ROOT/${FRONTEND_SRC[$SVC]}"
     done
   fi
 fi
