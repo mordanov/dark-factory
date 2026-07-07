@@ -43,10 +43,12 @@ data:
             "pkce.code.challenge.method": "S256"
           },
           "redirectUris": [
-            "${UIM_FRONTEND_URL}/*"
+            "${UIM_FRONTEND_URL}/*",
+            "https://dqaifactory.ru/*"
           ],
           "webOrigins": [
-            "${UIM_FRONTEND_URL}"
+            "${UIM_FRONTEND_URL}",
+            "https://dqaifactory.ru"
           ]
         },
         {

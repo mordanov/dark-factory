@@ -179,7 +179,7 @@ jobs:
       - name: Run frontend tests (Vitest)
         if: contains(fromJSON('["uim-frontend","tm-frontend"]'), matrix.service)
         working-directory: ${{ steps.paths.outputs.build_path }}
-        run: npm run test -- --run --coverage
+        run: npm run test
 
       # ── Services with no test suite (nginx, agent-tools) ──────────────────
       - name: Skip (no test suite)
