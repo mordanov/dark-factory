@@ -155,6 +155,12 @@ if [[ "$SKIP_APPLY" == false ]]; then
     sed -i "s|ghcr.io/$OWNER/\([^:]*\)$|ghcr.io/$OWNER/\1:$SHA|g" "$f"
   done
 
+  # Regenerate agent-registry ConfigMap from source file
+  kubectl create configmap agent-registry \
+    --from-file=registry.yaml="$REPO_ROOT/development/agents/registry.yaml" \
+    -n dark-factory --dry-run=client -o yaml \
+    > "$TMPDIR/k8s/configmaps/agent-registry.yaml"
+
   if [[ ${#SERVICES[@]} -eq 0 ]]; then
     # Full apply
     for DIR in namespace.yaml configmaps infrastructure backends frontends ingress; do
