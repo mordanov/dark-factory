@@ -25,7 +25,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   async initialize() {
     try {
-      await keycloak.init({ onLoad: 'login-required', pkceMethod: 'S256' })
+      await keycloak.init({ onLoad: 'login-required', pkceMethod: 'S256', checkLoginIframe: false })
 
       keycloak.onTokenExpired = () => {
         keycloak.updateToken(30).catch(() => {
