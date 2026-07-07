@@ -40,7 +40,7 @@ export function PendingTicketsPanel({ onTriggered }: Props) {
     setError('')
     try {
       const { data } = await orchestratorApi.getPendingTickets()
-      setTickets(data.tickets)
+      setTickets(data.tickets ?? [])
     } catch {
       setError(t('common.error'))
     } finally {
@@ -64,7 +64,7 @@ export function PendingTicketsPanel({ onTriggered }: Props) {
     }
   }
 
-  const hasTags = (t: PendingTicket, tag: string) => t.tags.includes(tag)
+  const hasTags = (t: PendingTicket, tag: string) => (t.tags ?? []).includes(tag)
 
   return (
     <div>

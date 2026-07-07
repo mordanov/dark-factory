@@ -95,7 +95,7 @@ function TaskNode({ task, readOnly, onChangeTitle, onChangeDesc, onDelete }: Tas
           <EditableField value={task.description} multiline maxLength={500} readOnly={readOnly} onSave={onChangeDesc} />
         </div>
       )}
-      {task.depends_on.length > 0 && (
+      {(task.depends_on?.length ?? 0) > 0 && (
         <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{t('planning.depends_on')}:</span>
           {task.depends_on.map(d => <span key={d} className="badge badge-muted">{d}</span>)}

@@ -31,7 +31,7 @@ export function AgentConfigPanel({ agentConfig }: Props) {
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 12 }}>
             {t('planning.agent_config_hint')}
           </p>
-          {agentConfig.tech_stack.length > 0 && (
+          {(agentConfig.tech_stack?.length ?? 0) > 0 && (
             <div style={{ marginBottom: 12 }}>
               <div className="meta-label">Tech stack</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
@@ -41,7 +41,7 @@ export function AgentConfigPanel({ agentConfig }: Props) {
               </div>
             </div>
           )}
-          {agentConfig.agent_overrides.length > 0 && (
+          {(agentConfig.agent_overrides?.length ?? 0) > 0 && (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
