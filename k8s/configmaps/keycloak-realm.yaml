@@ -77,6 +77,19 @@ data:
           ],
           "webOrigins": [
             "https://dqaifactory.ru"
+          ],
+          "protocolMappers": [
+            {
+              "name": "audience-mapper",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-audience-mapper",
+              "consentRequired": false,
+              "config": {
+                "included.client.audience": "oauth2-proxy",
+                "id.token.claim": "true",
+                "access.token.claim": "true"
+              }
+            }
           ]
         },
         {
