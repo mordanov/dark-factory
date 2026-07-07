@@ -33,3 +33,4 @@ data:
 
     cookie_secure = true
     cookie_name = "_oauth2_proxy_df"
+    cookie_domain = ".dqaifactory.ru"

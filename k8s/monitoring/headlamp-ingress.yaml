@@ -5,9 +5,9 @@ metadata:
   namespace: headlamp
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
-    nginx.ingress.kubernetes.io/auth-type: basic
-    nginx.ingress.kubernetes.io/auth-secret: headlamp-basic-auth
-    nginx.ingress.kubernetes.io/auth-realm: "Headlamp — Dark Factory"
+    nginx.ingress.kubernetes.io/auth-url: "http://oauth2-proxy.dark-factory.svc.cluster.local:4180/oauth2/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://dqaifactory.ru/oauth2/sign_in?rd=$escaped_request_uri"
+    nginx.ingress.kubernetes.io/auth-response-headers: "X-Auth-Request-User,X-Auth-Request-Email"
 spec:
   ingressClassName: nginx
   tls:
