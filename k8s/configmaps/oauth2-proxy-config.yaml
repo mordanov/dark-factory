@@ -21,6 +21,9 @@ data:
     pass_user_headers = true
     pass_access_token = false
 
+    skip_auth_routes = ["^/favicon\\.ico$"]
+    session_cookie_minimal = true
+
     email_domains = ["*"]
 
     upstreams = ["http://127.0.0.1:4181"]
