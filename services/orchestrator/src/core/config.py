@@ -39,7 +39,7 @@ class Settings(BaseSettings):
 
     # Ticket Manager
     ticket_manager_base_url: AnyHttpUrl = Field(
-        default="https://ticket-manager.dark-factory.miveralta.ru"
+        default="http://ticket-manager:8000"
     )
     ticket_manager_timeout_seconds: float = 20.0
 
