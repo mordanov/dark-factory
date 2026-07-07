@@ -89,7 +89,7 @@ for SERVICE in "${SERVICES[@]}"; do
 
   U=$(secret_val "${DB_USER_KEY[$SERVICE]}")
   P=$(secret_val "${DB_PASS_KEY[$SERVICE]}")
-  DB_URL="postgresql://$U:$P@postgres:5432/${DB_NAME[$SERVICE]}"
+  DB_URL="postgresql+asyncpg://$U:$P@postgres:5432/${DB_NAME[$SERVICE]}"
 
   # Write manifest to temp file to avoid shell quoting issues with special chars
   TMPFILE=$(mktemp /tmp/alembic-XXXXXX.yaml)
