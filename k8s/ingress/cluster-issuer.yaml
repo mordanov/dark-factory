@@ -8,7 +8,7 @@ metadata:
 spec:
   acme:
     server: https://acme-staging-v02.api.letsencrypt.org/directory
-    email: admin@dark-factory.local  # Replace with actual admin email
+    email: mordanov@gmail.com
     privateKeySecretRef:
       name: letsencrypt-staging-key
     solvers:
@@ -26,7 +26,7 @@ metadata:
 spec:
   acme:
     server: https://acme-v02.api.letsencrypt.org/directory
-    email: admin@dark-factory.local  # Replace with actual admin email
+    email: mordanov@gmail.com
     privateKeySecretRef:
       name: letsencrypt-prod-key
     solvers:
