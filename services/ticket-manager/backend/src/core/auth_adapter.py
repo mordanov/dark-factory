@@ -20,6 +20,7 @@ class UserClaims:
     email: str
     preferred_username: str
     roles: list[str] = field(default_factory=list)
+    is_service_account: bool = False
 
     @property
     def is_admin(self) -> bool:
@@ -81,7 +82,13 @@ class KeycloakValidator:
             raise UnauthorizedError("Token missing required claims (sub, email)")
         if not email:
             email = f"{preferred_username}@service.internal"
-        return UserClaims(sub=sub, email=email, preferred_username=preferred_username, roles=roles)
+        return UserClaims(
+            sub=sub,
+            email=email,
+            preferred_username=preferred_username,
+            roles=roles,
+            is_service_account=is_service_account,
+        )
 
 
 async def prefetch_jwks() -> None:

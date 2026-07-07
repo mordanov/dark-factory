@@ -39,7 +39,7 @@ def require_role(role: str) -> Depends:
 
 
 async def _service_account_or_admin(claims: UserClaims = Depends(get_current_user)) -> UserClaims:
-    if not claims.is_admin:
+    if not claims.is_admin and not claims.is_service_account:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient permissions",
