@@ -69,6 +69,13 @@ spec:
     - host: dqaifactory.ru
       http:
         paths:
+          - path: /api/v1
+            pathType: Prefix
+            backend:
+              service:
+                name: user-input-manager
+                port:
+                  number: 8000
           - path: /
             pathType: Prefix
             backend:
@@ -79,6 +86,13 @@ spec:
     - host: studio.dqaifactory.ru
       http:
         paths:
+          - path: /api/v1
+            pathType: Prefix
+            backend:
+              service:
+                name: user-input-manager
+                port:
+                  number: 8000
           - path: /
             pathType: Prefix
             backend:
@@ -89,6 +103,13 @@ spec:
     - host: tickets.dqaifactory.ru
       http:
         paths:
+          - path: /api/v1
+            pathType: Prefix
+            backend:
+              service:
+                name: ticket-manager
+                port:
+                  number: 8000
           - path: /
             pathType: Prefix
             backend:
