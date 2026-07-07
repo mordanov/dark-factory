@@ -3,6 +3,7 @@
 # Usage:
 #   ./infra/scripts/migrate.sh --owner <github-owner>
 #   ./infra/scripts/migrate.sh --owner <github-owner> --service orchestrator
+#   ./infra/scripts/migrate.sh --owner <github-owner> --create-tables context-distiller
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,21 +11,24 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 OWNER=""
 SERVICES=()
+CREATE_TABLES_SERVICES=()
 
 usage() {
-  echo "Usage: $0 --owner <github-owner> [--service <name>]"
+  echo "Usage: $0 --owner <github-owner> [--service <name>] [--create-tables <name>]"
   echo ""
-  echo "  --owner    GitHub owner (e.g. mordanov)"
-  echo "  --service  Migrate only this service (can be repeated). Omit for all."
-  echo "             Valid: user-input-manager ticket-manager orchestrator"
-  echo "                    context-distiller agent-dispatcher"
+  echo "  --owner         GitHub owner (e.g. mordanov)"
+  echo "  --service       Run alembic migrations for this service (can be repeated). Omit for all."
+  echo "                  Valid: user-input-manager ticket-manager orchestrator agent-dispatcher"
+  echo "  --create-tables Run SQLAlchemy create_all for this service (no alembic)."
+  echo "                  Valid: context-distiller"
   exit 1
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --owner)   OWNER="$2"; shift 2 ;;
-    --service) SERVICES+=("$2"); shift 2 ;;
+    --owner)         OWNER="$2"; shift 2 ;;
+    --service)       SERVICES+=("$2"); shift 2 ;;
+    --create-tables) CREATE_TABLES_SERVICES+=("$2"); shift 2 ;;
     *) echo "Unknown flag: $1"; usage ;;
   esac
 done
@@ -63,7 +67,8 @@ declare -A DB_NAME=(
   [agent-dispatcher]=df_dispatcher
 )
 
-ALL_SERVICES=(user-input-manager ticket-manager orchestrator context-distiller agent-dispatcher)
+ALL_SERVICES=(user-input-manager ticket-manager orchestrator agent-dispatcher)
+# context-distiller has no alembic setup — use create-tables-distiller pod instead
 
 if [[ ${#SERVICES[@]} -eq 0 ]]; then
   SERVICES=("${ALL_SERVICES[@]}")
@@ -138,3 +143,78 @@ MANIFEST
 done
 
 log "All migrations complete."
+
+# ---------------------------------------------------------------------------
+# create_all for services without alembic (e.g. context-distiller)
+# ---------------------------------------------------------------------------
+
+for SERVICE in "${CREATE_TABLES_SERVICES[@]:-}"; do
+  [[ -z "$SERVICE" ]] && continue
+
+  POD="create-tables-${SERVICE}"
+  RUNNING_IMG=$(kubectl get deployment/"$SERVICE" -n dark-factory \
+    -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "")
+  if [[ -z "$RUNNING_IMG" ]]; then
+    echo "[migrate] Cannot find running image for $SERVICE"; exit 1
+  fi
+
+  U=$(secret_val "${DB_USER_KEY[$SERVICE]}")
+  P=$(secret_val "${DB_PASS_KEY[$SERVICE]}")
+  DB_URL="postgresql+asyncpg://$U:$P@postgres:5432/${DB_NAME[$SERVICE]}"
+
+  log "Creating tables for $SERVICE (image: $RUNNING_IMG)..."
+  kubectl delete pod "$POD" -n dark-factory --ignore-not-found
+
+  TMPFILE=$(mktemp /tmp/create-tables-XXXXXX.yaml)
+  trap 'rm -f "$TMPFILE"' EXIT
+
+  cat > "$TMPFILE" <<MANIFEST
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${POD}
+  namespace: dark-factory
+spec:
+  restartPolicy: Never
+  imagePullSecrets:
+    - name: ghcr-pull-secret
+  containers:
+    - name: ${POD}
+      image: ${RUNNING_IMG}
+      command:
+        - python
+        - -c
+        - |
+          import asyncio, src.models
+          from src.db.postgres import engine, Base
+          async def main():
+              async with engine.begin() as conn:
+                  await conn.run_sync(Base.metadata.create_all)
+              print("Tables created.")
+          asyncio.run(main())
+      envFrom:
+        - secretRef:
+            name: dark-factory-secrets
+      env:
+        - name: DATABASE_URL
+          value: "${DB_URL}"
+MANIFEST
+
+  kubectl apply -f "$TMPFILE"
+  rm -f "$TMPFILE"
+  trap - EXIT
+
+  kubectl wait pod "$POD" -n dark-factory \
+    --for=jsonpath='{.status.phase}'=Succeeded \
+    --timeout=120s \
+  || {
+    echo "--- create-tables failed for $SERVICE ---"
+    kubectl logs "$POD" -n dark-factory
+    kubectl delete pod "$POD" -n dark-factory --ignore-not-found
+    exit 1
+  }
+
+  kubectl logs "$POD" -n dark-factory
+  kubectl delete pod "$POD" -n dark-factory
+  log "$SERVICE tables created."
+done
