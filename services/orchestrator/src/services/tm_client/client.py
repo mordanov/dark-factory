@@ -53,12 +53,12 @@ class TicketManagerClient:
         params: dict = {"limit": limit}
         if project_id:
             params["project_id"] = project_id
-        data = await self._request("GET", "/api/orchestrator/pending", params=params)
+        data = await self._request("GET", "/api/v1/orchestrator/pending", params=params)
         return data.get("tickets", data if isinstance(data, list) else [])
 
     async def get_ticket_full(self, project_id: str, ticket_id: str) -> dict:
         """GET /api/projects/{project_id}/tickets/{ticket_id}/full"""
-        return await self._request("GET", f"/api/projects/{project_id}/tickets/{ticket_id}/full")
+        return await self._request("GET", f"/api/v1/projects/{project_id}/tickets/{ticket_id}/full")
 
     # ------------------------------------------------------------------
     # FSM state management — extended endpoints
@@ -76,7 +76,7 @@ class TicketManagerClient:
         orchestrator_errors: list[str] | None = None,
         clear_override: bool = False,
     ) -> dict:
-        """PATCH /api/projects/{project_id}/tickets/{ticket_id}/fsm"""
+        """PATCH /api/v1/projects/{project_id}/tickets/{ticket_id}/fsm"""
         body: dict = {}
         if fsm_status is not None:
             body["fsm_status"] = fsm_status
@@ -92,23 +92,23 @@ class TicketManagerClient:
             body["override"] = False
             body["override_reason"] = None
         return await self._request(
-            "PATCH", f"/api/projects/{project_id}/tickets/{ticket_id}/fsm", json=body
+            "PATCH", f"/api/v1/projects/{project_id}/tickets/{ticket_id}/fsm", json=body
         )
 
     async def manage_tags(
         self, project_id: str, ticket_id: str, *, add: list[str] = (), remove: list[str] = ()
     ) -> dict:
-        """POST /api/projects/{project_id}/tickets/{ticket_id}/tags"""
+        """POST /api/v1/projects/{project_id}/tickets/{ticket_id}/tags"""
         return await self._request(
             "POST",
-            f"/api/projects/{project_id}/tickets/{ticket_id}/tags",
+            f"/api/v1/projects/{project_id}/tickets/{ticket_id}/tags",
             json={"add": list(add), "remove": list(remove)},
         )
 
     async def get_fsm_status_batch(self, ticket_ids: list[str]) -> dict[str, dict]:
-        """POST /api/tickets/fsm-status-batch"""
+        """POST /api/v1/tickets/fsm-status-batch"""
         data = await self._request(
-            "POST", "/api/tickets/fsm-status-batch", json={"ticket_ids": ticket_ids}
+            "POST", "/api/v1/tickets/fsm-status-batch", json={"ticket_ids": ticket_ids}
         )
         return data.get("statuses", {})
 
@@ -117,11 +117,11 @@ class TicketManagerClient:
     # ------------------------------------------------------------------
 
     async def list_projects(self) -> list[dict]:
-        data = await self._request("GET", "/api/projects")
+        data = await self._request("GET", "/api/v1/projects")
         return data if isinstance(data, list) else data.get("projects", [])
 
     async def list_tickets(self, project_id: str) -> list[dict]:
-        data = await self._request("GET", f"/api/projects/{project_id}/tickets")
+        data = await self._request("GET", f"/api/v1/projects/{project_id}/tickets")
         return data if isinstance(data, list) else data.get("tickets", [])
 
 
