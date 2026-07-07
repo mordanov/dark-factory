@@ -36,6 +36,13 @@ spec:
                   key: DISTILLER_DB_PASSWORD
             - name: DATABASE_URL
               value: "postgresql+asyncpg://$(_DB_USER):$(_DB_PASSWORD)@postgres:5432/df_distiller"
+            - name: KEYCLOAK_CLIENT_ID
+              value: "context-distiller"
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: dark-factory-secrets
+                  key: KC_DISTILLER_CLIENT_SECRET
           readinessProbe:
             httpGet:
               path: /health

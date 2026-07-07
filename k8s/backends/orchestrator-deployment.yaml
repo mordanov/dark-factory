@@ -38,6 +38,13 @@ spec:
               value: "postgresql+asyncpg://$(_DB_USER):$(_DB_PASSWORD)@postgres:5432/df_orchestrator"
             - name: DATABASE_URL_SYNC
               value: "postgresql://$(_DB_USER):$(_DB_PASSWORD)@postgres:5432/df_orchestrator"
+            - name: KEYCLOAK_CLIENT_ID
+              value: "orchestrator"
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: dark-factory-secrets
+                  key: KC_ORCHESTRATOR_CLIENT_SECRET
           readinessProbe:
             httpGet:
               path: /health

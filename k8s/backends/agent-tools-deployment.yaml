@@ -23,6 +23,14 @@ spec:
           envFrom:
             - secretRef:
                 name: dark-factory-secrets
+          env:
+            - name: KEYCLOAK_CLIENT_ID
+              value: "agent-tools"
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: dark-factory-secrets
+                  key: KC_AGENT_TOOLS_CLIENT_SECRET
           readinessProbe:
             httpGet:
               path: /health

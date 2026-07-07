@@ -38,6 +38,13 @@ spec:
               value: "postgresql+asyncpg://$(_DB_USER):$(_DB_PASSWORD)@postgres:5432/df_dispatcher"
             - name: AGENT_REGISTRY_PATH
               value: /app/development/agents/registry.yaml
+            - name: KEYCLOAK_CLIENT_ID
+              value: "agent-dispatcher"
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: dark-factory-secrets
+                  key: KC_DISPATCHER_CLIENT_SECRET
           volumeMounts:
             - name: agent-registry
               mountPath: /app/development/agents/registry.yaml
